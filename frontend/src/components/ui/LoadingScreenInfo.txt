@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>STICK — Loading</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,700;0,800;1,800&amp;family=Work+Sans:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-tint": "#5f5e5e",
+              "secondary-container": "#e3d2b5",
+              "on-error": "#ffffff",
+              "secondary-fixed": "#d5c5a8",
+              "surface-container-low": "#f7f3ea",
+              "on-tertiary": "#d4e9c3",
+              "surface-container-highest": "#e6e2d9",
+              "primary": "#000000",
+              "on-secondary-container": "#231a08",
+              "inverse-surface": "#31312b",
+              "on-secondary-fixed-variant": "#453a25",
+              "surface-container-lowest": "#ffffff",
+              "surface-dim": "#dddad1",
+              "inverse-on-surface": "#f4f0e7",
+              "on-background": "#1c1c17",
+              "on-surface": "#1c1c17",
+              "tertiary-fixed": "#516446",
+              "surface-container-high": "#ece8df",
+              "inverse-primary": "#c8c6c5",
+              "on-tertiary-fixed-variant": "#d4e9c3",
+              "on-tertiary-container": "#ffffff",
+              "surface-container": "#f1eee5",
+              "error-container": "#ffdad6",
+              "tertiary": "#2f4025",
+              "on-error-container": "#410002",
+              "surface-variant": "#e6e2d9",
+              "on-secondary-fixed": "#231a08",
+              "background": "#fdf9f0",
+              "surface": "#fdf9f0",
+              "secondary-fixed-dim": "#b9a98e",
+              "on-surface-variant": "#474747",
+              "on-primary": "#e5e2e1",
+              "outline-variant": "#c6c6c6",
+              "surface-bright": "#fdf9f0",
+              "on-primary-fixed-variant": "#e5e2e1",
+              "secondary": "#695d46",
+              "error": "#ba1a1a",
+              "primary-fixed": "#5f5e5e",
+              "on-tertiary-fixed": "#ffffff",
+              "primary-fixed-dim": "#474746",
+              "on-secondary": "#ffffff",
+              "tertiary-fixed-dim": "#3a4c30",
+              "tertiary-container": "#677a5b",
+              "on-primary-fixed": "#ffffff",
+              "primary-container": "#3c3b3b",
+              "outline": "#777777",
+              "on-primary-container": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Work Sans"],
+              "label": ["Work Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .sketch-border {
+            border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+        }
+        .wobble-text {
+            transform: rotate(-1.5deg);
+        }
+        .bg-notebook-pattern {
+            background-image: radial-gradient(circle, #c6c6c6 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface overflow-hidden">
+<!-- Loading State Canvas -->
+<main class="relative h-screen w-full flex flex-col items-center justify-center p-8 bg-notebook-pattern">
+<!-- Background Motifs -->
+<div class="absolute top-20 left-20 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-9xl text-primary">edit_note</span>
+</div>
+<div class="absolute bottom-40 right-40 opacity-10 pointer-events-none -rotate-12">
+<span class="material-symbols-outlined text-[12rem] text-primary">chat_bubble_outline</span>
+</div>
+<div class="absolute top-1/4 right-1/4 opacity-10 pointer-events-none rotate-6">
+<span class="material-symbols-outlined text-8xl text-primary">menu_book</span>
+</div>
+<!-- Central Identity Cluster -->
+<div class="flex flex-col items-center gap-12 relative z-10">
+<!-- Branding -->
+<div class="text-center">
+<h1 class="font-headline text-[8rem] font-black tracking-tighter text-primary italic leading-none wobble-text">
+                    STICK
+                </h1>
+<p class="font-headline text-2xl tracking-[0.4em] text-secondary mt-4 font-bold">
+                    ENGLISH HABIT
+                </p>
+</div>
+<!-- Visual Metaphor: Stick Figure holding Pencil -->
+<div class="relative w-64 h-64 flex items-center justify-center">
+<div class="absolute inset-0 border-4 border-primary sketch-border bg-surface-container-lowest opacity-50"></div>
+<!-- Image Representation: Minimalist hand-drawn stick figure illustration -->
+<img alt="Minimalist hand-drawn stick figure" class="w-48 h-48 object-contain" data-alt="A whimsical black ink stick figure illustration holding a large oversized pencil, standing on a cream paper texture background with organic lines." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZEGlIk4xEN4jOOuxdCsdJ0GCxSS6aWy3bAfZlCWdET9hVzgHWTgepujVtka1WJLuQ0BWrlvsX2WTIif-fD92mbiv_Z97lk4RhVsv97LS405-6fVaxnlw-M__VDshJ6ub8igISgQUNsjCbJ44t2qNi9gF-4FhWt16hREoabqALZvJqtKWXOxvJyJzQmnflMXZLUIBzJ2KpxvJ_IHEh68ZlQsrVy0AjsZ6a1vjOHaJvz5zMvc8bsVzLG32drITk08V1oEX2S0O3QmVi"/>
+</div>
+<!-- Loading Indicator -->
+<div class="flex flex-col items-center gap-6 mt-8">
+<!-- Custom Sketch-style Loader -->
+<div class="relative w-64 h-4 border-4 border-primary rounded-full overflow-hidden bg-surface-container">
+<div class="absolute top-0 left-0 h-full w-2/3 bg-secondary-container border-r-4 border-primary"></div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary animate-pulse">draw</span>
+<span class="font-headline text-lg font-bold tracking-wide uppercase">Sharpening pencils...</span>
+</div>
+</div>
+</div>
+<!-- Bottom Footer Accent -->
+<div class="absolute bottom-12 w-full flex justify-center px-12">
+<div class="max-w-md text-center opacity-60">
+<p class="text-secondary font-medium italic">
+                    "The secret of getting ahead is getting started."
+                </p>
+</div>
+</div>
+</main>
+<!-- Decorative Corner Details -->
+<div class="fixed top-0 left-0 w-32 h-32 pointer-events-none">
+<svg height="100%" preserveaspectratio="none" viewbox="0 0 100 100" width="100%">
+<path class="text-surface-container-highest" d="M0 0 L100 0 L0 100 Z" fill="currentColor"></path>
+<path d="M0 0 L90 0 L0 90 Z" fill="none" stroke="black" stroke-dasharray="10 5" stroke-width="2"></path>
+</svg>
+</div>
+<div class="fixed bottom-0 right-0 w-32 h-32 pointer-events-none rotate-180">
+<svg height="100%" preserveaspectratio="none" viewbox="0 0 100 100" width="100%">
+<path class="text-surface-container-highest" d="M0 0 L100 0 L0 100 Z" fill="currentColor"></path>
+<path d="M0 0 L90 0 L0 90 Z" fill="none" stroke="black" stroke-dasharray="10 5" stroke-width="2"></path>
+</svg>
+</div>
+</body></html>

@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: STICK Backend API (Hello World)
+  version: 1.0.0
+  description: |
+    Swagger starter for STICK backend.
+servers:
+  - url: http://localhost:3040
+    description: Local
+  - url: http://160.30.113.26:3040
+    description: VPS direct (without IIS reverse proxy)
+tags:
+  - name: System
+    description: Health and basic endpoints
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: stick-backend
+                  timestamp:
+                    type: string
+                    format: date-time
+  /hello:
+    get:
+      tags: [System]
+      summary: Hello world endpoint
+      responses:
+        '200':
+          description: Hello message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Hello from STICK backend
