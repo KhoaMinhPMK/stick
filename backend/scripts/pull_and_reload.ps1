@@ -17,9 +17,8 @@ git pull origin $Branch
 Set-Location "$RepoPath\backend"
 yarn install --immutable
 
-pm2 restart stick-backend
+pm2 restart stick-api-prod
 pm2 save
 
 Write-Host "Done. Current pm2 status:"
 pm2 status
-

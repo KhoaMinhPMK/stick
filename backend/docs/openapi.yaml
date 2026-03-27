@@ -30,7 +30,7 @@ paths:
                     example: ok
                   service:
                     type: string
-                    example: stick-backend
+                    example: stick-api-prod
                   timestamp:
                     type: string
                     format: date-time

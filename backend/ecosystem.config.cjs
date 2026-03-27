@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'stick-backend',
+      name: 'stick-api-prod',
       script: 'src/server.js',
       cwd: __dirname,
       instances: 1,

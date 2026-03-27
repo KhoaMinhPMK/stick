@@ -92,7 +92,7 @@ copy C:\apps\stick\backend\deploy\iis\web.config C:\inetpub\stick-proxy\web.conf
 
 1. Mo IIS Manager.
 2. `Sites` -> `Add Website`.
-3. Site name: `stick-backend`.
+3. Site name: `stick-api-prod`.
 4. Physical path: `C:\inetpub\stick-proxy`.
 5. Binding:
 - Type: `http`
@@ -131,14 +131,14 @@ Script se tu dong:
 
 1. `git fetch + pull`
 2. `yarn install --immutable`
-3. `pm2 restart stick-backend`
+3. `pm2 restart stick-api-prod`
 4. `pm2 save`
 
 ## 6) Lenh kiem tra nhanh khi co su co
 
 ```powershell
 pm2 status
-pm2 logs stick-backend --lines 100
+pm2 logs stick-api-prod --lines 100
 Invoke-WebRequest http://localhost:3040/health -UseBasicParsing
 ```
 
