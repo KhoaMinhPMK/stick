@@ -152,8 +152,12 @@ export const RegisterPage: React.FC = () => {
               type="submit"
               disabled={isSubmitting}
             >
-              {t('register.create_btn')}
-              <span className="material-symbols-outlined text-xl md:text-2xl group-hover:translate-x-2 transition-transform">arrow_forward</span>
+              {isSubmitting ? t('register.creating', 'Creating...') : t('register.create_btn')}
+              {isSubmitting ? (
+                <span className="material-symbols-outlined text-xl md:text-2xl animate-spin">sync</span>
+              ) : (
+                <span className="material-symbols-outlined text-xl md:text-2xl group-hover:translate-x-2 transition-transform">arrow_forward</span>
+              )}
             </button>
             {error && (
               <p className="text-error text-xs md:text-sm font-bold text-center">{error}</p>
@@ -174,7 +178,11 @@ export const RegisterPage: React.FC = () => {
                 className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95"
                 type="button"
               >
-                <span className="material-symbols-outlined text-primary text-lg md:text-2xl">public</span>
+                {isSubmitting ? (
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl animate-spin">sync</span>
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl">public</span>
+                )}
                 <span className="font-bold text-xs md:text-sm">Google</span>
               </button>
               <button
