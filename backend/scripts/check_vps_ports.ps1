@@ -35,24 +35,11 @@ Write-Host ""
 Write-Host "=== PM2 Apps ==="
 $pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
 if ($pm2Cmd) {
-  $pm2Raw = pm2 jlist 2>$null
-  if ($LASTEXITCODE -eq 0 -and $pm2Raw) {
-    $pm2Apps = $pm2Raw | ConvertFrom-Json
-    if ($pm2Apps.Count -gt 0) {
-      $pm2Apps |
-        Select-Object `
-          @{Name = "name"; Expression = { $_.name }}, `
-          @{Name = "pm_id"; Expression = { $_.pm_id }}, `
-          @{Name = "status"; Expression = { $_.pm2_env.status }}, `
-          @{Name = "pid"; Expression = { $_.pid }}, `
-          @{Name = "port"; Expression = { $_.pm2_env.PORT }}, `
-          @{Name = "cwd"; Expression = { $_.pm2_env.pm_cwd }} |
-        Format-Table -AutoSize
-    } else {
-      Write-Host "PM2 installed but no apps found."
-    }
-  } else {
-    Write-Host "PM2 exists but cannot read jlist output."
+  try {
+    # Avoid JSON parsing because some PM2 env payloads contain duplicated keys (USERNAME/username)
+    pm2 status
+  } catch {
+    Write-Host "PM2 exists but cannot read status output."
   }
 } else {
   Write-Host "PM2 not found on this machine."
@@ -62,7 +49,17 @@ Write-Host ""
 Write-Host "=== IIS Site Bindings ==="
 $appcmd = Join-Path $env:WINDIR "System32\inetsrv\appcmd.exe"
 if (Test-Path $appcmd) {
-  & $appcmd list site /text:name,bindings,state
+  try {
+    & $appcmd list site
+  } catch {
+    Write-Host "appcmd list site failed, trying WebAdministration module..."
+    try {
+      Import-Module WebAdministration -ErrorAction Stop
+      Get-Website | Select-Object Name, State, Bindings | Format-Table -AutoSize
+    } catch {
+      Write-Host "Unable to read IIS bindings with both appcmd and WebAdministration."
+    }
+  }
 } else {
   Write-Host "IIS appcmd not found."
 }
@@ -105,4 +102,3 @@ if ($freePorts.Count -gt 0) {
 
 Write-Host ""
 Write-Host "=== Done ==="
-
