@@ -25,7 +25,7 @@ export const LoginPage: React.FC = () => {
       } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Unable to sign in right now');
+        setError(`Sign-in error: ${(err as Error)?.message || String(err)}`);
       }
     } finally {
       setIsSubmitting(false);
