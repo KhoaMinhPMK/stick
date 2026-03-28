@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../services/api/client';
-import { createGuestSession, loginWithEmail } from '../../services/api/auth';
+import { createGuestSession, loginWithEmail, loginWithGoogle } from '../../services/api/auth';
 
 export const SaveProgressPage: React.FC = () => {
   const { t } = useTranslation();
@@ -9,6 +9,7 @@ export const SaveProgressPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +22,24 @@ export const SaveProgressPage: React.FC = () => {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Unable to sign in right now');
+        setError(`Sign-in error: ${(err as Error)?.message || String(err)}`);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithGoogle();
+      window.location.hash = '#app';
+    } catch (err: unknown) {
+      const msg = (err as { code?: string })?.code || '';
+      if (msg !== 'auth/popup-closed-by-user') {
+        const errorDetails = (err as Error)?.message || String(err);
+        setError(`Google sign-in failed: ${errorDetails}`);
       }
     } finally {
       setIsSubmitting(false);
@@ -46,6 +64,7 @@ export const SaveProgressPage: React.FC = () => {
   };
 
   return (
+    <>
     <div className="bg-surface text-on-surface min-h-[100dvh] w-full overflow-x-hidden flex flex-col relative">
       {/* Decorative Elements — desktop only */}
       <div className="hidden lg:block fixed bottom-12 right-12 w-48 opacity-40 grayscale contrast-150 pointer-events-none z-0">
@@ -120,9 +139,17 @@ export const SaveProgressPage: React.FC = () => {
               type="submit"
               disabled={isSubmitting}
             >
-              {t('save_progress.continue')}
-              <span className="material-symbols-outlined text-xl md:text-2xl group-hover:translate-x-2 transition-transform">arrow_forward</span>
+              {isSubmitting ? 'Signing In...' : t('save_progress.continue')}
+              {isSubmitting ? (
+                <span className="material-symbols-outlined text-xl md:text-2xl animate-spin">sync</span>
+              ) : (
+                <span className="material-symbols-outlined text-xl md:text-2xl group-hover:translate-x-2 transition-transform">arrow_forward</span>
+              )}
             </button>
+
+            {error && (
+              <p className="text-error text-xs md:text-sm font-bold text-center">{error}</p>
+            )}
 
             {/* Divider */}
             <div className="flex items-center gap-3 md:gap-4 py-1 md:py-2">
@@ -134,18 +161,25 @@ export const SaveProgressPage: React.FC = () => {
             {/* Social Options */}
             <div className="grid grid-cols-2 gap-3 md:gap-4">
               <button
+                onClick={handleGoogleSignIn}
+                disabled={isSubmitting}
                 className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95"
                 type="button"
               >
-                <span className="material-symbols-outlined text-primary text-lg md:text-2xl">public</span>
+                {isSubmitting ? (
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl animate-spin">sync</span>
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl">public</span>
+                )}
                 <span className="font-bold text-xs md:text-sm">Google</span>
               </button>
               <button
+                onClick={() => { setShowToast(true); setTimeout(() => setShowToast(false), 2500); }}
                 className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95"
                 type="button"
               >
                 <span className="material-symbols-outlined text-primary text-lg md:text-2xl">smartphone</span>
-                <span className="font-bold text-xs md:text-sm">Apple</span>
+                <span className="font-bold text-xs md:text-sm">Phone</span>
               </button>
             </div>
           </form>
@@ -161,9 +195,6 @@ export const SaveProgressPage: React.FC = () => {
             {t('save_progress.guest')}
             <span className="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">trending_flat</span>
           </button>
-          {error && (
-            <p className="text-error text-xs md:text-sm font-bold">{error}</p>
-          )}
           <p className="mt-4 md:mt-8 text-on-surface-variant text-xs md:text-sm">
             {t('save_progress.new_here')}{' '}
             <button
@@ -175,5 +206,14 @@ export const SaveProgressPage: React.FC = () => {
         </div>
       </main>
     </div>
+
+    {/* Coming Soon Toast */}
+    {showToast && (
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-tertiary-container text-white px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
+        <span className="material-symbols-outlined text-lg">info</span>
+        Coming soon!
+      </div>
+    )}
+    </>
   );
 };
