@@ -1,16 +1,32 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../../services/api/client';
+import { loginWithEmail } from '../../services/api/auth';
 
 export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: actual login logic
-    window.location.hash = '#app';
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithEmail({ email, password });
+      window.location.hash = '#app';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Unable to sign in right now');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOAuth = () => {
@@ -81,10 +97,14 @@ export const LoginPage: React.FC = () => {
             <button
               className="sketch-border bg-surface-container-highest hover:bg-secondary-container py-3 sm:py-4 md:py-5 px-6 md:px-8 font-headline font-extrabold text-lg sm:text-xl md:text-2xl flex items-center justify-center gap-2 md:gap-3 transition-colors group"
               type="submit"
+              disabled={isSubmitting}
             >
               {t('login.sign_in_btn')}
               <span className="material-symbols-outlined text-xl md:text-2xl group-hover:translate-x-2 transition-transform">arrow_forward</span>
             </button>
+            {error && (
+              <p className="text-error text-xs md:text-sm font-bold text-center">{error}</p>
+            )}
 
             {/* Divider */}
             <div className="flex items-center gap-3 md:gap-4 py-1 md:py-2">

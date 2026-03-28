@@ -1,19 +1,48 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../../services/api/client';
+import { createGuestSession, loginWithEmail } from '../../services/api/auth';
 
 export const SaveProgressPage: React.FC = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: actual auth logic
-    window.location.hash = '#app';
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithEmail({ email, password });
+      window.location.hash = '#app';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Unable to sign in right now');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleGuest = () => {
-    window.location.hash = '#app';
+  const handleGuest = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await createGuestSession();
+      window.location.hash = '#app';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Unable to continue as guest right now');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -89,6 +118,7 @@ export const SaveProgressPage: React.FC = () => {
             <button
               className="sketch-border bg-surface-container-highest hover:bg-secondary-container py-3 sm:py-4 md:py-5 px-6 md:px-8 font-headline font-extrabold text-lg sm:text-xl md:text-2xl flex items-center justify-center gap-2 md:gap-3 transition-colors group"
               type="submit"
+              disabled={isSubmitting}
             >
               {t('save_progress.continue')}
               <span className="material-symbols-outlined text-xl md:text-2xl group-hover:translate-x-2 transition-transform">arrow_forward</span>
@@ -126,10 +156,14 @@ export const SaveProgressPage: React.FC = () => {
           <button
             onClick={handleGuest}
             className="text-primary font-bold text-sm md:text-lg hover:underline underline-offset-8 decoration-2 flex items-center gap-2 group"
+            disabled={isSubmitting}
           >
             {t('save_progress.guest')}
             <span className="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">trending_flat</span>
           </button>
+          {error && (
+            <p className="text-error text-xs md:text-sm font-bold">{error}</p>
+          )}
           <p className="mt-4 md:mt-8 text-on-surface-variant text-xs md:text-sm">
             {t('save_progress.new_here')}{' '}
             <button

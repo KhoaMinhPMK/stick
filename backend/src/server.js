@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
+const apiV1Routes = require('./routes/apiV1');
 
 const app = express();
 const port = Number(process.env.PORT || 3040);
@@ -30,6 +31,7 @@ app.get('/docs.json', (_req, res) => {
 });
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument, { explorer: true }));
+app.use('/api/v1', apiV1Routes);
 
 app.use((req, res) => {
   res.status(404).json({

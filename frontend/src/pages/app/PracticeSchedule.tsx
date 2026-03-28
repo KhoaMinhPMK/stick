@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../../services/api/client';
+import { saveOnboardingState } from '../../services/api/onboarding';
 
 interface TimeSlot {
   id: string;
@@ -19,6 +21,8 @@ export const PracticeSchedulePage: React.FC = () => {
   const { t } = useTranslation();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedLength, setSelectedLength] = useState<string>('10min');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const timeSlots: TimeSlot[] = [
     { id: 'morning', icon: 'light_mode', titleKey: 'schedule.times.morning.title', timeKey: 'schedule.times.morning.time' },
@@ -33,8 +37,26 @@ export const PracticeSchedulePage: React.FC = () => {
     { id: 'flexible', labelKey: 'schedule.lengths.flexible.label', tagKey: 'schedule.lengths.flexible.tag' },
   ];
 
-  const handleContinue = () => {
-    window.location.hash = '#goal';
+  const handleContinue = async () => {
+    if (!selectedTime) return;
+
+    setError('');
+    setIsSaving(true);
+    try {
+      await saveOnboardingState({
+        step: 2,
+        schedule: `${selectedTime}:${selectedLength}`,
+      });
+      window.location.hash = '#goal';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Unable to save schedule');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -137,7 +159,7 @@ export const PracticeSchedulePage: React.FC = () => {
         <div className="flex justify-center animate-fade-in-up delay-500">
           <button
             onClick={handleContinue}
-            disabled={!selectedTime}
+            disabled={!selectedTime || isSaving}
             className={`group flex items-center gap-2 md:gap-4 px-8 sm:px-12 md:px-16 py-3 sm:py-4 md:py-6 rounded-full border-[3px] border-black transition-all active:scale-95
               ${selectedTime
                 ? 'bg-surface-container-highest hover:bg-secondary-container hover:translate-x-1 md:hover:translate-x-2 cursor-pointer'
@@ -149,6 +171,9 @@ export const PracticeSchedulePage: React.FC = () => {
             <span className="material-symbols-outlined text-2xl sm:text-3xl md:text-4xl group-hover:translate-x-1 md:group-hover:translate-x-2 transition-transform">arrow_right_alt</span>
           </button>
         </div>
+        {error && (
+          <p className="mt-3 text-error text-xs md:text-sm font-bold text-center">{error}</p>
+        )}
       </main>
     </div>
   );

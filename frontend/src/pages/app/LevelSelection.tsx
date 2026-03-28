@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../../services/api/client';
+import { saveOnboardingState } from '../../services/api/onboarding';
 
 export const LevelSelectionPage: React.FC = () => {
   const { t } = useTranslation();
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const levels = [
     { id: 'beginner', icon: 'child_care', titleKey: 'level_selection.levels.beginner.title', descKey: 'level_selection.levels.beginner.desc' },
@@ -13,9 +17,26 @@ export const LevelSelectionPage: React.FC = () => {
     { id: 'not_sure', icon: 'help_outline', titleKey: 'level_selection.levels.not_sure.title', descKey: 'level_selection.levels.not_sure.desc', isFullWidth: true },
   ];
 
-  const handleContinue = () => {
-    // Proceed to the main app interface
-    window.location.hash = '#schedule';
+  const handleContinue = async () => {
+    if (!selectedLevel) return;
+
+    setError('');
+    setIsSaving(true);
+    try {
+      await saveOnboardingState({
+        step: 1,
+        level: selectedLevel,
+      });
+      window.location.hash = '#schedule';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Unable to save level selection');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -109,7 +130,7 @@ export const LevelSelectionPage: React.FC = () => {
             
             <button 
               onClick={handleContinue}
-              disabled={!selectedLevel}
+              disabled={!selectedLevel || isSaving}
               className={`w-full md:w-auto px-6 md:px-8 py-2 md:py-2.5 rounded-full font-headline font-extrabold text-sm md:text-base flex items-center justify-center gap-2 transition-all 
                 ${selectedLevel 
                   ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(0,0,0,0.3)] hover:scale-[1.02] active:scale-[0.98]' 
@@ -121,9 +142,11 @@ export const LevelSelectionPage: React.FC = () => {
               <span className="material-symbols-outlined text-base md:text-lg" style={{ fontVariationSettings: "'wght' 600" }}>arrow_forward</span>
             </button>
           </div>
+          {error && (
+            <p className="mt-3 text-error text-xs md:text-sm font-bold text-center">{error}</p>
+          )}
         </div>
       </main>
     </div>
   );
 };
-

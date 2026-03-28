@@ -59,4 +59,4 @@ frontend/.vite/
 # Backend
 backend/.pm2/
 backend/.nyc_output/
-
+backend/data/

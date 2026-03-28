@@ -12,6 +12,10 @@ servers:
 tags:
   - name: System
     description: Health and basic endpoints
+  - name: Auth
+    description: Authentication endpoints
+  - name: User
+    description: User and onboarding endpoints
 paths:
   /health:
     get:
@@ -49,3 +53,106 @@ paths:
                   message:
                     type: string
                     example: Hello from STICK backend
+  /api/v1/health:
+    get:
+      tags: [System]
+      summary: API v1 health check
+      responses:
+        '200':
+          description: API v1 is healthy
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Registered and authenticated
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email/password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Authenticated
+  /api/v1/auth/guest:
+    post:
+      tags: [Auth]
+      summary: Create guest session
+      responses:
+        '201':
+          description: Guest session created
+  /api/v1/me:
+    get:
+      tags: [User]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+  /api/v1/onboarding/state:
+    get:
+      tags: [User]
+      summary: Get onboarding state
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Onboarding state
+    put:
+      tags: [User]
+      summary: Update onboarding state
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Updated onboarding state
+  /api/v1/profile:
+    get:
+      tags: [User]
+      summary: Get profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+    put:
+      tags: [User]
+      summary: Update profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Updated profile
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

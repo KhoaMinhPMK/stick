@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../../services/api/client';
+import { saveOnboardingState } from '../../services/api/onboarding';
 
 export const GoalSelectionPage: React.FC = () => {
   const { t } = useTranslation();
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const goals = [
     { id: 'habit', icon: 'calendar_today', titleKey: 'goal_selection.goals.habit.title', descKey: 'goal_selection.goals.habit.desc' },
@@ -20,9 +24,25 @@ export const GoalSelectionPage: React.FC = () => {
     );
   };
 
-  const handleContinue = () => {
-    if (selectedGoals.length > 0) {
+  const handleContinue = async () => {
+    if (selectedGoals.length === 0) return;
+
+    setError('');
+    setIsSaving(true);
+    try {
+      await saveOnboardingState({
+        step: 3,
+        goal: selectedGoals,
+      });
       window.location.hash = '#save-progress';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Unable to save goals');
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -78,7 +98,7 @@ export const GoalSelectionPage: React.FC = () => {
         <div className="flex justify-center w-full max-w-[280px] sm:max-w-none mb-12">
           <button 
             onClick={handleContinue}
-            disabled={selectedGoals.length === 0}
+            disabled={selectedGoals.length === 0 || isSaving}
             className={`w-full sm:w-auto py-4 px-12 rounded-full font-headline font-bold text-lg md:text-xl transition-all sketch-border flex items-center justify-center gap-3 ${
               selectedGoals.length > 0 
                 ? 'bg-primary text-white hover:-translate-y-1 hover:shadow-[4px_4px_0px_#000]' 
@@ -91,6 +111,9 @@ export const GoalSelectionPage: React.FC = () => {
             </span>
           </button>
         </div>
+        {error && (
+          <p className="mb-8 text-error text-xs md:text-sm font-bold text-center">{error}</p>
+        )}
       </main>
 
       {/* Decorative Stick Figures */}
