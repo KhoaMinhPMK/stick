@@ -21,7 +21,8 @@ export const RegisterPage: React.FC = () => {
     } catch (err: unknown) {
       const msg = (err as { code?: string })?.code || '';
       if (msg !== 'auth/popup-closed-by-user') {
-        setError('Google sign-in failed');
+        const errorDetails = (err as Error)?.message || String(err);
+        setError(`Google sign-in failed: ${errorDetails}`);
       }
     } finally {
       setIsSubmitting(false);

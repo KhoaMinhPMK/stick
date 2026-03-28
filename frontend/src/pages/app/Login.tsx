@@ -40,10 +40,12 @@ export const LoginPage: React.FC = () => {
       window.location.hash = '#app';
     } catch (err: unknown) {
       const msg = (err as { code?: string })?.code || '';
+      const errorDetails = (err as Error)?.message || String(err);
+      console.error("Popup Error Debug: ", err);
       if (msg === 'auth/popup-closed-by-user') {
-        // User closed the popup, do nothing
+        alert("Browser blocked the popup or you closed it too fast! Please check your popup blocker settings.");
       } else {
-        setError('Google sign-in failed');
+        setError(`Google sign-in failed: ${errorDetails}`);
       }
     } finally {
       setIsSubmitting(false);
