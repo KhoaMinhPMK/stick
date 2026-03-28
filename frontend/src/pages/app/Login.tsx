@@ -33,6 +33,7 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleGoogleSignIn = async () => {
+    alert('DEBUG: Google button clicked! Handler is running.');
     setError('');
     setIsSubmitting(true);
     try {
