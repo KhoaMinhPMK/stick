@@ -5,10 +5,12 @@ info:
   description: |
     Swagger starter for STICK backend.
 servers:
+  - url: /
+    description: Same origin (works for both IIS domain and direct backend host)
   - url: http://localhost:3040
-    description: Local
+    description: Local direct
   - url: http://160.30.113.26:3040
-    description: VPS direct (without IIS reverse proxy)
+    description: VPS direct (port 3040)
 tags:
   - name: System
     description: Health and basic endpoints
