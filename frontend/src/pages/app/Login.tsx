@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../services/api/client';
-import { loginWithEmail } from '../../services/api/auth';
+import { loginWithEmail, loginWithGoogle } from '../../services/api/auth';
 
 export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
@@ -18,8 +18,11 @@ export const LoginPage: React.FC = () => {
     try {
       await loginWithEmail({ email, password });
       window.location.hash = '#app';
-    } catch (err) {
-      if (err instanceof ApiError) {
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || '';
+      if (msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password') || msg.includes('auth/user-not-found')) {
+        setError('Invalid email or password');
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Unable to sign in right now');
@@ -29,7 +32,25 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleOAuth = () => {
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithGoogle();
+      window.location.hash = '#app';
+    } catch (err: unknown) {
+      const msg = (err as { code?: string })?.code || '';
+      if (msg === 'auth/popup-closed-by-user') {
+        // User closed the popup, do nothing
+      } else {
+        setError('Google sign-in failed');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePhoneSignIn = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
   };
@@ -115,13 +136,13 @@ export const LoginPage: React.FC = () => {
 
             {/* Social */}
             <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <button onClick={handleOAuth} className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
+              <button onClick={handleGoogleSignIn} disabled={isSubmitting} className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
                 <span className="material-symbols-outlined text-primary text-lg md:text-2xl">public</span>
                 <span className="font-bold text-xs md:text-sm">Google</span>
               </button>
-              <button onClick={handleOAuth} className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
+              <button onClick={handlePhoneSignIn} disabled={isSubmitting} className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
                 <span className="material-symbols-outlined text-primary text-lg md:text-2xl">smartphone</span>
-                <span className="font-bold text-xs md:text-sm">Apple</span>
+                <span className="font-bold text-xs md:text-sm">Phone</span>
               </button>
             </div>
           </form>

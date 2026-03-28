@@ -1,4 +1,6 @@
+require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
@@ -8,9 +10,15 @@ const app = express();
 const port = Number(process.env.PORT || 3040);
 
 const openApiPath = path.join(__dirname, '..', 'docs', 'openapi.yaml');
-const openApiDocument = YAML.load(openApiPath);
+let openApiDocument;
+try {
+  openApiDocument = YAML.load(openApiPath);
+} catch {
+  openApiDocument = { info: { title: 'STICK API', version: '1.0.0' }, paths: {} };
+}
 
-app.use(express.json());
+app.use(cors());
+app.use(express.json({ limit: '5mb' }));
 
 app.get('/health', (_req, res) => {
   res.status(200).json({
@@ -37,6 +45,15 @@ app.use((req, res) => {
   res.status(404).json({
     code: 'NOT_FOUND',
     message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global error handler
+app.use((err, req, res, _next) => {
+  console.error('Unhandled Error:', err);
+  res.status(500).json({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'An unexpected error occurred',
   });
 });
 

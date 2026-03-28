@@ -5,6 +5,15 @@
 !.yarn/sdks
 !.yarn/versions
 
+# Environment and Data
+node_modules/
+.env
+.env.*
+*.db
+*.db-journal
+serviceAccountKey.json
+data/*.json
+
 # Swap the comments on the following lines if you don't wish to use zero-installs
 # Documentation here: https://yarnpkg.com/features/zero-installs
 !.yarn/cache

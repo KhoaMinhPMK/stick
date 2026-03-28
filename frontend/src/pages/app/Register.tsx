@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../services/api/client';
-import { registerWithEmail } from '../../services/api/auth';
+import { registerWithEmail, loginWithGoogle } from '../../services/api/auth';
 
 export const RegisterPage: React.FC = () => {
   const { t } = useTranslation();
@@ -12,7 +12,23 @@ export const RegisterPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleOAuth = () => {
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithGoogle();
+      window.location.hash = '#app';
+    } catch (err: unknown) {
+      const msg = (err as { code?: string })?.code || '';
+      if (msg !== 'auth/popup-closed-by-user') {
+        setError('Google sign-in failed');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePhoneSignIn = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
   };
@@ -24,8 +40,13 @@ export const RegisterPage: React.FC = () => {
     try {
       await registerWithEmail({ name, email, password });
       window.location.hash = '#app';
-    } catch (err) {
-      if (err instanceof ApiError) {
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || '';
+      if (msg.includes('auth/email-already-in-use')) {
+        setError('This email is already registered');
+      } else if (msg.includes('auth/weak-password')) {
+        setError('Password should be at least 6 characters');
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Unable to register right now');
@@ -148,7 +169,8 @@ export const RegisterPage: React.FC = () => {
             {/* Social Options */}
             <div className="grid grid-cols-2 gap-3 md:gap-4">
               <button
-                onClick={handleOAuth}
+                onClick={handleGoogleSignIn}
+                disabled={isSubmitting}
                 className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95"
                 type="button"
               >
@@ -156,12 +178,13 @@ export const RegisterPage: React.FC = () => {
                 <span className="font-bold text-xs md:text-sm">Google</span>
               </button>
               <button
-                onClick={handleOAuth}
+                onClick={handlePhoneSignIn}
+                disabled={isSubmitting}
                 className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95"
                 type="button"
               >
                 <span className="material-symbols-outlined text-primary text-lg md:text-2xl">smartphone</span>
-                <span className="font-bold text-xs md:text-sm">Apple</span>
+                <span className="font-bold text-xs md:text-sm">Phone</span>
               </button>
             </div>
           </form>

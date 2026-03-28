@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { loadDb, saveDb } = require('./dataStore');
+const { prisma } = require('./db');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
@@ -9,18 +9,14 @@ function generateId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
-function createSession(userId) {
-  const db = loadDb();
+async function createSession(userId) {
   const accessToken = crypto.randomBytes(24).toString('hex');
-
-  db.sessions.push({
-    id: generateId('sess'),
-    userId,
-    accessToken,
-    createdAt: new Date().toISOString(),
+  await prisma.session.create({
+    data: {
+      userId,
+      token: accessToken,
+    },
   });
-
-  saveDb(db);
   return accessToken;
 }
 
@@ -36,7 +32,7 @@ function sanitizeUser(user) {
   };
 }
 
-function getUserFromBearer(authHeader) {
+async function getUserFromBearer(authHeader) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
@@ -46,33 +42,36 @@ function getUserFromBearer(authHeader) {
     return null;
   }
 
-  const db = loadDb();
-  const session = db.sessions.find((s) => s.accessToken === token);
-  if (!session) {
+  const session = await prisma.session.findUnique({
+    where: { token },
+    include: { user: true },
+  });
+
+  if (!session || !session.user) {
     return null;
   }
 
-  const user = db.users.find((u) => u.id === session.userId);
-  if (!user) {
-    return null;
-  }
-
-  return { user, token };
+  return { user: session.user, token };
 }
 
-function requireAuth(req, res, next) {
-  const result = getUserFromBearer(req.headers.authorization);
-  if (!result) {
-    res.status(401).json({
-      code: 'UNAUTHORIZED',
-      message: 'Missing or invalid access token',
-    });
-    return;
-  }
+async function requireAuth(req, res, next) {
+  try {
+    const result = await getUserFromBearer(req.headers.authorization);
+    if (!result) {
+      res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: 'Missing or invalid access token',
+      });
+      return;
+    }
 
-  req.authUser = result.user;
-  req.accessToken = result.token;
-  next();
+    req.authUser = result.user;
+    req.accessToken = result.token;
+    next();
+  } catch (err) {
+    console.error('requireAuth Error:', err);
+    res.status(500).json({ code: 'INTERNAL_ERROR', message: 'Auth service failed' });
+  }
 }
 
 module.exports = {
@@ -82,4 +81,3 @@ module.exports = {
   sanitizeUser,
   requireAuth,
 };
-
