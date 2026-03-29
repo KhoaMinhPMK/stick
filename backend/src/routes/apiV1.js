@@ -342,7 +342,15 @@ router.delete('/journals/:id', requireAuth, asyncHandler(async (req, res) => {
 
 // ─── AI Feedback ─────────────────────────────────────
 router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
-  const { journalId, content, language } = req.body || {};
+  let { journalId, content, language } = req.body || {};
+
+  if (!content && journalId) {
+    const journal = await prisma.journal.findUnique({ where: { id: journalId } });
+    if (journal) {
+      content = journal.content;
+      language = journal.language;
+    }
+  }
 
   if (!content) {
     return res.status(400).json({
@@ -363,13 +371,14 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
     level,
   });
 
-  // If journalId is provided, update the journal score
+  // If journalId is provided, update the journal score and feedback
   if (journalId) {
     try {
       await prisma.journal.update({
         where: { id: journalId },
         data: {
           score: feedback.overallScore || null,
+          feedback: JSON.stringify(feedback),
           status: 'submitted',
         },
       });

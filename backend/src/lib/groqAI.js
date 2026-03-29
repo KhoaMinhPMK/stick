@@ -16,26 +16,27 @@ The student's proficiency level is: ${level}.
 Analyze the following journal entry and return a JSON object with this exact structure:
 {
   "overallScore": <number 0-100>,
-  "summary": "<1-2 sentence overall assessment>",
-  "grammar": {
-    "score": <number 0-100>,
-    "errors": [
-      {
-        "original": "<the incorrect text>",
-        "corrected": "<the corrected text>",
-        "explanation": "<brief explanation>"
-      }
-    ]
-  },
-  "vocabulary": {
-    "score": <number 0-100>,
-    "level": "<CEFR level estimate A1-C2>",
-    "suggestions": ["<word or phrase suggestion>"]
-  },
-  "fluency": {
-    "score": <number 0-100>,
-    "comments": "<assessment of natural flow and coherence>"
-  },
+  "enhancedText": "<a natural, polished version of the original text>",
+  "corrections": [
+    {
+      "original": "<the incorrect text>",
+      "corrected": "<the corrected text>",
+      "explanation": "<brief explanation of the grammatical or stylistic fix>"
+    }
+  ],
+  "vocabularyBoosters": [
+    {
+      "word": "<a native-like word or idiom to replace a basic one used>",
+      "meaning": "<short definition>",
+      "level": "<CEFR level estimate A1-C2>"
+    }
+  ],
+  "sentencePatterns": [
+    {
+      "pattern": "<a useful sentence structure extracted or recommended>",
+      "example": "<an example sentence using this pattern>"
+    }
+  ],
   "encouragement": "<a warm, motivating message to keep the student going>"
 }
 
@@ -97,25 +98,15 @@ function generateFallbackFeedback(content) {
 
   return {
     overallScore,
-    summary: `Your entry has ${wordCount} words across ${sentenceCount} sentence(s). Keep writing to improve!`,
-    grammar: {
-      score: errors.length === 0 ? 80 : 60,
-      errors,
-    },
-    vocabulary: {
-      score: Math.min(80, wordCount),
-      level: wordCount > 50 ? 'B1' : 'A2',
-      suggestions: ['Try using more descriptive adjectives', 'Use linking words like "however", "moreover"'],
-    },
-    fluency: {
-      score: fluencyScore,
-      comments: avgWordsPerSentence >= 8
-        ? 'Good sentence length and flow.'
-        : 'Try writing longer, more detailed sentences.',
-    },
+    enhancedText: content,
+    vocabularyBoosters: [],
+    corrections: errors,
+    sentencePatterns: [],
     encouragement: 'Great job writing today! Every journal entry helps you improve. Keep it up! 🌟',
-    _fallback: true,
+    _fallback: true
   };
 }
 
-module.exports = { groq, generateJournalFeedback };
+module.exports = {
+  generateJournalFeedback,
+};

@@ -71,6 +71,7 @@ model Journal {
   content   String    @db.Text
   status    String    @default("draft")
   score     Int?
+  feedback  String?   @db.Text
   language  String    @default("en")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
