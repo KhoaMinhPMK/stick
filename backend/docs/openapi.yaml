@@ -1,12 +1,13 @@
 openapi: 3.0.3
 info:
-  title: STICK Backend API (Hello World)
-  version: 1.0.0
+  title: STICK Backend API
+  version: 2.0.0
   description: |
-    Swagger starter for STICK backend.
+    Full API documentation for STICK — AI-powered English learning platform.
+    Phase 2: MySQL database, 38 endpoints.
 servers:
   - url: /
-    description: Same origin (works for both IIS domain and direct backend host)
+    description: Same origin (IIS reverse proxy)
   - url: http://localhost:3040
     description: Local direct
   - url: http://160.30.113.26:3040
@@ -17,8 +18,30 @@ tags:
   - name: Auth
     description: Authentication endpoints
   - name: User
-    description: User and onboarding endpoints
+    description: User profile and onboarding
+  - name: Journals
+    description: Writing journal CRUD
+  - name: AI
+    description: AI feedback endpoints
+  - name: Settings
+    description: User settings and reminders
+  - name: Notifications
+    description: Notification management
+  - name: Achievements
+    description: Achievement definitions and progress
+  - name: Phrases
+    description: Saved phrases collection
+  - name: Vocab
+    description: Vocabulary notebook
+  - name: History
+    description: Learning session history
+  - name: Progress
+    description: User progress and statistics
+  - name: Library
+    description: Lesson catalog
+
 paths:
+  # ──── System ────
   /health:
     get:
       tags: [System]
@@ -31,30 +54,9 @@ paths:
               schema:
                 type: object
                 properties:
-                  status:
-                    type: string
-                    example: ok
-                  service:
-                    type: string
-                    example: stick-api-prod
-                  timestamp:
-                    type: string
-                    format: date-time
-  /hello:
-    get:
-      tags: [System]
-      summary: Hello world endpoint
-      responses:
-        '200':
-          description: Hello message
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Hello from STICK backend
+                  status: { type: string, example: ok }
+                  service: { type: string, example: stick-api-prod }
+                  timestamp: { type: string, format: date-time }
   /api/v1/health:
     get:
       tags: [System]
@@ -62,6 +64,8 @@ paths:
       responses:
         '200':
           description: API v1 is healthy
+
+  # ──── Auth ────
   /api/v1/auth/register:
     post:
       tags: [Auth]
@@ -74,34 +78,28 @@ paths:
               type: object
               required: [name, email, password]
               properties:
-                name:
-                  type: string
-                email:
-                  type: string
-                password:
-                  type: string
+                name: { type: string, example: John Doe }
+                email: { type: string, example: john@example.com }
+                password: { type: string, example: myPassword123 }
       responses:
         '201':
           description: Registered and authenticated
-  /api/v1/auth/login:
+  /api/v1/auth/firebase/login:
     post:
       tags: [Auth]
-      summary: Login with email/password
+      summary: Login with Firebase token (Google/Email)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [email, password]
+              required: [idToken]
               properties:
-                email:
-                  type: string
-                password:
-                  type: string
+                idToken: { type: string, description: Firebase ID token }
       responses:
         '200':
-          description: Authenticated
+          description: Authenticated with session token
   /api/v1/auth/guest:
     post:
       tags: [Auth]
@@ -109,6 +107,17 @@ paths:
       responses:
         '201':
           description: Guest session created
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current session
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+
+  # ──── User ────
   /api/v1/me:
     get:
       tags: [User]
@@ -132,9 +141,23 @@ paths:
       summary: Update onboarding state
       security:
         - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         '200':
           description: Updated onboarding state
+  /api/v1/onboarding/complete:
+    post:
+      tags: [User]
+      summary: Mark onboarding as complete
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Onboarding completed
   /api/v1/profile:
     get:
       tags: [User]
@@ -149,12 +172,565 @@ paths:
       summary: Update profile
       security:
         - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatarUrl: { type: string }
+                level: { type: string }
       responses:
         '200':
           description: Updated profile
+
+  # ──── Journals ────
+  /api/v1/journals:
+    get:
+      tags: [Journals]
+      summary: List user journals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated journal list
+    post:
+      tags: [Journals]
+      summary: Create a journal entry
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+                mood: { type: string }
+                tags: { type: string }
+      responses:
+        '201':
+          description: Journal created
+  /api/v1/journals/{id}:
+    get:
+      tags: [Journals]
+      summary: Get journal by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Journal detail
+    patch:
+      tags: [Journals]
+      summary: Update journal
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: string }
+                mood: { type: string }
+      responses:
+        '200':
+          description: Updated journal
+    delete:
+      tags: [Journals]
+      summary: Delete journal
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Journal deleted
+
+  # ──── AI ────
+  /api/v1/ai/feedback/text:
+    post:
+      tags: [AI]
+      summary: Get AI text feedback for journal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+      responses:
+        '200':
+          description: AI feedback result
+
+  # ──── Settings ────
+  /api/v1/settings:
+    get:
+      tags: [Settings]
+      summary: Get user settings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User settings object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      theme: { type: string, example: light }
+                      language: { type: string, example: en-GB }
+                      notificationsOn: { type: boolean }
+                      soundOn: { type: boolean }
+                      dailyGoalMinutes: { type: integer, example: 15 }
+    put:
+      tags: [Settings]
+      summary: Update user settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                theme: { type: string }
+                language: { type: string }
+                notificationsOn: { type: boolean }
+                soundOn: { type: boolean }
+                dailyGoalMinutes: { type: integer }
+      responses:
+        '200':
+          description: Updated settings
+
+  # ──── Reminders ────
+  /api/v1/reminders:
+    get:
+      tags: [Settings]
+      summary: Get user reminders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of reminders
+    put:
+      tags: [Settings]
+      summary: Update reminders
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reminders:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      time: { type: string, example: "08:00" }
+                      days: { type: string, example: "mon,tue,wed,thu,fri" }
+                      enabled: { type: boolean }
+                      label: { type: string }
+      responses:
+        '200':
+          description: Updated reminders
+
+  # ──── Notifications ────
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: Get notifications (paginated)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Notification list with unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+                  total: { type: integer }
+                  unreadCount: { type: integer }
+                  nextCursor: { type: string, nullable: true }
+  /api/v1/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Notification marked as read
+  /api/v1/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
+
+  # ──── Achievements ────
+  /api/v1/achievements:
+    get:
+      tags: [Achievements]
+      summary: List all achievements with unlock status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Achievement list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Achievement' }
+                  total: { type: integer }
+  /api/v1/achievements/summary:
+    get:
+      tags: [Achievements]
+      summary: Get achievement summary stats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Achievement summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalAchievements: { type: integer }
+                  unlocked: { type: integer }
+                  locked: { type: integer }
+                  xpEarned: { type: integer }
+                  completionPercent: { type: number }
+
+  # ──── Saved Phrases ────
+  /api/v1/phrases:
+    get:
+      tags: [Phrases]
+      summary: List saved phrases
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Phrase list
+    post:
+      tags: [Phrases]
+      summary: Save a new phrase
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phrase]
+              properties:
+                phrase: { type: string, example: "Break the ice" }
+                meaning: { type: string, example: "To initiate conversation" }
+                example: { type: string }
+                category: { type: string, example: "idiom" }
+      responses:
+        '201':
+          description: Phrase saved
+  /api/v1/phrases/{id}:
+    delete:
+      tags: [Phrases]
+      summary: Delete a saved phrase
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Phrase deleted
+
+  # ──── Vocab Notebook ────
+  /api/v1/vocab/notebook:
+    get:
+      tags: [Vocab]
+      summary: List vocabulary items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mastery
+          in: query
+          schema: { type: string, enum: [new, learning, mastered] }
+      responses:
+        '200':
+          description: Vocab list
+    post:
+      tags: [Vocab]
+      summary: Add a word to notebook
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [word]
+              properties:
+                word: { type: string, example: "Eloquent" }
+                meaning: { type: string }
+                example: { type: string }
+                tags: { type: string }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Word added
+  /api/v1/vocab/notebook/{id}:
+    patch:
+      tags: [Vocab]
+      summary: Update vocab item (mastery, notes, etc.)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mastery: { type: string, enum: [new, learning, mastered] }
+                meaning: { type: string }
+                example: { type: string }
+                notes: { type: string }
+      responses:
+        '200':
+          description: Vocab updated
+    delete:
+      tags: [Vocab]
+      summary: Delete vocab item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Vocab deleted
+
+  # ──── History ────
+  /api/v1/history:
+    get:
+      tags: [History]
+      summary: List learning sessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema: { type: string, enum: [journal, lesson, speaking, grammar, listening] }
+      responses:
+        '200':
+          description: Session list
+  /api/v1/history/{id}:
+    get:
+      tags: [History]
+      summary: Get session detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Session detail
+
+  # ──── Progress ────
+  /api/v1/progress/summary:
+    get:
+      tags: [Progress]
+      summary: Get progress summary (streak, XP, stats)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Progress summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalJournals: { type: integer }
+                  totalWords: { type: integer }
+                  totalPhrases: { type: integer }
+                  totalSessions: { type: integer }
+                  currentStreak: { type: integer }
+                  avgScore: { type: number }
+                  totalXp: { type: integer }
+                  level: { type: string }
+  /api/v1/progress/daily:
+    get:
+      tags: [Progress]
+      summary: Get daily progress data
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30 }
+      responses:
+        '200':
+          description: Daily progress items
+
+  # ──── Library ────
+  /api/v1/library/lessons:
+    get:
+      tags: [Library]
+      summary: List all lessons
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: level
+          in: query
+          schema: { type: string, enum: [beginner, intermediate, advanced] }
+      responses:
+        '200':
+          description: Lesson list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Lesson' }
+                  total: { type: integer }
+  /api/v1/library/lessons/{id}:
+    get:
+      tags: [Library]
+      summary: Get lesson detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lesson detail with full content
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: Token
+
+  schemas:
+    Notification:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        title: { type: string }
+        body: { type: string }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    Achievement:
+      type: object
+      properties:
+        id: { type: string }
+        key: { type: string }
+        title: { type: string }
+        description: { type: string }
+        icon: { type: string }
+        category: { type: string }
+        threshold: { type: integer }
+        xpReward: { type: integer }
+        unlocked: { type: boolean }
+        unlockedAt: { type: string, format: date-time, nullable: true }
+        progress: { type: integer }
+
+    Lesson:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        category: { type: string }
+        level: { type: string }
+        duration: { type: integer }
+        orderIndex: { type: integer }
