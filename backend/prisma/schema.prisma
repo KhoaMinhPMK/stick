@@ -1,22 +1,22 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// STICK Backend — Prisma Schema (MySQL)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
+// ─── Core User ───────────────────────────────────────
 model User {
   id               String    @id @default(uuid())
   email            String?   @unique
   passwordHash     String?
   name             String
   isGuest          Boolean   @default(false)
-  bio              String?
+  bio              String?   @db.Text
   nativeLanguage   String?
   firebaseUid      String?   @unique
   firebaseProvider String?
@@ -26,18 +26,30 @@ model User {
   sessions         Session[]
   onboarding       OnboardingState?
   journals         Journal[]
+  settings         UserSettings?
+  reminders        Reminder[]
+  notifications    Notification[]
+  userAchievements UserAchievement[]
+  savedPhrases     SavedPhrase[]
+  vocabItems       VocabNotebookItem[]
+  learningSessions LearningSession[]
+  progressDaily    ProgressDaily[]
 }
 
+// ─── Auth ────────────────────────────────────────────
 model Session {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  token     String   @unique
-  createdAt DateTime @default(now())
+  token     String    @unique
+  createdAt DateTime  @default(now())
   expiresAt DateTime?
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
+// ─── Onboarding ──────────────────────────────────────
 model OnboardingState {
   id        String   @id @default(uuid())
   userId    String   @unique
@@ -51,11 +63,12 @@ model OnboardingState {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// ─── Journals ────────────────────────────────────────
 model Journal {
   id        String    @id @default(uuid())
   userId    String
   title     String
-  content   String
+  content   String    @db.Text
   status    String    @default("draft")
   score     Int?
   language  String    @default("en")
@@ -64,4 +77,163 @@ model Journal {
   deletedAt DateTime?
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─── User Settings ───────────────────────────────────
+model UserSettings {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  theme            String   @default("system") // "light", "dark", "system"
+  language         String   @default("en")
+  notificationsOn  Boolean  @default(true)
+  soundOn          Boolean  @default(true)
+  dailyGoalMinutes Int      @default(15)
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Reminders ───────────────────────────────────────
+model Reminder {
+  id        String   @id @default(uuid())
+  userId    String
+  time      String   // "08:00", "20:30"
+  days      String   // "mon,tue,wed,thu,fri"
+  enabled   Boolean  @default(true)
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Notifications ───────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // "achievement", "streak", "feedback", "system"
+  title     String
+  body      String   @db.Text
+  read      Boolean  @default(false)
+  data      String?  @db.Text // JSON metadata
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt(sort: Desc)])
+}
+
+// ─── Achievements ────────────────────────────────────
+model AchievementDefinition {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  title       String
+  description String   @db.Text
+  icon        String
+  category    String   // "journal", "streak", "vocabulary", "speaking"
+  threshold   Int      @default(1)
+  xpReward    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+  progress      Int      @default(0)
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   AchievementDefinition @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+// ─── Saved Phrases ───────────────────────────────────
+model SavedPhrase {
+  id        String   @id @default(uuid())
+  userId    String
+  phrase    String
+  meaning   String?  @db.Text
+  example   String?  @db.Text
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─── Vocab Notebook ──────────────────────────────────
+model VocabNotebookItem {
+  id        String   @id @default(uuid())
+  userId    String
+  word      String
+  meaning   String?  @db.Text
+  example   String?  @db.Text
+  mastery   String   @default("new") // "new", "learning", "mastered"
+  tags      String?  // comma-separated
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, mastery, updatedAt(sort: Desc)])
+}
+
+// ─── Learning Sessions (History) ─────────────────────
+model LearningSession {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // "journal", "speaking", "grammar", "listening", "reading"
+  title       String
+  summary     String?  @db.Text
+  score       Int?
+  duration    Int?     // in seconds
+  metadata    String?  @db.Text // JSON extra data
+  completedAt DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt(sort: Desc)])
+}
+
+// ─── Progress Daily ──────────────────────────────────
+model ProgressDaily {
+  id            String   @id @default(uuid())
+  userId        String
+  day           DateTime @db.Date
+  journalsCount Int      @default(0)
+  wordsLearned  Int      @default(0)
+  minutesSpent  Int      @default(0)
+  xpEarned      Int      @default(0)
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([userId, day(sort: Desc)])
+}
+
+// ─── Lessons (Library content) ───────────────────────
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  category    String   // "grammar", "vocabulary", "reading", "listening", "speaking"
+  level       String   // "beginner", "intermediate", "advanced"
+  content     String   @db.LongText
+  duration    Int      @default(10) // in minutes
+  orderIndex  Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category, level])
 }

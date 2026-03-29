@@ -379,17 +379,444 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
   res.status(200).json({ feedback });
 }));
 
-// ─── Progress ────────────────────────────────────────
+// ─── Settings ────────────────────────────────────────
+router.get('/settings', requireAuth, asyncHandler(async (req, res) => {
+  let settings = await prisma.userSettings.findUnique({
+    where: { userId: req.authUser.id },
+  });
+  if (!settings) {
+    settings = await prisma.userSettings.create({
+      data: { userId: req.authUser.id },
+    });
+  }
+  res.status(200).json({ settings });
+}));
+
+router.put('/settings', requireAuth, asyncHandler(async (req, res) => {
+  const { theme, language, notificationsOn, soundOn, dailyGoalMinutes } = req.body || {};
+  const data = {};
+  if (typeof theme === 'string') data.theme = theme;
+  if (typeof language === 'string') data.language = language;
+  if (typeof notificationsOn === 'boolean') data.notificationsOn = notificationsOn;
+  if (typeof soundOn === 'boolean') data.soundOn = soundOn;
+  if (typeof dailyGoalMinutes === 'number') data.dailyGoalMinutes = dailyGoalMinutes;
+
+  const settings = await prisma.userSettings.upsert({
+    where: { userId: req.authUser.id },
+    create: { userId: req.authUser.id, ...data },
+    update: data,
+  });
+  res.status(200).json({ settings });
+}));
+
+// ─── Reminders ───────────────────────────────────────
+router.get('/reminders', requireAuth, asyncHandler(async (req, res) => {
+  const reminders = await prisma.reminder.findMany({
+    where: { userId: req.authUser.id },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.status(200).json({ items: reminders, total: reminders.length });
+}));
+
+router.put('/reminders', requireAuth, asyncHandler(async (req, res) => {
+  const { reminders } = req.body || {};
+  if (!Array.isArray(reminders)) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'reminders array is required' });
+  }
+
+  // Delete existing and recreate (simple upsert strategy)
+  await prisma.reminder.deleteMany({ where: { userId: req.authUser.id } });
+
+  const created = [];
+  for (const r of reminders) {
+    const reminder = await prisma.reminder.create({
+      data: {
+        userId: req.authUser.id,
+        time: r.time || '08:00',
+        days: r.days || 'mon,tue,wed,thu,fri',
+        enabled: r.enabled !== false,
+        label: r.label || null,
+      },
+    });
+    created.push(reminder);
+  }
+  res.status(200).json({ items: created, total: created.length });
+}));
+
+// ─── Notifications ───────────────────────────────────
+router.get('/notifications', requireAuth, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const cursor = req.query.cursor || null;
+
+  const where = { userId: req.authUser.id };
+  const findOptions = {
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+  };
+  if (cursor) {
+    findOptions.cursor = { id: cursor };
+    findOptions.skip = 1;
+  }
+
+  const notifications = await prisma.notification.findMany(findOptions);
+  const hasMore = notifications.length > limit;
+  if (hasMore) notifications.pop();
+
+  const unreadCount = await prisma.notification.count({
+    where: { userId: req.authUser.id, read: false },
+  });
+
+  res.status(200).json({
+    items: notifications,
+    total: notifications.length,
+    unreadCount,
+    nextCursor: hasMore ? notifications[notifications.length - 1]?.id : null,
+  });
+}));
+
+router.patch('/notifications/:id/read', requireAuth, asyncHandler(async (req, res) => {
+  const notification = await prisma.notification.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!notification) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Notification not found' });
+  }
+  const updated = await prisma.notification.update({
+    where: { id: req.params.id },
+    data: { read: true },
+  });
+  res.status(200).json({ notification: updated });
+}));
+
+router.post('/notifications/read-all', requireAuth, asyncHandler(async (req, res) => {
+  await prisma.notification.updateMany({
+    where: { userId: req.authUser.id, read: false },
+    data: { read: true },
+  });
+  res.status(200).json({ message: 'All notifications marked as read' });
+}));
+
+// ─── Achievements ────────────────────────────────────
+router.get('/achievements', requireAuth, asyncHandler(async (req, res) => {
+  const definitions = await prisma.achievementDefinition.findMany({
+    orderBy: { category: 'asc' },
+  });
+  const userAchievements = await prisma.userAchievement.findMany({
+    where: { userId: req.authUser.id },
+  });
+
+  const userMap = {};
+  for (const ua of userAchievements) {
+    userMap[ua.achievementId] = ua;
+  }
+
+  const items = definitions.map((def) => ({
+    ...def,
+    unlocked: !!userMap[def.id],
+    unlockedAt: userMap[def.id]?.unlockedAt || null,
+    progress: userMap[def.id]?.progress || 0,
+  }));
+
+  res.status(200).json({ items, total: items.length });
+}));
+
+router.get('/achievements/summary', requireAuth, asyncHandler(async (req, res) => {
+  const totalDefinitions = await prisma.achievementDefinition.count();
+  const totalUnlocked = await prisma.userAchievement.count({
+    where: { userId: req.authUser.id },
+  });
+  const totalXp = await prisma.userAchievement.findMany({
+    where: { userId: req.authUser.id },
+    include: { achievement: true },
+  });
+  const xpEarned = totalXp.reduce((sum, ua) => sum + (ua.achievement?.xpReward || 0), 0);
+
+  res.status(200).json({
+    totalAchievements: totalDefinitions,
+    unlocked: totalUnlocked,
+    locked: totalDefinitions - totalUnlocked,
+    xpEarned,
+    completionPercent: totalDefinitions > 0 ? Math.round((totalUnlocked / totalDefinitions) * 100) : 0,
+  });
+}));
+
+// ─── Saved Phrases ───────────────────────────────────
+router.get('/phrases', requireAuth, asyncHandler(async (req, res) => {
+  const category = req.query.category || undefined;
+  const search = req.query.search || undefined;
+
+  const where = { userId: req.authUser.id };
+  if (category) where.category = category;
+  if (search) {
+    where.phrase = { contains: search };
+  }
+
+  const phrases = await prisma.savedPhrase.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+  });
+  res.status(200).json({ items: phrases, total: phrases.length });
+}));
+
+router.post('/phrases', requireAuth, asyncHandler(async (req, res) => {
+  const { phrase, meaning, example, category } = req.body || {};
+  if (!phrase) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'phrase is required' });
+  }
+  const saved = await prisma.savedPhrase.create({
+    data: {
+      userId: req.authUser.id,
+      phrase: String(phrase),
+      meaning: meaning || null,
+      example: example || null,
+      category: category || 'general',
+    },
+  });
+  res.status(201).json({ phrase: saved });
+}));
+
+router.delete('/phrases/:id', requireAuth, asyncHandler(async (req, res) => {
+  const existing = await prisma.savedPhrase.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Phrase not found' });
+  }
+  await prisma.savedPhrase.delete({ where: { id: req.params.id } });
+  res.status(200).json({ message: 'Phrase deleted' });
+}));
+
+// ─── Vocab Notebook ──────────────────────────────────
+router.get('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
+  const mastery = req.query.mastery || undefined;
+  const where = { userId: req.authUser.id };
+  if (mastery) where.mastery = mastery;
+
+  const items = await prisma.vocabNotebookItem.findMany({
+    where,
+    orderBy: { updatedAt: 'desc' },
+  });
+  res.status(200).json({ items, total: items.length });
+}));
+
+router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
+  const { word, meaning, example, tags, notes } = req.body || {};
+  if (!word) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'word is required' });
+  }
+  const item = await prisma.vocabNotebookItem.create({
+    data: {
+      userId: req.authUser.id,
+      word: String(word),
+      meaning: meaning || null,
+      example: example || null,
+      tags: tags || null,
+      notes: notes || null,
+    },
+  });
+  res.status(201).json({ item });
+}));
+
+router.patch('/vocab/notebook/:id', requireAuth, asyncHandler(async (req, res) => {
+  const existing = await prisma.vocabNotebookItem.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Vocab item not found' });
+  }
+  const { mastery, tags, notes, meaning, example } = req.body || {};
+  const data = {};
+  if (typeof mastery === 'string') data.mastery = mastery;
+  if (typeof tags === 'string') data.tags = tags;
+  if (typeof notes === 'string') data.notes = notes;
+  if (typeof meaning === 'string') data.meaning = meaning;
+  if (typeof example === 'string') data.example = example;
+
+  const updated = await prisma.vocabNotebookItem.update({
+    where: { id: req.params.id },
+    data,
+  });
+  res.status(200).json({ item: updated });
+}));
+
+router.delete('/vocab/notebook/:id', requireAuth, asyncHandler(async (req, res) => {
+  const existing = await prisma.vocabNotebookItem.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Vocab item not found' });
+  }
+  await prisma.vocabNotebookItem.delete({ where: { id: req.params.id } });
+  res.status(200).json({ message: 'Vocab item deleted' });
+}));
+
+// ─── History (Learning Sessions) ─────────────────────
+router.get('/history', requireAuth, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const cursor = req.query.cursor || null;
+  const type = req.query.type || undefined;
+
+  const where = { userId: req.authUser.id };
+  if (type) where.type = type;
+
+  const findOptions = {
+    where,
+    orderBy: { completedAt: 'desc' },
+    take: limit + 1,
+  };
+  if (cursor) {
+    findOptions.cursor = { id: cursor };
+    findOptions.skip = 1;
+  }
+
+  const sessions = await prisma.learningSession.findMany(findOptions);
+  const hasMore = sessions.length > limit;
+  if (hasMore) sessions.pop();
+
+  res.status(200).json({
+    items: sessions,
+    total: sessions.length,
+    nextCursor: hasMore ? sessions[sessions.length - 1]?.id : null,
+  });
+}));
+
+router.get('/history/:id', requireAuth, asyncHandler(async (req, res) => {
+  const session = await prisma.learningSession.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!session) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Learning session not found' });
+  }
+  // Parse metadata JSON if present
+  const result = { ...session };
+  if (result.metadata) {
+    try { result.metadata = JSON.parse(result.metadata); } catch {}
+  }
+  res.status(200).json({ session: result });
+}));
+
+// ─── Progress (Expanded) ────────────────────────────
 router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   const totalJournals = await prisma.journal.count({
     where: { userId: req.authUser.id, deletedAt: null },
   });
+  const totalWords = await prisma.vocabNotebookItem.count({
+    where: { userId: req.authUser.id },
+  });
+  const totalPhrases = await prisma.savedPhrase.count({
+    where: { userId: req.authUser.id },
+  });
+  const totalSessions = await prisma.learningSession.count({
+    where: { userId: req.authUser.id },
+  });
   const onboarding = await getOrCreateOnboardingState(req.authUser.id);
+
+  // Calculate streak (consecutive days with activity)
+  const dailyProgress = await prisma.progressDaily.findMany({
+    where: { userId: req.authUser.id },
+    orderBy: { day: 'desc' },
+    take: 60,
+  });
+
+  let currentStreak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 60; i++) {
+    const checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - i);
+    const dateStr = checkDate.toISOString().split('T')[0];
+    const found = dailyProgress.find((p) => {
+      const pDate = new Date(p.day).toISOString().split('T')[0];
+      return pDate === dateStr;
+    });
+    if (found && (found.journalsCount > 0 || found.minutesSpent > 0)) {
+      currentStreak++;
+    } else if (i === 0) {
+      // Today might not have activity yet, skip
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  // Average score
+  const journals = await prisma.journal.findMany({
+    where: { userId: req.authUser.id, deletedAt: null, score: { not: null } },
+    select: { score: true },
+  });
+  const avgScore = journals.length > 0
+    ? Math.round(journals.reduce((s, j) => s + j.score, 0) / journals.length)
+    : 0;
+
+  // Total XP
+  const totalXp = dailyProgress.reduce((sum, p) => sum + p.xpEarned, 0);
 
   res.status(200).json({
     totalJournals,
+    totalWords,
+    totalPhrases,
+    totalSessions,
+    currentStreak,
+    avgScore,
+    totalXp,
     onboardingCompleted: onboarding.completed,
+    level: onboarding.level || 'beginner',
   });
+}));
+
+router.get('/progress/daily', requireAuth, asyncHandler(async (req, res) => {
+  const days = Math.min(parseInt(req.query.days) || 30, 90);
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  const progress = await prisma.progressDaily.findMany({
+    where: {
+      userId: req.authUser.id,
+      day: { gte: startDate },
+    },
+    orderBy: { day: 'asc' },
+  });
+
+  res.status(200).json({ items: progress, days });
+}));
+
+// ─── Library / Lessons ───────────────────────────────
+router.get('/library/lessons', asyncHandler(async (req, res) => {
+  const category = req.query.category || undefined;
+  const level = req.query.level || undefined;
+
+  const where = { published: true };
+  if (category) where.category = category;
+  if (level) where.level = level;
+
+  const lessons = await prisma.lesson.findMany({
+    where,
+    orderBy: [{ category: 'asc' }, { orderIndex: 'asc' }],
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      level: true,
+      duration: true,
+      orderIndex: true,
+    },
+  });
+  res.status(200).json({ items: lessons, total: lessons.length });
+}));
+
+router.get('/library/lessons/:id', asyncHandler(async (req, res) => {
+  const lesson = await prisma.lesson.findFirst({
+    where: { id: req.params.id, published: true },
+  });
+  if (!lesson) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+  res.status(200).json({ lesson });
 }));
 
 // ─── Error Handler ───────────────────────────────────
