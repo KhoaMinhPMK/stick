@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getSettings, updateSettings } from '../../services/api/endpoints';
 
 const speeds = ['Slow', 'Normal', 'Fast'];
 const languages = [
-  { label: 'English (United Kingdom)', selected: true },
-  { label: 'English (United States)', selected: false },
-  { label: 'Tiếng Việt', selected: false },
+  { label: 'English (United Kingdom)', value: 'en-GB' },
+  { label: 'English (United States)', value: 'en-US' },
+  { label: 'Tiếng Việt', value: 'vi' },
 ];
 
 export const SettingsPage: React.FC = () => {
@@ -17,16 +18,58 @@ export const SettingsPage: React.FC = () => {
   const [dailyGoal, setDailyGoal] = useState(15);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setShowSaved(true);
-    setTimeout(() => setShowSaved(false), 2000);
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const { settings } = await getSettings();
+        setSoundEnabled(settings.soundOn);
+        setDailyGoal(settings.dailyGoalMinutes);
+        // Match language
+        const langIdx = languages.findIndex(l => l.value === settings.language);
+        if (langIdx >= 0) setSelectedLang(langIdx);
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateSettings({
+        soundOn: soundEnabled,
+        dailyGoalMinutes: dailyGoal,
+        language: languages[selectedLang].value,
+      });
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = () => {
     setShowResetConfirm(false);
     window.location.hash = '#onboarding';
   };
+
+  if (loading) {
+    return (
+      <AppLayout activePath="#settings">
+        <div className="flex items-center justify-center py-20">
+          <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <>
@@ -94,7 +137,7 @@ export const SettingsPage: React.FC = () => {
             <div className="space-y-2 md:space-y-4">
               {languages.map((lang, i) => (
                 <button
-                  key={lang.label}
+                  key={lang.value}
                   onClick={() => setSelectedLang(i)}
                   className={`flex items-center justify-between w-full p-3 md:p-4 rounded-lg transition-colors text-left ${
                     i === selectedLang
@@ -161,10 +204,15 @@ export const SettingsPage: React.FC = () => {
     {/* Save FAB */}
     <button
       onClick={handleSave}
-      className="fixed bottom-24 md:bottom-8 right-6 md:right-8 px-6 py-3 bg-black text-white rounded-full flex items-center gap-2 shadow-xl border-[3px] border-white hover:scale-105 active:scale-95 transition-all z-50 font-headline font-bold text-sm md:text-base"
+      disabled={saving}
+      className="fixed bottom-24 md:bottom-8 right-6 md:right-8 px-6 py-3 bg-black text-white rounded-full flex items-center gap-2 shadow-xl border-[3px] border-white hover:scale-105 active:scale-95 transition-all z-50 font-headline font-bold text-sm md:text-base disabled:opacity-50"
     >
-      <span className="material-symbols-outlined text-lg">save</span>
-      Save
+      {saving ? (
+        <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+      ) : (
+        <span className="material-symbols-outlined text-lg">save</span>
+      )}
+      {saving ? 'Saving...' : 'Save'}
     </button>
 
     {/* Saved Toast */}

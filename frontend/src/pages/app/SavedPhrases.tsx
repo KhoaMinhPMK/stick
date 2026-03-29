@@ -1,35 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getPhrases, createPhrase, deletePhrase, type SavedPhrase } from '../../services/api/endpoints';
 
-const mockPhrases = [
-  { id: '1', phrase: 'Break the ice', meaning: 'saved_phrases.m_break_ice', source: 'Journal #12', date: '2026-03-25', category: 'idiom' },
-  { id: '2', phrase: 'On the other hand', meaning: 'saved_phrases.m_other_hand', source: 'Lesson: Connectors', date: '2026-03-24', category: 'connector' },
-  { id: '3', phrase: 'As a matter of fact', meaning: 'saved_phrases.m_matter_fact', source: 'Journal #10', date: '2026-03-23', category: 'expression' },
-  { id: '4', phrase: 'Take it for granted', meaning: 'saved_phrases.m_take_granted', source: 'Feedback', date: '2026-03-22', category: 'idiom' },
-  { id: '5', phrase: 'In the long run', meaning: 'saved_phrases.m_long_run', source: 'Journal #8', date: '2026-03-21', category: 'expression' },
-  { id: '6', phrase: 'Nevertheless', meaning: 'saved_phrases.m_nevertheless', source: 'Lesson: Formal Writing', date: '2026-03-20', category: 'connector' },
-  { id: '7', phrase: 'Hit the nail on the head', meaning: 'saved_phrases.m_nail_head', source: 'Feedback', date: '2026-03-18', category: 'idiom' },
-  { id: '8', phrase: 'Not only... but also', meaning: 'saved_phrases.m_not_only', source: 'Lesson: Advanced Grammar', date: '2026-03-17', category: 'connector' },
-];
-
-type CategoryFilter = 'all' | 'idiom' | 'connector' | 'expression';
+type CategoryFilter = 'all' | 'idiom' | 'connector' | 'expression' | 'general';
 
 export const SavedPhrasesPage: React.FC = () => {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<CategoryFilter>('all');
   const [search, setSearch] = useState('');
-  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [phrases, setPhrases] = useState<SavedPhrase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newPhrase, setNewPhrase] = useState('');
+  const [newMeaning, setNewMeaning] = useState('');
+  const [newCategory, setNewCategory] = useState('general');
+  const [adding, setAdding] = useState(false);
 
-  const filtered = mockPhrases.filter(p => {
-    if (removedIds.includes(p.id)) return false;
-    if (filter !== 'all' && p.category !== filter) return false;
-    if (search) return p.phrase.toLowerCase().includes(search.toLowerCase());
-    return true;
-  });
+  useEffect(() => {
+    loadPhrases();
+  }, [filter]);
 
-  const handleRemove = (id: string) => {
-    setRemovedIds(prev => [...prev, id]);
+  async function loadPhrases() {
+    try {
+      setLoading(true);
+      const cat = filter === 'all' ? undefined : filter;
+      const res = await getPhrases(cat, search || undefined);
+      setPhrases(res.items);
+    } catch (err) {
+      console.error('Failed to load phrases:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleRemove = async (id: string) => {
+    try {
+      await deletePhrase(id);
+      setPhrases(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Failed to delete phrase:', err);
+    }
+  };
+
+  const handleAdd = async () => {
+    if (!newPhrase.trim()) return;
+    setAdding(true);
+    try {
+      const res = await createPhrase({
+        phrase: newPhrase.trim(),
+        meaning: newMeaning.trim() || undefined,
+        category: newCategory,
+      });
+      setPhrases(prev => [res.phrase, ...prev]);
+      setNewPhrase('');
+      setNewMeaning('');
+      setShowAdd(false);
+    } catch (err) {
+      console.error('Failed to add phrase:', err);
+    } finally {
+      setAdding(false);
+    }
   };
 
   const getCategoryColor = (cat: string) => {
@@ -64,12 +95,13 @@ export const SavedPhrasesPage: React.FC = () => {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && loadPhrases()}
               placeholder={t('saved_phrases.search_placeholder')}
               className="w-full pl-10 md:pl-12 pr-4 py-2.5 md:py-3 border-2 md:border-3 border-black rounded-full font-body text-sm md:text-base bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-stone-400"
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(['all', 'idiom', 'connector', 'expression'] as CategoryFilter[]).map(f => (
+            {(['all', 'general', 'idiom', 'connector', 'expression'] as CategoryFilter[]).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -79,7 +111,7 @@ export const SavedPhrasesPage: React.FC = () => {
                     : 'bg-surface-container border-2 border-black/20 hover:border-black/50 text-on-surface-variant'
                 }`}
               >
-                {t(`saved_phrases.filter_${f}`)}
+                {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
@@ -89,19 +121,24 @@ export const SavedPhrasesPage: React.FC = () => {
         <div className="flex items-center gap-3 md:gap-6 mb-6 text-xs md:text-sm text-on-surface-variant">
           <span className="flex items-center gap-1.5 font-bold">
             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>bookmark</span>
-            {filtered.length} {t('saved_phrases.phrases')}
+            {phrases.length} {t('saved_phrases.phrases')}
           </span>
         </div>
 
         {/* Phrases List */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+          </div>
+        ) : phrases.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center">
             <span className="material-symbols-outlined text-5xl md:text-6xl text-stone-300 mb-4">bookmark_border</span>
             <p className="font-headline font-bold text-lg md:text-xl text-stone-400">{t('saved_phrases.empty')}</p>
+            <p className="text-sm text-stone-400 mt-2">Tap + to add your first phrase!</p>
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
-            {filtered.map((phrase, i) => (
+            {phrases.map((phrase, i) => (
               <div
                 key={phrase.id}
                 className={`group sketch-card bg-surface-container-lowest p-4 md:p-6 transition-all hover:shadow-[3px_3px_0_0_#000] ${
@@ -116,11 +153,11 @@ export const SavedPhrasesPage: React.FC = () => {
                         {phrase.category}
                       </span>
                     </div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-2">{t(phrase.meaning)}</p>
+                    {phrase.meaning && (
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-2">{phrase.meaning}</p>
+                    )}
                     <div className="flex items-center gap-3 text-[10px] md:text-xs text-stone-400">
-                      <span>{phrase.source}</span>
-                      <span>·</span>
-                      <span>{new Date(phrase.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      <span>{new Date(phrase.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
                   </div>
                   <button
@@ -141,6 +178,57 @@ export const SavedPhrasesPage: React.FC = () => {
           <p className="font-headline italic font-bold text-xs md:text-sm">&ldquo;{t('saved_phrases.footer_quote')}&rdquo;</p>
         </div>
       </div>
+
+      {/* Add FAB */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 bg-black text-white rounded-full flex items-center justify-center shadow-xl border-[3px] border-white hover:scale-110 active:scale-95 transition-all z-50"
+      >
+        <span className="material-symbols-outlined text-2xl">add</span>
+      </button>
+
+      {/* Add Phrase Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest sketch-card p-6 md:p-8 max-w-md w-full">
+            <h3 className="font-headline font-bold text-lg md:text-xl mb-4">Add New Phrase</h3>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={newPhrase}
+                onChange={e => setNewPhrase(e.target.value)}
+                placeholder="Enter phrase..."
+                className="w-full px-4 py-2.5 border-2 border-black rounded-xl font-body text-sm bg-white focus:outline-none"
+              />
+              <input
+                type="text"
+                value={newMeaning}
+                onChange={e => setNewMeaning(e.target.value)}
+                placeholder="Meaning (optional)"
+                className="w-full px-4 py-2.5 border-2 border-black/30 rounded-xl font-body text-sm bg-white focus:outline-none"
+              />
+              <select
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                className="w-full px-4 py-2.5 border-2 border-black/30 rounded-xl font-body text-sm bg-white focus:outline-none"
+              >
+                <option value="general">General</option>
+                <option value="idiom">Idiom</option>
+                <option value="connector">Connector</option>
+                <option value="expression">Expression</option>
+              </select>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 sketch-border bg-surface-container font-headline font-bold text-sm active:scale-95">
+                Cancel
+              </button>
+              <button onClick={handleAdd} disabled={adding || !newPhrase.trim()} className="flex-1 py-2.5 sketch-border bg-black text-white font-headline font-bold text-sm active:scale-95 disabled:opacity-50">
+                {adding ? 'Adding...' : 'Add Phrase'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 };
