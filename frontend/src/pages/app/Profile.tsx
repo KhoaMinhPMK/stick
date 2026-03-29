@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getProgressSummary, type ProgressSummary } from '../../services/api/endpoints';
+import { apiRequest } from '../../services/api/client';
 
-const miniBarData = [30, 50, 40, 70, 90, 60, 85];
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  level: string;
+  createdAt: string;
+}
 
 const navCards = [
   { icon: 'person_edit', titleKey: 'profile.card_edit', descKey: 'profile.card_edit_desc', href: '#edit-profile' },
@@ -13,6 +22,31 @@ const navCards = [
 
 export const ProfilePage: React.FC = () => {
   const { t } = useTranslation();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [summary, setSummary] = useState<ProgressSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [profileRes, summaryRes] = await Promise.all([
+          apiRequest<{ user: UserProfile }>('/profile'),
+          getProgressSummary(),
+        ]);
+        setProfile(profileRes.user);
+        setSummary(summaryRes);
+      } catch (err) {
+        console.error('Profile load error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const memberSince = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : '';
 
   return (
     <AppLayout activePath="#profile">
@@ -21,49 +55,72 @@ export const ProfilePage: React.FC = () => {
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-8 items-start">
           {/* Main Profile Card */}
           <div className="lg:col-span-8 bg-surface-container-lowest sketch-border p-5 md:p-8 lg:p-10 relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row gap-5 md:gap-8 items-center sm:items-start">
-              {/* Avatar */}
-              <div className="relative shrink-0">
-                <div className="w-24 h-24 md:w-32 md:h-32 sketch-border overflow-hidden bg-surface-container-high flex items-center justify-center">
-                  <span className="material-symbols-outlined text-4xl md:text-5xl text-black/30">person</span>
-                </div>
-                <button className="absolute -bottom-1.5 -right-1.5 md:-bottom-2 md:-right-2 bg-primary text-surface p-1 md:p-2 rounded-full flex items-center justify-center border-2 border-surface">
-                  <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
-                </button>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
               </div>
-
-              {/* Info */}
-              <div className="flex-1 space-y-3 md:space-y-4 text-center sm:text-left">
-                <div>
-                  <h3 className="font-headline text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight text-primary -rotate-1 inline-block">
-                    Alex Rivers
-                  </h3>
-                  <p className="text-secondary font-medium text-xs md:text-sm mt-1">{t('profile.subtitle')}</p>
-                </div>
-
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2 md:gap-3 justify-center sm:justify-start">
-                  <span className="px-3 md:px-4 py-0.5 md:py-1 bg-secondary-container border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
-                    <span className="material-symbols-outlined text-xs md:text-sm">military_tech</span>
-                    {t('profile.level_badge')}
-                  </span>
-                  <span className="px-3 md:px-4 py-0.5 md:py-1 bg-surface-container-highest border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
-                    <span className="material-symbols-outlined text-xs md:text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
-                    {t('profile.streak_badge')}
-                  </span>
-                </div>
-
-                {/* Goal */}
-                <div className="pt-3 md:pt-4 border-t-2 border-dotted border-outline-variant/30">
-                  <p className="text-[10px] md:text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-1 md:mb-2">{t('profile.current_goal')}</p>
-                  <p className="text-sm md:text-lg font-headline font-semibold text-primary">"Read 20 English news articles by Friday"</p>
-                  <div className="w-full h-2.5 md:h-3 bg-surface-container-high rounded-full mt-2 md:mt-3 overflow-hidden border-2 border-primary">
-                    <div className="bg-tertiary h-full w-[65%]" />
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-5 md:gap-8 items-center sm:items-start">
+                {/* Avatar */}
+                <div className="relative shrink-0">
+                  <div className="w-24 h-24 md:w-32 md:h-32 sketch-border overflow-hidden bg-surface-container-high flex items-center justify-center">
+                    {profile?.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-4xl md:text-5xl text-black/30">person</span>
+                    )}
                   </div>
-                  <p className="text-right text-[10px] md:text-xs mt-1 font-bold">13/20</p>
+                  <button className="absolute -bottom-1.5 -right-1.5 md:-bottom-2 md:-right-2 bg-primary text-surface p-1 md:p-2 rounded-full flex items-center justify-center border-2 border-surface">
+                    <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
+                  </button>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 space-y-3 md:space-y-4 text-center sm:text-left">
+                  <div>
+                    <h3 className="font-headline text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight text-primary -rotate-1 inline-block">
+                      {profile?.name || 'User'}
+                    </h3>
+                    <p className="text-secondary font-medium text-xs md:text-sm mt-1">
+                      {profile?.email || t('profile.subtitle')}
+                    </p>
+                  </div>
+
+                  {/* Badges */}
+                  <div className="flex flex-wrap gap-2 md:gap-3 justify-center sm:justify-start">
+                    <span className="px-3 md:px-4 py-0.5 md:py-1 bg-secondary-container border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
+                      <span className="material-symbols-outlined text-xs md:text-sm">military_tech</span>
+                      {summary?.level || profile?.level || 'Beginner'}
+                    </span>
+                    <span className="px-3 md:px-4 py-0.5 md:py-1 bg-surface-container-highest border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
+                      <span className="material-symbols-outlined text-xs md:text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
+                      {summary?.currentStreak || 0} day streak
+                    </span>
+                  </div>
+
+                  {/* Stats Row */}
+                  <div className="pt-3 md:pt-4 border-t-2 border-dotted border-outline-variant/30">
+                    <p className="text-[10px] md:text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-2">
+                      Member since {memberSince}
+                    </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center">
+                        <p className="font-headline font-black text-lg md:text-2xl text-primary">{summary?.totalJournals || 0}</p>
+                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">Journals</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-headline font-black text-lg md:text-2xl text-primary">{summary?.totalWords || 0}</p>
+                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">Words</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-headline font-black text-lg md:text-2xl text-primary">{summary?.totalPhrases || 0}</p>
+                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">Phrases</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Quick Stats */}
@@ -71,21 +128,13 @@ export const ProfilePage: React.FC = () => {
             <div className="bg-surface-container border-2 border-black rounded-lg p-4 md:p-6 rotate-1">
               <p className="text-on-surface-variant font-bold text-xs md:text-sm mb-3 md:mb-4">{t('profile.entries_month')}</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl md:text-5xl font-headline font-black text-primary">24</span>
-                <span className="text-tertiary font-bold flex items-center text-xs md:text-sm">
-                  <span className="material-symbols-outlined text-xs md:text-sm">arrow_upward</span>12%
-                </span>
-              </div>
-              <div className="mt-3 md:mt-4 flex gap-1 h-6 md:h-8 items-end">
-                {miniBarData.map((h, i) => (
-                  <div key={i} className="w-full bg-primary rounded-sm" style={{ height: `${h}%`, opacity: h / 100 }} />
-                ))}
+                <span className="text-3xl md:text-5xl font-headline font-black text-primary">{summary?.totalJournals || 0}</span>
               </div>
             </div>
             <div className="bg-surface-container-highest border-2 border-black rounded-lg p-4 md:p-6 -rotate-1">
               <p className="text-on-surface-variant font-bold text-xs md:text-sm mb-3 md:mb-4">{t('profile.total_points')}</p>
               <div className="flex items-center justify-between">
-                <span className="text-2xl md:text-4xl font-headline font-black text-primary">8,420</span>
+                <span className="text-2xl md:text-4xl font-headline font-black text-primary">{summary?.totalXp || 0}</span>
                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-primary flex items-center justify-center bg-secondary-container">
                   <span className="material-symbols-outlined text-primary text-sm md:text-base">star</span>
                 </div>

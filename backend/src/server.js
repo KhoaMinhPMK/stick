@@ -38,6 +38,8 @@ app.get('/docs.json', (_req, res) => {
   res.status(200).json(openApiDocument);
 });
 
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument, { explorer: true }));
+// Keep old path as alias
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument, { explorer: true }));
 app.use('/api/v1', apiV1Routes);
 
