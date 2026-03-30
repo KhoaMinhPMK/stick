@@ -9,7 +9,6 @@ export const SaveProgressPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showToast, setShowToast] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,14 +164,6 @@ export const SaveProgressPage: React.FC = () => {
                 )}
                 <span className="font-bold text-xs md:text-sm">Google</span>
               </button>
-              <button
-                onClick={() => { setShowToast(true); setTimeout(() => setShowToast(false), 2500); }}
-                className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-primary text-lg md:text-2xl">smartphone</span>
-                <span className="font-bold text-xs md:text-sm">Phone</span>
-              </button>
             </div>
           </form>
         </div>
@@ -198,14 +189,6 @@ export const SaveProgressPage: React.FC = () => {
         </div>
       </main>
     </div>
-
-    {/* Coming Soon Toast */}
-    {showToast && (
-      <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-tertiary-container text-white px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
-        <span className="material-symbols-outlined text-lg">info</span>
-        Coming soon!
-      </div>
-    )}
     </>
   );
 };

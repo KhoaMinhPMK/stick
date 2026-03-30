@@ -1,15 +1,37 @@
 // Analytics Core Loop Module
 // Single source of truth for firing events in the STICK core loop.
-// Interface is stable — swap the actual provider (console, Mixpanel, Firebase, etc.)
-// by changing only the `track` function below.
+// Uses Firebase Analytics in production, console.debug in dev.
+
+import { getAnalytics, logEvent, isSupported } from 'firebase/analytics';
+import { initializeApp, getApps } from 'firebase/app';
+
+let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
+
+async function initAnalytics() {
+  if (analyticsInstance) return analyticsInstance;
+  const supported = await isSupported();
+  if (!supported) return null;
+  const app = getApps()[0] || initializeApp({
+    apiKey: "AIzaSyAWXH675F8F-Od6PlGOopDXXzpGf36qKhI",
+    authDomain: "stick-e9560.firebaseapp.com",
+    projectId: "stick-e9560",
+    storageBucket: "stick-e9560.firebasestorage.app",
+    messagingSenderId: "490758085326",
+    appId: "1:490758085326:web:076338557bf872189c8e9f",
+    measurementId: "G-CENLSST8RL"
+  });
+  analyticsInstance = getAnalytics(app);
+  return analyticsInstance;
+}
 
 function track(eventName: string, props: Record<string, unknown>) {
-  // TODO: swap with real provider (Mixpanel, Firebase Analytics, etc.)
   if (import.meta.env.DEV) {
     console.debug(`[ANALYTICS] ${eventName}`, props);
   }
-  // Production: send to provider
-  // e.g. window.analytics?.track(eventName, props)
+  // Fire to Firebase Analytics
+  initAnalytics().then(analytics => {
+    if (analytics) logEvent(analytics, eventName, props);
+  }).catch(() => { /* silently fail */ });
 }
 
 function getSessionId(): string {

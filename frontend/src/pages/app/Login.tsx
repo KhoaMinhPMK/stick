@@ -7,7 +7,6 @@ export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showToast, setShowToast] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,20 +40,14 @@ export const LoginPage: React.FC = () => {
     } catch (err: unknown) {
       const msg = (err as { code?: string })?.code || '';
       const errorDetails = (err as Error)?.message || String(err);
-      console.error("Popup Error Debug: ", err);
       if (msg === 'auth/popup-closed-by-user') {
-        alert("Browser blocked the popup or you closed it too fast! Please check your popup blocker settings.");
+        setError(t('login.popup_blocked', { defaultValue: 'Browser blocked the popup. Please check your popup blocker settings.' }));
       } else {
         setError(`Google sign-in failed: ${errorDetails}`);
       }
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handlePhoneSignIn = () => {
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2500);
   };
 
   return (
@@ -141,7 +134,7 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Social */}
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 gap-3 md:gap-4">
               <button onClick={handleGoogleSignIn} disabled={isSubmitting} className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
                 {isSubmitting ? (
                   <span className="material-symbols-outlined text-primary text-lg md:text-2xl animate-spin">sync</span>
@@ -149,10 +142,6 @@ export const LoginPage: React.FC = () => {
                   <span className="material-symbols-outlined text-primary text-lg md:text-2xl">public</span>
                 )}
                 <span className="font-bold text-xs md:text-sm">Google</span>
-              </button>
-              <button onClick={handlePhoneSignIn} disabled={isSubmitting} className="sketch-border border-2 bg-transparent hover:bg-surface-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
-                <span className="material-symbols-outlined text-primary text-lg md:text-2xl">smartphone</span>
-                <span className="font-bold text-xs md:text-sm">Phone</span>
               </button>
             </div>
           </form>
@@ -169,14 +158,6 @@ export const LoginPage: React.FC = () => {
         </div>
       </main>
     </div>
-
-    {/* Coming Soon Toast */}
-    {showToast && (
-      <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-tertiary-container text-white px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
-        <span className="material-symbols-outlined text-lg">info</span>
-        {t('login.coming_soon')}
-      </div>
-    )}
     </>
   );
 };

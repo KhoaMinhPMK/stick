@@ -84,10 +84,9 @@ export const JournalPage: React.FC = () => {
           {/* Illustration Area */}
           <div className="md:col-span-4 flex flex-col items-center text-center space-y-6 md:space-y-8 mt-6 md:mt-0 pb-16 md:pb-0">
             <div className="relative w-full flex items-center justify-center">
-              {/* Placeholder for Stick Figure Coach Illustration */}
               <div className="w-48 h-48 md:w-56 md:h-56 relative">
-                <div className="w-full h-full bg-surface-container border-[3px] border-dashed border-black rounded-full flex items-center justify-center">
-                  <span className="material-symbols-outlined text-6xl md:text-7xl text-black/40">person</span>
+                <div className="w-full h-full bg-surface-container border-[3px] border-black rounded-full flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[80px] md:text-[90px] text-primary/50" style={{ fontVariationSettings: "'FILL' 1" }}>draw</span>
                 </div>
                 {/* Speech Bubble */}
                 <div className="absolute -top-4 -right-4 md:-right-8 bg-white p-3 md:p-4 sketch-border rotate-3 shadow-sm max-w-[140px] md:max-w-[180px] z-10">
