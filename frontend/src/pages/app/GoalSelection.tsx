@@ -117,19 +117,11 @@ export const GoalSelectionPage: React.FC = () => {
       </main>
 
       {/* Decorative Stick Figures */}
-      <div className="fixed bottom-10 right-10 pointer-events-none opacity-20 hidden lg:block z-0">
-        <img 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2av7dK4lVVXvve5WwP5TXUKCuMLRHfmEQAavHPvSzsw_QhYVpoOr1nuJSjWB28J6K7rOBP_SK2ZCevntFkw2xlzXpnTVOv5dHgjuDajYVCrFrOwz9-m_3tYWeDtY9mFiMlgVevPqq7uddE_iUqKo2si911vagkg4hp3YcWPcyq4DRYcPmsusJ6nmT7ypnfUHGinUE10peAX4QcjOC0wSOB9ZOvW78bD8kPto3cNnnW06sMP2tEYe1b-i1W266Iw009OQq0xTzsJ0y" 
-          alt="Draw doodle" 
-          className="w-48 h-48 mix-blend-multiply drop-shadow-sm" 
-        />
+      <div className="fixed bottom-10 right-10 pointer-events-none opacity-10 hidden lg:block z-0">
+        <span className="material-symbols-outlined text-[120px] text-primary">rocket_launch</span>
       </div>
-      <div className="fixed top-40 left-10 xl:left-20 pointer-events-none opacity-[0.15] hidden md:block z-0">
-        <img 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4bUPHns9L9rCHdH-vgzX-d0oIa91bm2gGSoN6YFZ5JdxUiHAbP5rrslFKUfcWYhzxdReM7M2OywASs4sv36AKI3nHtZPRIzNQf89rKzJ5_9LkRn4YoTFZNDaWHVn1trH8sR-cU2JOFjJqE-GEr1hphxS6bwiykwH5vcaZMv6S2RB3Wya5l7qfoq6d0Uvcs-HyCJH9EA1aHGgJdTFSDi3uzKRn0RwBjkyc5O02L2a7d0MYCmhYPuxpTUcdUrpxmWSVygclDw1W4HLF" 
-          alt="Sparkle" 
-          className="rotate-12 w-24 xl:w-32 mix-blend-multiply drop-shadow-sm" 
-        />
+      <div className="fixed top-40 left-10 xl:left-20 pointer-events-none opacity-[0.08] hidden md:block z-0">
+        <span className="material-symbols-outlined text-[60px] xl:text-[80px] text-primary rotate-12">auto_awesome</span>
       </div>
     </div>
   );

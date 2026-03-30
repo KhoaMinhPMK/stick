@@ -147,12 +147,8 @@ export const FeedbackPage: React.FC = () => {
           {/* Central Feedback Card */}
           <div className="sketch-card bg-surface-container-lowest p-6 sm:p-8 md:p-12 relative mt-16 md:mt-0">
             {/* Floating Illustration */}
-            <div className="absolute -top-20 -right-4 md:-top-16 md:-right-8 w-32 h-32 md:w-48 md:h-48 pointer-events-none z-10 drop-shadow-sm">
-              <img 
-                alt="Hand-drawn stick figure jumping for joy" 
-                className="w-full h-full object-contain mix-blend-multiply rotate-6 hover:rotate-12 transition-transform duration-500 float-anim" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2FRNlfT_qXT0cZF9mjXPCsy0TejR4562mAbeMNrEkOxd-iwdN-Ju3p0SjC5pqwK500G4aQyBJq0G9-xKQ0u0AqKS8_-wLFKCN_OmX6F6ME4jMtlqbBv41FBypszbpA53tD606s5gNgafCi-NeKFLDU_rThpl38aQKbQ2jYBQdYZ3AVTOJzHlT3Yryzul1aJKOfeJ3fD77-tL43s-K7IX-Buf59KBBWT7uFBZU75vo2N9o4iu6ic0dPmfZv3F-VsNOwEIwZVQ0GEag" 
-              />
+            <div className="absolute -top-20 -right-4 md:-top-16 md:-right-8 w-32 h-32 md:w-48 md:h-48 pointer-events-none z-10 drop-shadow-sm flex items-center justify-center">
+              <span className="material-symbols-outlined text-[80px] md:text-[120px] text-primary/30 rotate-6 hover:rotate-12 transition-transform duration-500 float-anim" style={{ fontVariationSettings: "'FILL' 1" }}>emoji_objects</span>
             </div>
 
             <div className="space-y-10 md:space-y-12 relative z-20">

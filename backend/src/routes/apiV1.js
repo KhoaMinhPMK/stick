@@ -7,7 +7,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken } = require('../lib/firebase');
-const { generateJournalFeedback } = require('../lib/groqAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent } = require('../lib/groqAI');
 
 const router = express.Router();
 
@@ -408,6 +408,43 @@ router.get('/journals/:id/review-items', requireAuth, asyncHandler(async (req, r
     }
   }
   res.status(200).json({ items, total: items.length });
+}));
+
+// ─── Daily Challenge ─────────────────────────────────
+router.get('/daily-challenge', requireAuth, asyncHandler(async (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const challenge = await generateDailyChallenge(today);
+  // Get user's day number from journal count
+  const totalJournals = await prisma.journal.count({
+    where: { userId: req.authUser.id, deletedAt: null },
+  });
+  res.status(200).json({
+    ...challenge,
+    date: today,
+    dayNumber: totalJournals + 1,
+  });
+}));
+
+// ─── Grammar Quiz ────────────────────────────────────
+router.get('/ai/grammar-quiz', requireAuth, asyncHandler(async (req, res) => {
+  const count = Math.min(parseInt(req.query.count) || 5, 10);
+  const onboarding = await prisma.onboardingState.findUnique({
+    where: { userId: req.authUser.id },
+  });
+  const level = onboarding?.level || 'intermediate';
+  const quiz = await generateGrammarQuiz(level, count);
+  res.status(200).json(quiz);
+}));
+
+// ─── Reading Content ─────────────────────────────────
+router.get('/ai/reading-content', requireAuth, asyncHandler(async (req, res) => {
+  const topic = req.query.topic || '';
+  const onboarding = await prisma.onboardingState.findUnique({
+    where: { userId: req.authUser.id },
+  });
+  const level = onboarding?.level || 'intermediate';
+  const content = await generateReadingContent(topic, level);
+  res.status(200).json(content);
 }));
 
 // ─── AI Feedback ─────────────────────────────────────

@@ -174,11 +174,9 @@ export const VocabularyReviewPage: React.FC = () => {
 
                 {/* Illustration Card */}
                 <div className="bg-white sketch-border p-4 md:p-6 flex flex-col items-center justify-center text-center">
-                  <img 
-                    className="w-32 h-32 md:w-40 md:h-40 lg:w-48 lg:h-48 object-contain mb-3 md:mb-4 grayscale opacity-80" 
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSXxNWe4uThnM9rDfMBH524WHWR88VZTaYJO0Y0rLkqNdNrzrIF_brpriL2-rWTYzZy29RrBpC1LGuJeLrFXDRmH18cyi12DT8A3zK3ylFJRWcw8zkMzzv9_nFNrjF80EqJiZcyW2annn5XEBOVmw-vpu2S9ky81yeOhoA0856xr2UhdoZTcC3DPoDFmfTBVk160oSFeWcSbYjHsCYEZ3Zmm0x38Rh0ouRXyo0EwnwourWGaDKPzKNx_MQI05BDhsGO91XI18tb-9J" 
-                    alt="Study illustration"
-                  />
+                  <div className="w-32 h-32 md:w-40 md:h-40 lg:w-48 lg:h-48 flex items-center justify-center mb-3 md:mb-4">
+                    <span className="material-symbols-outlined text-[80px] md:text-[100px] lg:text-[120px] text-primary/30">auto_stories</span>
+                  </div>
                   <p className="font-headline font-bold italic text-sm md:text-base">
                     "{t('vocab_review.illustration_quote')}"
                   </p>

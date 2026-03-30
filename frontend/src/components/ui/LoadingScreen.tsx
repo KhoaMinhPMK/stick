@@ -64,7 +64,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isLoading, minDela
             
             <div className="relative w-36 h-36 sm:w-48 sm:h-48 md:w-64 md:h-64 flex items-center justify-center shrink-0">
               <div className="absolute inset-0 border-[3px] md:border-4 border-primary sketch-border bg-surface-container-lowest opacity-50"></div>
-              <img alt="Minimalist hand-drawn stick figure" className="w-24 h-24 sm:w-32 sm:h-32 md:w-48 md:h-48 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZEGlIk4xEN4jOOuxdCsdJ0GCxSS6aWy3bAfZlCWdET9hVzgHWTgepujVtka1WJLuQ0BWrlvsX2WTIif-fD92mbiv_Z97lk4RhVsv97LS405-6fVaxnlw-M__VDshJ6ub8igISgQUNsjCbJ44t2qNi9gF-4FhWt16hREoabqALZvJqtKWXOxvJyJzQmnflMXZLUIBzJ2KpxvJ_IHEh68ZlQsrVy0AjsZ6a1vjOHaJvz5zMvc8bsVzLG32drITk08V1oEX2S0O3QmVi" />
+              <span className="material-symbols-outlined text-[60px] sm:text-[80px] md:text-[120px] text-primary/60" style={{ fontVariationSettings: "'FILL' 1" }}>draw</span>
             </div>
 
             <div className="flex flex-col items-center gap-3 md:gap-6 mt-2 md:mt-8 w-full">

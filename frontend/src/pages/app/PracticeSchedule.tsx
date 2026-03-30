@@ -147,11 +147,10 @@ export const PracticeSchedulePage: React.FC = () => {
         <div className="flex justify-center mb-6 sm:mb-8 md:mb-16 animate-fade-in delay-400">
           <div className="relative w-48 md:w-64 h-24 md:h-32 flex items-center justify-center">
             <div
-              className="absolute inset-0 bg-no-repeat bg-contain bg-center opacity-80"
-              style={{
-                backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCDsfSpGJyOe7ni2PJ-tmqasObkPZkdbU4LPVdQWMhUJLxQCzbHT85SAB4QICcz6voObzFXK4kUKIUC0uIouQkB5Pe5GHD-zfK7zXQBsA61yC5PGd3LWdqSj6I-Ndj4461E0se_X-mPLeNDYXIBIHjYjLJ_OemB6UGd_ha4LVCYj2Ah5KH5ishX8bompImWY6TcfNhS6hqZioqDMJltD-6Ftxr1xYefptfyx8UO4ez0RVj19bJb3wO61lmYHAM4gtExAhhfHC7hx4Z0')"
-              }}
-            />
+              className="absolute inset-0 opacity-80 flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined text-[80px] text-primary/20">schedule</span>
+            </div>
           </div>
         </div>
 

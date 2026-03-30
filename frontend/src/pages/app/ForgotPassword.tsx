@@ -1,14 +1,35 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../services/firebase';
 
 export const ForgotPasswordPage: React.FC = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.includes('@')) setSent(true);
+    if (!email.includes('@') || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSent(true);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/user-not-found') {
+        setError(t('forgot_password.error_not_found', { defaultValue: 'No account found with this email.' }));
+      } else if (code === 'auth/invalid-email') {
+        setError(t('forgot_password.error_invalid', { defaultValue: 'Invalid email address.' }));
+      } else {
+        setError(t('forgot_password.error_generic', { defaultValue: 'Something went wrong. Please try again.' }));
+      }
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -39,10 +60,11 @@ export const ForgotPasswordPage: React.FC = () => {
                   required
                 />
               </div>
-              <button className="sketch-border bg-surface-container-highest hover:bg-secondary-container py-3 md:py-4 px-6 font-headline font-extrabold text-lg md:text-xl flex items-center justify-center gap-2 transition-colors group" type="submit">
-                {t('forgot_password.send_btn')}
-                <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">send</span>
+              <button className="sketch-border bg-surface-container-highest hover:bg-secondary-container py-3 md:py-4 px-6 font-headline font-extrabold text-lg md:text-xl flex items-center justify-center gap-2 transition-colors group disabled:opacity-50" type="submit" disabled={sending}>
+                {sending ? '...' : t('forgot_password.send_btn')}
+                {!sending && <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">send</span>}
               </button>
+              {error && <p className="text-error text-sm font-bold text-center">{error}</p>}
             </form>
           </div>
         ) : (

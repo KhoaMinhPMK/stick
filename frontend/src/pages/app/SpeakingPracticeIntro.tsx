@@ -67,11 +67,7 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
               <div className="relative">
                 {/* Simple Stick Figure Coach Illustration */}
                 <div className="w-40 h-40 md:w-48 md:h-48 bg-surface border-2 border-black border-dashed rounded-full flex items-center justify-center p-4">
-                  <img 
-                    alt="Friendly coach illustration" 
-                    className="w-full h-full object-contain filter grayscale opacity-90 transition-transform hover:scale-105 duration-300"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_NZpfOun8us0woivR62RIv3aQA7gwaIz3AZ2c5UfjtEg0hVH4UdZXtEZTnofF9R3OfXsVAbssdGqYD_eBK0TLDwt9j5uuWFdNXDzBbWGn7tyjZzHuluBjV7KQTxC1FndzU6yk3nRXxOryWIAHSnu_Be-CGIV1ssY2pdHo6CFTLZ06qvmFeGQdamu5DyB-CAcGyGcinuMvnJZYv7ptzwYIGYeOMPRoYEdLDwaXp_Fp9yqtzI3Aed3cUumMe3uxJWrjZT01ta2-AQvh" 
-                  />
+                  <span className="material-symbols-outlined text-[80px] md:text-[100px] text-primary/60 transition-transform hover:scale-105 duration-300" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
                 </div>
                 {/* Speech Bubble */}
                 <div className="absolute -top-6 -right-10 md:-top-4 md:-right-16 bg-white sketch-border px-4 py-3 wobble-text shadow-sm z-10 pointer-events-none">

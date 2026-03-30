@@ -67,19 +67,11 @@ export const SaveProgressPage: React.FC = () => {
     <>
     <div className="bg-surface text-on-surface min-h-[100dvh] w-full overflow-x-hidden flex flex-col relative">
       {/* Decorative Elements — desktop only */}
-      <div className="hidden lg:block fixed bottom-12 right-12 w-48 opacity-40 grayscale contrast-150 pointer-events-none z-0">
-        <img
-          alt="Minimalist stick figure sketch"
-          className="w-full"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_6nHS_ykcEo4n7c2uwnJlqGBak-v9FkXgYkIwXr0cDGPFd_rToKr1X4uYaTlDj4LVn4jg8n_VuCy87QlUvPMqImBpuzTR3YCL9zzaxUfmBb83G-lPK-KuGAJsvEY49sENg5uObgHK-jT2lKxRtHtxMp-8Vquh7YtK-gXoa9SrfbAYRzw5oz19yQ84wtZcvPpv5FGYWMb4nbYdgpzUTSyxQPEjJqSVZduifWt20S1KZ3ZbnGudj-Q8f0-pP9Wq73j0F3gxbIyMjUFQ"
-        />
+      <div className="hidden lg:block fixed bottom-12 right-12 w-48 opacity-10 pointer-events-none z-0">
+        <span className="material-symbols-outlined text-[120px] text-primary">draw</span>
       </div>
-      <div className="hidden lg:block fixed top-12 left-12 w-32 opacity-30 pointer-events-none z-0">
-        <img
-          alt="Ink doodles"
-          className="w-full"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDReggf0P_wkcWWd0Fhda423sy33gQx4O8yth4VORSkrFmIMe3hMyR8OnwWuWU7OtpoU0sAv3n4dkMWkS36H28HiKLwMspeao6F2RwT7bAFdhxT0uIrPFmUOS6_XoXSbWuQnClBuMTVwZfGsZrQLuPRzj2q45y-6NYcCrphCnXtCdleSUlubDBY3GMZ_hyjYo2NA4eZ5kbw5GpGJZ1kzET1yTom38bkLcbe6v4hpyS0jTOSoHlOUehYbHvZAcxANcttNMP6F4SZODNM"
-        />
+      <div className="hidden lg:block fixed top-12 left-12 w-32 opacity-10 pointer-events-none z-0">
+        <span className="material-symbols-outlined text-[80px] text-primary">edit_note</span>
       </div>
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 md:px-12 py-6 md:py-12 relative z-10">

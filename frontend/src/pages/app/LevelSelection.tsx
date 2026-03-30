@@ -42,19 +42,11 @@ export const LevelSelectionPage: React.FC = () => {
   return (
     <div className="bg-surface font-body text-on-surface h-[100dvh] w-full overflow-hidden flex flex-col relative">
       {/* Decorative Images (xl only) */}
-      <div className="absolute top-16 left-8 hidden xl:block opacity-30 animate-fade-in delay-300 pointer-events-none z-0">
-        <img 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAW2U84HEOmiHW_63TqxruziDaKvxotxJHflcuepS9VsXXOdXd-b4mHuemSS83ltoH75dE36T4uX_nHrkJHSzk-Tsb_fZxPHjX0PvbhWAv3QC5VtCJx3-3ifjumGkBT2kxL0ab1Mj3wXZ7mcnpz4Yw0LpX-VqMiKtZ0lu2DNQBz5r2KwmdK3gmyOfoiJ3gxmPpwEDNvzXytU0iKF88pgH4iHmGZOXYHpRGLjugBMslORsJOxVW27ZaJb9WFExkk-e_L0rs8-BxDf03R" 
-          alt="Notebook sketch" 
-          className="w-24 h-auto rotate-12 object-contain" 
-        />
+      <div className="absolute top-16 left-8 hidden xl:block opacity-10 animate-fade-in delay-300 pointer-events-none z-0">
+        <span className="material-symbols-outlined text-[60px] text-primary rotate-12">school</span>
       </div>
-      <div className="absolute bottom-16 right-8 hidden xl:block opacity-30 animate-fade-in delay-500 pointer-events-none z-0">
-        <img 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBXTbgvm77eHbOrTlsjmKX0IkLKrduBYVsF5i2R4MsGESC4n15dYM4MOK879M-wJf7FY-kyaylvF_e3rGafraq_9K_MFyx9EpOZR-AozApDK3LL8AFqEXITrcV8-BZbvsdxMWWf_s1x9qQDxpoG0uS8e1QDz-vpxRzg6BOYOt5mXu1cjEpvaw6m4CJD8vy2DICTHKRTcu6QSZ-lr7nwIRuqweTLog72nlUEd7zdrFZnKSJpP8HwFZf_XtOA2XmseP7ML40ZQqF-S5MG" 
-          alt="Stick figure animation" 
-          className="w-36 h-auto object-contain" 
-        />
+      <div className="absolute bottom-16 right-8 hidden xl:block opacity-10 animate-fade-in delay-500 pointer-events-none z-0">
+        <span className="material-symbols-outlined text-[90px] text-primary">trending_up</span>
       </div>
 
       <main className="flex-1 w-full max-w-4xl mx-auto flex flex-col items-center px-4 sm:px-6 py-4 sm:py-6 md:py-8 relative z-10 min-h-0">

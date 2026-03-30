@@ -147,9 +147,9 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="my-5 md:my-6 flex items-center gap-3 md:gap-4">
             <div className="flex-1 h-3 md:h-3.5 bg-surface-container rounded-full border-2 border-black overflow-hidden relative sketch-card">
-              <div className="absolute top-0 left-0 h-full bg-secondary-container w-[0%] border-r-2 border-black"></div>
+              <div className="absolute top-0 left-0 h-full bg-secondary-container border-r-2 border-black" style={{ width: `${Math.min(100, (summary?.totalJournals || 0) * 20)}%` }}></div>
             </div>
-            <span className="font-bold text-base md:text-base font-headline">0%</span>
+            <span className="font-bold text-base md:text-base font-headline">{Math.min(100, (summary?.totalJournals || 0) * 20)}%</span>
           </div>
           <button onClick={() => (window.location.hash = '#speaking-intro')} className="w-full border-2 border-black py-2 md:py-2.5 rounded-xl font-headline font-bold hover:bg-secondary-container transition-colors sketch-border-subtle active:scale-95 text-sm md:text-base">
             {t('dashboard.continue_practice')}

@@ -63,13 +63,8 @@ export const CompletionPage: React.FC = () => {
           {/* Celebration Illustration Column */}
           <div className="md:col-span-5 flex flex-col items-center justify-center text-center">
             <div className="relative w-full aspect-square max-w-[360px] md:max-w-[400px]">
-              {/* Hand-drawn style illustration placeholder */}
               <div className="absolute inset-0 flex items-center justify-center animate-fade-in-up">
-                <img 
-                  className="w-full h-full object-contain filter grayscale opacity-90 transition-transform duration-500 hover:scale-105" 
-                  alt="Celebration stick figure" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNwyosLnMwOWeadIZ9nHC6SRlixq86Xc80HPYlQsV1XI0J4AaSL0tEOz-fM8zqhVpbza-8OeYC_Fq-JBuV_Q963enPDLatEssQL6tNp5en18NxZ50s56e9t7rm8dn2EgKjQwFqDmLRGBgd8k_khrbfheFgzDx2_4-NU7mvrb9E9IAZKrTsrx_kIg13Pm22y4lG7o9A-VdfSckMfAEpsZ4Ao6eulxjMajW4Nvg8MbSE_jNNIGL3Rb4TYjEmFFAU3zBMAf6zSvsVKnLD" 
-                />
+                <span className="material-symbols-outlined text-[120px] md:text-[160px] text-primary/40 transition-transform duration-500 hover:scale-105" style={{ fontVariationSettings: "'FILL' 1" }}>celebration</span>
               </div>
               {/* Abstract hand-drawn shapes */}
               <div className="absolute -top-4 -right-4 w-20 h-20 md:w-24 md:h-24 border-[3px] border-black rounded-full opacity-20 -rotate-12 float-anim delay-100 hidden sm:block"></div>

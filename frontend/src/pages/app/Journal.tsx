@@ -1,9 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getProgressSummary, type ProgressSummary } from '../../services/api/endpoints';
+import { trackPromptView } from '../../services/analytics/coreLoop';
 
 export const JournalPage: React.FC = () => {
   const { t } = useTranslation();
+  const [summary, setSummary] = useState<ProgressSummary | null>(null);
+
+  useEffect(() => {
+    getProgressSummary()
+      .then(res => {
+        setSummary(res);
+        trackPromptView({ dayNumber: (res.totalJournals || 0) + 1 });
+      })
+      .catch(() => {});
+  }, []);
+
+  const dayNumber = summary ? (summary.totalJournals || 0) + 1 : '...';
 
   return (
     <AppLayout activePath="#journal">
@@ -21,7 +35,7 @@ export const JournalPage: React.FC = () => {
                   {t('journal.session_intro')}
                 </span>
                 <h2 className="font-headline font-extrabold text-3xl md:text-4xl text-black wobble-heading leading-tight mx-auto md:mx-0 max-w-[90%] md:max-w-none">
-                  {t('journal.day_title', { day: 12 })}
+                  {t('journal.day_title', { day: dayNumber })}
                 </h2>
                 <div className="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant font-medium text-sm md:text-base mt-2">
                   <span className="material-symbols-outlined text-base md:text-lg">schedule</span>
@@ -72,11 +86,9 @@ export const JournalPage: React.FC = () => {
             <div className="relative w-full flex items-center justify-center">
               {/* Placeholder for Stick Figure Coach Illustration */}
               <div className="w-48 h-48 md:w-56 md:h-56 relative">
-                <img 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuACRj6ZUDspKqGFtYr0gxXtzZjyYV0OhHDyq2omcjUh-bGKTXPHW3GbmxPpDjH27NMZ2IajOW29jdLeZtqf5MnIEEmFHOZ49nJ-yOhC1BQBZDbAsjCgtR3TNw7boYU2bX5au17qpz447wZm5K6SNrwN7pqzWFXYtz6q3PkOHeuCDKpWVEF74wCDxkJ36Iha0IC9BybfzKglSvjqPDKGeRQfp-YAM99AP1KqdU3hIlp5eVAWq33vWq3vzGd1-oeR7565MO9EHBIi0Bdz" 
-                  alt="Coach Illustration" 
-                  className="w-full h-full grayscale opacity-80 object-contain drop-shadow-md"
-                />
+                <div className="w-full h-full bg-surface-container border-[3px] border-dashed border-black rounded-full flex items-center justify-center">
+                  <span className="material-symbols-outlined text-6xl md:text-7xl text-black/40">person</span>
+                </div>
                 {/* Speech Bubble */}
                 <div className="absolute -top-4 -right-4 md:-right-8 bg-white p-3 md:p-4 sketch-border rotate-3 shadow-sm max-w-[140px] md:max-w-[180px] z-10">
                   <p className="text-xs md:text-sm font-bold border-l-2 pl-2 border-black">

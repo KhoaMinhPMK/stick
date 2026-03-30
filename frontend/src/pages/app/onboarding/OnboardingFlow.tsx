@@ -69,8 +69,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ stepIndex }) => 
             <img
               alt={t('onboarding.step1.illustration_alt')}
               className="w-auto h-auto max-h-[min(24vh,220px)] sm:max-h-[min(28vh,220px)] object-contain opacity-90"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCO27qxX-wAOvvSdlYzerH1sfC9D8lEbkR8x5KmVLCn6GnbmG6GbCw7ocmeRTeNCB0qEZmOULFAf9IkhvFKTkj0K8Y1s1LdQCSDRzUhh-XUZqlEnNxamIXuD3yXx0RoulpmQ9QwGr2OEM9Lnj6W3b4gyXhHK74XA-ghVW_ECEevfUNjcSOi_nuHP0K1kB0daZ3EztALh_b7e4ftUyO-MgCCIwEt_6UPl_voLe31gRiismjf3sR0ChRHPuQfm5-1FHCvZffmb9PuIaUy"
+              src=""
+              style={{ display: 'none' }}
             />
+            <span className="material-symbols-outlined text-[100px] sm:text-[120px] text-primary/50" style={{ fontVariationSettings: "'FILL' 1" }}>draw</span>
           </div>
           <div className="space-y-2 md:space-y-4 animate-fade-in-up delay-200 opacity-0-init">
             <h1 className="font-headline font-extrabold text-[clamp(1.55rem,5.8vw,3rem)] text-primary tracking-tight px-2 transform -rotate-1 leading-tight">
