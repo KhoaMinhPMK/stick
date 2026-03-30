@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getProgressSummary, getProgressDaily, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
+import { getProgressSummary, getProgressDaily, getProgressDailyDetail, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -11,6 +11,8 @@ export const ProgressPage: React.FC = () => {
   const { t } = useTranslation();
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [dayDetail, setDayDetail] = useState<any>(null);
+  const [dayDetailLoading, setDayDetailLoading] = useState(false);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ export const ProgressPage: React.FC = () => {
       try {
         const [sumRes, dailyRes] = await Promise.all([
           getProgressSummary(),
-          getProgressDaily(60),
+          getProgressDaily(90),
         ]);
         setSummary(sumRes);
         setDailyData(dailyRes.items);
@@ -44,7 +46,7 @@ export const ProgressPage: React.FC = () => {
   // Build day statuses from daily progress data
   const activeDates = new Set(
     dailyData
-      .filter(d => (d.journalsCount > 0 || d.minutesSpent > 0 || d.xpEarned > 0))
+      .filter(d => (d.journalsCount > 0 || d.minutesSpent > 0 || d.xpEarned > 0 || d.wordsLearned > 0))
       .map(d => new Date(d.day).toISOString().split('T')[0])
   );
 
@@ -62,6 +64,32 @@ export const ProgressPage: React.FC = () => {
 
   const completedCount = days.filter(d => d.status === 'completed').length;
   const streak = summary?.currentStreak || 0;
+  const bestStreak = summary?.bestStreak || 0;
+
+  // Dynamic milestone: next multiple of 10
+  const nextMilestone = Math.max(Math.ceil((completedCount + 1) / 10) * 10, 10);
+
+  // Load day detail when clicking a completed day
+  const handleDayClick = async (day: number, status: DayStatus) => {
+    if (status !== 'completed' && status !== 'today') return;
+    if (selectedDay === day) {
+      setSelectedDay(null);
+      setDayDetail(null);
+      return;
+    }
+    setSelectedDay(day);
+    setDayDetailLoading(true);
+    setDayDetail(null);
+    try {
+      const dateStr = new Date(viewDate.getFullYear(), viewDate.getMonth(), day).toISOString().split('T')[0];
+      const res = await getProgressDailyDetail(dateStr);
+      setDayDetail(res.detail);
+    } catch (err) {
+      console.error('Failed to load day detail:', err);
+    } finally {
+      setDayDetailLoading(false);
+    }
+  };
 
   return (
     <AppLayout activePath="#progress">
@@ -89,10 +117,10 @@ export const ProgressPage: React.FC = () => {
                     <p className="text-on-surface-variant font-medium text-xs md:text-sm">{t('progress.consistency_quote')}</p>
                   </div>
                   <div className="flex gap-2 md:gap-4">
-                    <button onClick={() => setMonthOffset(m => m - 1)} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
+                    <button onClick={() => { setMonthOffset(m => m - 1); setSelectedDay(null); setDayDetail(null); }} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
                       <span className="material-symbols-outlined text-sm md:text-base">chevron_left</span>
                     </button>
-                    <button onClick={() => setMonthOffset(m => Math.min(m + 1, 0))} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
+                    <button onClick={() => { setMonthOffset(m => Math.min(m + 1, 0)); setSelectedDay(null); setDayDetail(null); }} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
                       <span className="material-symbols-outlined text-sm md:text-base">chevron_right</span>
                     </button>
                   </div>
@@ -118,7 +146,7 @@ export const ProgressPage: React.FC = () => {
                       return (
                         <div
                           key={day}
-                          onClick={() => setSelectedDay(selectedDay === day ? null : day)}
+                          onClick={() => handleDayClick(day, status)}
                           className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-tertiary-container flex flex-col items-center justify-center gap-0.5 md:gap-1 hover:-rotate-1 transition-transform cursor-pointer ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                         >
                           <span className="font-headline font-bold text-white text-xs md:text-base">{day}</span>
@@ -143,7 +171,8 @@ export const ProgressPage: React.FC = () => {
                       return (
                         <div
                           key={day}
-                          className="aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-secondary-container flex flex-col items-center justify-center gap-0.5 md:gap-1 ring-2 md:ring-4 ring-primary ring-offset-2 md:ring-offset-4 ring-offset-surface"
+                          onClick={() => handleDayClick(day, status)}
+                          className="aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-secondary-container flex flex-col items-center justify-center gap-0.5 md:gap-1 ring-2 md:ring-4 ring-primary ring-offset-2 md:ring-offset-4 ring-offset-surface cursor-pointer"
                         >
                           <span className="font-headline font-bold text-black text-xs md:text-base">{day}</span>
                           <span className="text-[8px] md:text-xs font-black uppercase">{t('progress.today')}</span>
@@ -161,6 +190,67 @@ export const ProgressPage: React.FC = () => {
                   })}
                 </div>
               </div>
+
+              {/* Day Detail Panel */}
+              {selectedDay && (
+                <div className="mt-4 bg-surface-container-lowest sketch-border p-4 md:p-6 animate-fade-in">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-headline font-bold text-base md:text-lg">
+                      📋 {viewDate.toLocaleDateString('en-US', { month: 'short' })} {selectedDay} — Day Detail
+                    </h4>
+                    <button onClick={() => { setSelectedDay(null); setDayDetail(null); }} className="text-stone-400 hover:text-black">
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                  {dayDetailLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                    </div>
+                  ) : dayDetail ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="bg-surface-container p-3 rounded-lg text-center">
+                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.journalsCount}</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">Journals</p>
+                        </div>
+                        <div className="bg-surface-container p-3 rounded-lg text-center">
+                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.wordsLearned}</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">Words</p>
+                        </div>
+                        <div className="bg-surface-container p-3 rounded-lg text-center">
+                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.xpEarned}</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">XP</p>
+                        </div>
+                        <div className="bg-surface-container p-3 rounded-lg text-center">
+                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.minutesSpent}</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">Minutes</p>
+                        </div>
+                      </div>
+                      {dayDetail.journals && dayDetail.journals.length > 0 && (
+                        <div>
+                          <p className="font-bold text-xs uppercase text-stone-500 mb-2">Journal entries:</p>
+                          <div className="space-y-2">
+                            {dayDetail.journals.map((j: any) => (
+                              <div
+                                key={j.id}
+                                onClick={() => window.location.hash = `#history-detail?id=${j.id}`}
+                                className="flex items-center justify-between bg-white p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-surface-container transition-colors"
+                              >
+                                <span className="font-medium text-sm">{j.title}</span>
+                                {j.score != null && (
+                                  <span className="bg-tertiary-container text-white text-xs font-bold px-2 py-0.5 rounded-full">{j.score}/100</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-stone-400 text-sm italic">No activity recorded for this day.</p>
+                  )}
+                </div>
+              )}
             </section>
 
             {/* Stats Side Panel */}
@@ -174,6 +264,13 @@ export const ProgressPage: React.FC = () => {
                     <div>
                       <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">Current Streak</p>
                       <p className="font-headline font-bold text-lg md:text-2xl">{streak} {t('progress.days')}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 md:gap-4 bg-surface/50 p-3 md:p-4 border-2 border-black rounded-lg">
+                    <div className="text-2xl md:text-4xl">🏆</div>
+                    <div>
+                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">Best Streak</p>
+                      <p className="font-headline font-bold text-lg md:text-2xl">{bestStreak} {t('progress.days')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 md:gap-4 bg-surface/50 p-3 md:p-4 border-2 border-black rounded-lg">
@@ -202,13 +299,26 @@ export const ProgressPage: React.FC = () => {
                 <h4 className="font-headline font-bold text-base md:text-xl mb-1 md:mb-2">{t('progress.keep_it_up')}</h4>
                 <p className="text-on-tertiary/90 leading-relaxed text-xs md:text-sm mb-4 md:mb-6">{t('progress.milestone_desc')}</p>
                 <div className="w-full h-3 md:h-4 bg-black/20 rounded-full overflow-hidden mb-1 md:mb-2">
-                  <div className="h-full bg-on-tertiary rounded-full transition-all" style={{ width: `${Math.min((completedCount / 20) * 100, 100)}%` }} />
+                  <div className="h-full bg-on-tertiary rounded-full transition-all" style={{ width: `${Math.min((completedCount / nextMilestone) * 100, 100)}%` }} />
                 </div>
                 <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase">
                   <span>{t('progress.day_current', { day: completedCount })}</span>
-                  <span>{t('progress.day_milestone', { day: 20 })}</span>
+                  <span>{t('progress.day_milestone', { day: nextMilestone })}</span>
                 </div>
               </div>
+
+              {/* Leaderboard CTA */}
+              <button
+                onClick={() => window.location.hash = '#leaderboard'}
+                className="w-full bg-surface-container-highest sketch-border p-4 md:p-5 flex items-center gap-3 hover:-rotate-1 transition-transform cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-3xl text-amber-500">emoji_events</span>
+                <div className="text-left flex-1">
+                  <p className="font-headline font-bold text-sm md:text-base">Leaderboard</p>
+                  <p className="text-xs text-stone-500">See how you rank against others</p>
+                </div>
+                <span className="material-symbols-outlined text-stone-400">chevron_right</span>
+              </button>
 
               {/* Encouragement */}
               <div className="flex flex-col items-center text-center py-4 md:py-6 opacity-60">

@@ -1,35 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-
-interface VocabCard {
-  type: 'phrase' | 'word';
-  word: string;
-  meaningKey: string;
-  exampleKey: string;
-  exampleHighlightKey: string;
-}
+import { apiRequest } from '../../services/api/client';
 
 export const VocabularyReviewPage: React.FC = () => {
   const { t } = useTranslation();
-  const [currentStep] = useState(3);
-  const totalSteps = 5;
-  const [reviewed, setReviewed] = useState<Record<string, 'got_it' | 'later'>>({});
+  const [vocabItems, setVocabItems] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const currentVocab: VocabCard = {
-    type: 'phrase',
-    word: 'a lot of',
-    meaningKey: 'vocab_review.cards.a_lot_of.meaning',
-    exampleKey: 'vocab_review.cards.a_lot_of.example',
-    exampleHighlightKey: 'a lot of',
-  };
+  useEffect(() => {
+    async function loadVocab() {
+      try {
+        const res = await apiRequest('/vocab/notebook');
+        setVocabItems(res.items || []);
+      } catch (err) {
+        console.error('Failed to load vocab', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadVocab();
+  }, []);
 
-  const handleGotIt = () => {
-    setReviewed(prev => ({ ...prev, [currentVocab.word]: 'got_it' }));
+  const currentVocab = vocabItems[currentIndex];
+  const isFinished = currentIndex >= vocabItems.length && !loading;
+
+  const handleGotIt = async () => {
+    if (!currentVocab || actionLoading) return;
+    setActionLoading(true);
+    try {
+      await apiRequest(`/vocab/notebook/${currentVocab.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ mastery: 'learning' })
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+      setCurrentIndex(prev => prev + 1);
+    }
   };
 
   const handleReviewLater = () => {
-    setReviewed(prev => ({ ...prev, [currentVocab.word]: 'later' }));
+    setCurrentIndex(prev => prev + 1);
   };
 
   const handleContinue = () => {
@@ -51,11 +66,22 @@ export const VocabularyReviewPage: React.FC = () => {
             </p>
           </section>
 
-          {/* Card Grid: Bento Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 lg:gap-8">
-            
-            {/* Primary Phrase Card */}
-            <div className="lg:col-span-7 bg-surface-container-lowest sketch-border p-6 md:p-8 lg:p-10 flex flex-col justify-between min-h-[320px] md:min-h-[380px]">
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <span className="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
+            </div>
+          ) : isFinished ? (
+            <div className="flex flex-col items-center justify-center text-center py-20 space-y-4">
+              <span className="material-symbols-outlined text-6xl text-tertiary">celebration</span>
+              <h2 className="font-headline text-2xl md:text-3xl font-bold">{vocabItems.length === 0 ? t('vocab_review.no_items', { defaultValue: 'Your notebook is empty!' }) : t('vocab_review.finished', { defaultValue: "You've reviewed all items!" })}</h2>
+              <button onClick={handleContinue} className="px-6 py-3 bg-black text-white rounded-full font-bold mt-4">
+                {t('vocab_review.continue_to_speaking')}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 lg:gap-8">
+              {/* Primary Phrase Card */}
+              <div className="lg:col-span-7 bg-surface-container-lowest sketch-border p-6 md:p-8 lg:p-10 flex flex-col justify-between min-h-[320px] md:min-h-[380px]">
               <div className="space-y-4 md:space-y-6">
                 <div className="flex justify-between items-start">
                   <span className="bg-secondary-container text-on-secondary-container px-3 md:px-4 py-1 rounded-full text-xs md:text-sm font-bold border-2 border-black uppercase">
@@ -69,35 +95,32 @@ export const VocabularyReviewPage: React.FC = () => {
                 <div className="space-y-3 md:space-y-4 pt-3 md:pt-4 border-t-2 border-dashed border-outline-variant">
                   <div>
                     <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-secondary mb-1">{t('vocab_review.meaning')}</p>
-                    <p className="text-lg md:text-xl lg:text-2xl font-medium">{t(currentVocab.meaningKey)}</p>
+                    <p className="text-lg md:text-xl lg:text-2xl font-medium">{currentVocab.meaning || 'No meaning provided'}</p>
                   </div>
-                  <div>
-                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-secondary mb-1">{t('vocab_review.example')}</p>
-                    <p className="text-lg md:text-xl lg:text-2xl italic text-tertiary">
-                      "I have <span className="underline decoration-4 decoration-secondary-container">{currentVocab.exampleHighlightKey}</span> friends."
-                    </p>
-                  </div>
+                  {currentVocab.example && (
+                    <div>
+                      <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-secondary mb-1">{t('vocab_review.example')}</p>
+                      <p className="text-lg md:text-xl lg:text-2xl italic text-tertiary">
+                        "{currentVocab.example}"
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-3 md:gap-4 mt-8 md:mt-10">
                 <button 
+                <button 
                   onClick={handleGotIt}
-                  className={`flex-1 py-3 md:py-4 rounded-full border-[3px] border-black font-bold text-sm md:text-base lg:text-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${
-                    reviewed[currentVocab.word] === 'got_it'
-                      ? 'bg-tertiary text-white'
-                      : 'bg-tertiary-container text-white hover:scale-[0.98]'
-                  }`}
+                  disabled={actionLoading}
+                  className="flex-1 py-3 md:py-4 rounded-full border-[3px] border-black font-bold text-sm md:text-base lg:text-lg transition-all flex items-center justify-center gap-2 active:scale-95 bg-tertiary-container text-white hover:scale-[0.98]"
                 >
                   <span className="material-symbols-outlined text-lg md:text-xl">check_circle</span>
-                  {t('vocab_review.got_it')}
+                  {actionLoading ? '...' : t('vocab_review.got_it')}
                 </button>
                 <button 
                   onClick={handleReviewLater}
-                  className={`flex-1 py-3 md:py-4 rounded-full border-[3px] border-black font-bold text-sm md:text-base lg:text-lg transition-all flex items-center justify-center gap-2 active:scale-95 ${
-                    reviewed[currentVocab.word] === 'later'
-                      ? 'bg-secondary-container'
-                      : 'bg-surface-container-highest text-black hover:bg-secondary-container'
-                  }`}
+                  disabled={actionLoading}
+                  className="flex-1 py-3 md:py-4 rounded-full border-[3px] border-black font-bold text-sm md:text-base lg:text-lg transition-all flex items-center justify-center gap-2 active:scale-95 bg-surface-container-highest text-black hover:bg-secondary-container"
                 >
                   <span className="material-symbols-outlined text-lg md:text-xl">replay</span>
                   {t('vocab_review.review_later')}
@@ -143,25 +166,29 @@ export const VocabularyReviewPage: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom Action Bar */}
-        <footer className="fixed bottom-0 left-0 md:left-[224px] lg:left-[256px] right-0 h-20 md:h-24 bg-surface-container-highest/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 lg:px-12 z-30 border-t-2 border-black/5">
-          <div className="flex flex-col">
-            <p className="text-[10px] md:text-xs font-bold text-on-surface-variant uppercase tracking-widest">
-              {t('vocab_review.step_of', { current: currentStep, total: totalSteps })}
-            </p>
-            <p className="font-headline font-bold text-sm md:text-base">{t('vocab_review.step_name')}</p>
-          </div>
-          <button 
-            onClick={handleContinue}
-            className="px-6 md:px-10 lg:px-12 py-3 md:py-4 bg-black text-white rounded-full font-headline font-black text-sm md:text-base lg:text-lg flex items-center gap-2 md:gap-3 hover:scale-105 transition-transform active:scale-95 sketch-border"
-          >
-            {t('vocab_review.continue_to_speaking')}
-            <span className="material-symbols-outlined text-lg md:text-xl">arrow_forward</span>
-          </button>
-        </footer>
+        {!isFinished && !loading && (
+          <footer className="fixed bottom-0 left-0 md:left-[224px] lg:left-[256px] right-0 h-20 md:h-24 bg-surface-container-highest/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 lg:px-12 z-30 border-t-2 border-black/5">
+            <div className="flex flex-col">
+              <p className="text-[10px] md:text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+                {t('vocab_review.step_of', { current: currentIndex + 1, total: vocabItems.length })}
+              </p>
+              <p className="font-headline font-bold text-sm md:text-base">Vocabulary Builder</p>
+            </div>
+            <button 
+              onClick={handleContinue}
+              className="px-6 md:px-10 lg:px-12 py-3 md:py-4 bg-black text-white rounded-full font-headline font-black text-sm md:text-base lg:text-lg flex items-center gap-2 md:gap-3 hover:scale-105 transition-transform active:scale-95 sketch-border"
+            >
+              Skip
+              <span className="material-symbols-outlined text-lg md:text-xl">fast_forward</span>
+            </button>
+          </footer>
+        )}
       </div>
     </AppLayout>
   );

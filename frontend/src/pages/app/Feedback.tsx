@@ -1,19 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { apiRequest } from '../../services/api/client';
 
 export const FeedbackPage: React.FC = () => {
   const { t } = useTranslation();
-  const [isLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isPlayingUser, setIsPlayingUser] = useState(false);
   const [isPlayingModel, setIsPlayingModel] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.location.hash = '#feedback-result';
-    }, 3000);
-    return () => clearTimeout(timer);
+  const id = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
   }, []);
+
+  useEffect(() => {
+    async function getFeedback() {
+      if (!id) {
+        window.location.hash = '#journal-workspace';
+        return;
+      }
+      try {
+        await apiRequest('/ai/feedback/text', {
+          method: 'POST',
+          body: JSON.stringify({ journalId: id }),
+        });
+        window.location.hash = `#feedback-result?id=${id}`;
+      } catch (err) {
+        console.error('AI feedback failed', err);
+        window.location.hash = `#history-detail?id=${id}`;
+      }
+    }
+    getFeedback();
+  }, [id]);
 
   // Example waveform data
   const waveform = [

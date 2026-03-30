@@ -1,18 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { apiRequest } from '../../services/api/client';
 
 export const EditProfilePage: React.FC = () => {
   const { t } = useTranslation();
-  const [name, setName] = useState('Alex Rivers');
-  const [bio, setBio] = useState('Language learner, coffee lover, aspiring traveler.');
-  const [email, setEmail] = useState('alex@example.com');
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
+  const [email, setEmail] = useState('');
   const [nativeLang, setNativeLang] = useState('Vietnamese');
   const [showToast, setShowToast] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2500);
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const res = await apiRequest<{ user: { name: string; email: string; bio: string | null; nativeLanguage: string | null } }>('/profile');
+        if (res.user) {
+          setName(res.user.name || '');
+          setEmail(res.user.email || '');
+          setBio(res.user.bio || '');
+          setNativeLang(res.user.nativeLanguage || 'Vietnamese');
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+  }, []);
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await apiRequest('/profile', {
+        method: 'PUT',
+        body: { name, bio, nativeLanguage: nativeLang }
+      });
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2500);
+    } catch (err) {
+      console.error('Failed to save profile', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -30,7 +64,13 @@ export const EditProfilePage: React.FC = () => {
           </h2>
           <p className="text-on-surface-variant font-medium text-xs md:text-sm mt-1">{t('edit_profile.subtitle')}</p>
         </div>
-
+          
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+          </div>
+        ) : (
+          <>
         {/* Avatar Section */}
         <div className="sketch-card p-6 md:p-8 mb-6 flex flex-col sm:flex-row items-center gap-5 md:gap-8">
           <div className="relative shrink-0">
@@ -109,15 +149,18 @@ export const EditProfilePage: React.FC = () => {
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Save FAB */}
       <button
         onClick={handleSave}
-        className="fixed bottom-24 md:bottom-8 right-6 md:right-8 bg-primary text-white px-6 py-3 rounded-full sketch-border shadow-xl flex items-center gap-2 font-headline font-bold hover:scale-105 active:scale-95 transition-all z-50"
+        disabled={loading || saving}
+        className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 bg-primary text-white px-6 py-3 rounded-full sketch-border shadow-xl flex items-center gap-2 font-headline font-bold hover:scale-105 active:scale-95 transition-all z-50 ${loading || saving ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <span className="material-symbols-outlined text-lg">save</span>
-        {t('edit_profile.save')}
+        <span className="material-symbols-outlined text-lg">{saving ? 'hourglass_empty' : 'save'}</span>
+        {saving ? t('edit_profile.saving', { defaultValue: 'Saving...' }) : t('edit_profile.save')}
       </button>
     </AppLayout>
 

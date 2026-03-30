@@ -1,20 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getLeaderboard, getProgressSummary, type LeaderboardEntry } from '../../services/api/endpoints';
 
 export const LeaderboardPage: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'weekly' | 'all-time'>('weekly');
+  const [ranking, setRanking] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userStreak, setUserStreak] = useState(0);
 
-  const ranking = [
-    { rank: 1, name: "Maria Garcia", score: 12450, isUser: false, streak: 45 },
-    { rank: 2, name: "David Chen", score: 11200, isUser: false, streak: 30 },
-    { rank: 3, name: "Sarah Williams", score: 10850, isUser: false, streak: 22 },
-    { rank: 4, name: "You", score: 9840, isUser: true, streak: 15 },
-    { rank: 5, name: "Alex Turner", score: 9500, isUser: false, streak: 18 },
-    { rank: 6, name: "Jessica Lee", score: 8700, isUser: false, streak: 12 },
-    { rank: 7, name: "Michael Chang", score: 8200, isUser: false, streak: 10 },
-  ];
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        const [lbRes, sumRes] = await Promise.all([
+          getLeaderboard(activeTab),
+          getProgressSummary(),
+        ]);
+        setRanking(lbRes.items);
+        setUserStreak(sumRes.currentStreak);
+      } catch (err) {
+        console.error('Failed to load leaderboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [activeTab]);
+
+  // Get top 3 and remaining
+  const top3 = ranking.slice(0, 3);
+  const rest = ranking.slice(3);
+
+  // Podium order: [2nd, 1st, 3rd]
+  const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
+
+  const medalColors = ['#C0C0C0', '#FFD700', '#CD7F32']; // silver, gold, bronze
+  const podiumHeights = ['h-24 md:h-32', 'h-32 md:h-48', 'h-20 md:h-24'];
+  const podiumBg = ['bg-stone-200', 'bg-[#FFF5CC]', 'bg-orange-100'];
 
   return (
     <AppLayout activePath="#progress">
@@ -23,7 +47,7 @@ export const LeaderboardPage: React.FC = () => {
         {/* Header Element */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
           <div className="flex items-center gap-4 w-full md:w-auto">
-             <button onClick={() => window.history.back()} className="p-2 hover:bg-surface-container rounded-full transition-colors hidden md:block">
+             <button onClick={() => window.location.hash = '#progress'} className="p-2 hover:bg-surface-container rounded-full transition-colors hidden md:block">
                 <span className="material-symbols-outlined">arrow_back</span>
              </button>
              <h1 className="font-headline font-black text-3xl tracking-tighter w-full md:w-auto text-center md:text-left">
@@ -51,75 +75,108 @@ export const LeaderboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Podium (Top 3) */}
-        <div className="flex justify-center items-end gap-2 md:gap-4 lg:gap-8 mb-16 px-4">
-           {/* 2nd Place */}
-           <div className="flex flex-col items-center flex-1 max-w-[120px]">
-             <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-surface-container border-2 border-stone-300 relative mb-4">
-                <div className="absolute -bottom-2 md:-bottom-3 left-1/2 -translate-x-1/2 bg-stone-300 text-stone-800 font-black text-xs md:text-sm w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full border border-surface">2</div>
-             </div>
-             <p className="font-headline font-bold text-xs md:text-sm text-center line-clamp-1 mb-1">{ranking[1].name}</p>
-             <div className="w-full bg-stone-200 h-24 md:h-32 rounded-t-xl sketch-border border-b-0 flex flex-col items-center justify-start pt-4">
-               <span className="font-black text-lg md:text-xl">{ranking[1].score.toLocaleString()}</span>
-             </div>
-           </div>
-           
-           {/* 1st Place */}
-           <div className="flex flex-col items-center flex-1 max-w-[140px] z-10">
-             <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-secondary-container border-4 border-[#FFD700] relative mb-4 shadow-[0_0_20px_rgba(255,215,0,0.5)]">
-                <span className="material-symbols-outlined text-[#FFD700] absolute -top-6 left-1/2 -translate-x-1/2 text-3xl">emoji_events</span>
-                <div className="absolute -bottom-3 md:-bottom-4 left-1/2 -translate-x-1/2 bg-[#FFD700] text-stone-900 font-black text-sm md:text-base w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full border-2 border-surface">1</div>
-             </div>
-             <p className="font-headline font-black text-sm md:text-base text-center line-clamp-1 mb-1">{ranking[0].name}</p>
-             <div className="w-full bg-[#FFF5CC] h-32 md:h-48 rounded-t-xl sketch-border border-[#FFD700] border-b-0 flex flex-col items-center justify-start pt-4">
-               <span className="font-black text-xl md:text-2xl text-[#B38F00]">{ranking[0].score.toLocaleString()}</span>
-             </div>
-           </div>
-
-           {/* 3rd Place */}
-           <div className="flex flex-col items-center flex-1 max-w-[120px]">
-             <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-surface-container border-2 border-[#CD7F32] relative mb-4">
-                <div className="absolute -bottom-2 md:-bottom-3 left-1/2 -translate-x-1/2 bg-[#CD7F32] text-white font-black text-xs md:text-sm w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full border border-surface">3</div>
-             </div>
-             <p className="font-headline font-bold text-xs md:text-sm text-center line-clamp-1 mb-1">{ranking[2].name}</p>
-             <div className="w-full bg-[#f4e2d2] h-20 md:h-28 rounded-t-xl sketch-border border-b-0 flex flex-col items-center justify-start pt-4">
-               <span className="font-black text-lg md:text-xl text-[#8E511A]">{ranking[2].score.toLocaleString()}</span>
-             </div>
-           </div>
-        </div>
-
-        {/* List View */}
-        <div className="bg-surface-container-lowest rounded-3xl sketch-border overflow-hidden flex flex-col gap-px bg-black">
-          {ranking.slice(3).map((r, i) => (
-            <div 
-              key={i} 
-              className={`flex items-center gap-4 p-4 md:p-6 transition-colors ${r.isUser ? 'bg-primary/10 -ml-1 border-l-4 border-l-primary' : 'bg-surface-container-lowest hover:bg-surface-container'}`}
-            >
-              <div className="font-headline font-black text-on-surface-variant w-6 text-center">{r.rank}</div>
-              <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
-                 <span className="material-symbols-outlined text-stone-500">person</span>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+          </div>
+        ) : ranking.length === 0 ? (
+          <div className="text-center py-20">
+            <span className="material-symbols-outlined text-6xl text-stone-300 mb-4">leaderboard</span>
+            <h3 className="font-headline font-bold text-xl mb-2">No data yet</h3>
+            <p className="text-stone-400">Start writing journals and learning words to appear on the leaderboard!</p>
+          </div>
+        ) : (
+          <>
+            {/* Podium (Top 3) */}
+            {top3.length >= 3 && (
+              <div className="flex justify-center items-end gap-2 md:gap-4 lg:gap-8 mb-16 px-4">
+                {podiumOrder.map((entry, podiumIdx) => {
+                  const actualRank = entry.rank;
+                  const isGold = actualRank === 1;
+                  const borderColor = actualRank === 1 ? '#FFD700' : actualRank === 2 ? '#C0C0C0' : '#CD7F32';
+                  return (
+                    <div key={entry.userId} className={`flex flex-col items-center flex-1 ${isGold ? 'max-w-[140px] z-10' : 'max-w-[120px]'}`}>
+                      <div className={`${isGold ? 'w-16 h-16 md:w-24 md:h-24 border-4' : 'w-12 h-12 md:w-16 md:h-16 border-2'} rounded-full bg-surface-container relative mb-4 ${isGold ? 'shadow-[0_0_20px_rgba(255,215,0,0.5)]' : ''}`}
+                        style={{ borderColor }}
+                      >
+                        {isGold && <span className="material-symbols-outlined text-[#FFD700] absolute -top-6 left-1/2 -translate-x-1/2 text-3xl">emoji_events</span>}
+                        <div className="absolute -bottom-2 md:-bottom-3 left-1/2 -translate-x-1/2 font-black text-xs md:text-sm w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full border border-surface"
+                          style={{ backgroundColor: borderColor, color: actualRank === 1 ? '#5c4c00' : '#fff' }}
+                        >
+                          {actualRank}
+                        </div>
+                        <div className="w-full h-full rounded-full flex items-center justify-center text-xl md:text-2xl font-black text-stone-400">
+                          {entry.name.charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+                      <p className={`font-headline ${isGold ? 'font-black text-sm md:text-base' : 'font-bold text-xs md:text-sm'} text-center line-clamp-1 mb-1 ${entry.isUser ? 'text-primary' : ''}`}>
+                        {entry.isUser ? 'You' : entry.name}
+                      </p>
+                      <div className={`w-full ${podiumHeights[podiumIdx]} rounded-t-xl sketch-border border-b-0 flex flex-col items-center justify-start pt-4 ${podiumBg[podiumIdx]}`}
+                        style={{ borderColor: isGold ? '#FFD700' : undefined }}
+                      >
+                        <span className={`font-black ${isGold ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'}`}
+                          style={{ color: isGold ? '#B38F00' : undefined }}
+                        >
+                          {entry.score.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] md:text-xs font-bold text-stone-500 mt-1">XP</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex-1 min-w-0">
-                <h4 className={`font-headline font-bold text-base md:text-lg truncate ${r.isUser ? 'text-primary' : ''}`}>
-                  {r.name}
-                </h4>
-                <div className="flex items-center gap-1 text-xs text-orange-600 font-bold max-w-max bg-orange-100 px-2 py-0.5 rounded">
-                  <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
-                  {r.streak} day streak
+            )}
+
+            {/* Rest of rankings */}
+            <div className="space-y-3 px-2 md:px-0">
+              {rest.map((entry) => (
+                <div
+                  key={entry.userId}
+                  className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl border-2 transition-all ${
+                    entry.isUser
+                      ? 'border-primary bg-secondary-container shadow-[4px_4px_0_0_#000]'
+                      : 'border-stone-200 bg-white hover:border-stone-400'
+                  }`}
+                >
+                  {/* Rank */}
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-black text-sm md:text-base ${
+                    entry.isUser ? 'bg-black text-white' : 'bg-surface-container text-stone-600'
+                  }`}>
+                    {entry.rank}
+                  </div>
+
+                  {/* Avatar circle */}
+                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center text-lg font-bold ${
+                    entry.isUser ? 'border-black bg-surface-container-highest' : 'border-stone-200 bg-surface-container'
+                  }`}>
+                    {(entry.isUser ? 'Y' : entry.name.charAt(0)).toUpperCase()}
+                  </div>
+
+                  {/* Name */}
+                  <div className="flex-1">
+                    <p className={`font-headline font-bold text-sm md:text-base ${entry.isUser ? 'text-black' : 'text-stone-700'}`}>
+                      {entry.isUser ? `You${userStreak > 0 ? ` 🔥${userStreak}` : ''}` : entry.name}
+                    </p>
+                  </div>
+
+                  {/* Score */}
+                  <div className="text-right">
+                    <p className="font-headline font-black text-base md:text-lg">{entry.score.toLocaleString()}</p>
+                    <p className="text-[10px] md:text-xs font-bold text-stone-400 uppercase">XP</p>
+                  </div>
                 </div>
-              </div>
-              <div className="font-headline font-black text-lg md:text-xl text-stone-800 text-right">
-                {r.score.toLocaleString()}
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Footer info msg */}
-        <p className="font-body text-on-surface-variant text-center mt-6 text-sm">
-           {t('leaderboard.update_info', { defaultValue: 'Leaderboard updates every 15 minutes.' })}
-        </p>
-
+            {/* No one outside top 3 */}
+            {rest.length === 0 && top3.length > 0 && (
+              <div className="text-center py-10">
+                <p className="text-stone-400 text-sm">Keep learning to climb the ranks!</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </AppLayout>
   );

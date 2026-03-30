@@ -28,6 +28,36 @@ async function getOrCreateOnboardingState(userId) {
   return state;
 }
 
+/**
+ * Track daily progress — upsert a ProgressDaily row for today.
+ * Call this whenever the user does something meaningful.
+ */
+async function trackDailyProgress(userId, data = {}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  try {
+    await prisma.progressDaily.upsert({
+      where: { userId_day: { userId, day: today } },
+      update: {
+        journalsCount: { increment: data.journals || 0 },
+        wordsLearned:  { increment: data.words || 0 },
+        minutesSpent:  { increment: data.minutes || 0 },
+        xpEarned:      { increment: data.xp || 0 },
+      },
+      create: {
+        userId,
+        day: today,
+        journalsCount: data.journals || 0,
+        wordsLearned:  data.words || 0,
+        minutesSpent:  data.minutes || 0,
+        xpEarned:      data.xp || 0,
+      },
+    });
+  } catch (err) {
+    console.error('trackDailyProgress error:', err.message);
+  }
+}
+
 // ─── Health ───────────────────────────────────────────
 router.get('/health', (_req, res) => {
   res.status(200).json({
@@ -283,6 +313,9 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
     },
   });
 
+  // Track daily progress: +1 journal, +10 XP
+  await trackDailyProgress(req.authUser.id, { journals: 1, xp: 10 });
+
   res.status(201).json({ journal });
 }));
 
@@ -374,7 +407,7 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
   // If journalId is provided, update the journal score and feedback
   if (journalId) {
     try {
-      await prisma.journal.update({
+      const updatedJournal = await prisma.journal.update({
         where: { id: journalId },
         data: {
           score: feedback.overallScore || null,
@@ -382,7 +415,25 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
           status: 'submitted',
         },
       });
-    } catch {}
+
+      // Track XP based on score
+      const bonusXp = Math.round((feedback.overallScore || 0) / 5);
+      await trackDailyProgress(req.authUser.id, { xp: bonusXp });
+
+      // Create a LearningSession record for history
+      await prisma.learningSession.create({
+        data: {
+          userId: req.authUser.id,
+          type: 'journal',
+          title: updatedJournal.title || 'Journal Entry',
+          summary: `Score: ${feedback.overallScore || 0}/100`,
+          score: feedback.overallScore || null,
+          metadata: JSON.stringify({ journalId }),
+        },
+      });
+    } catch (err) {
+      console.error('Failed to update journal after AI feedback:', err.message);
+    }
   }
 
   res.status(200).json({ feedback });
@@ -582,6 +633,10 @@ router.post('/phrases', requireAuth, asyncHandler(async (req, res) => {
       category: category || 'general',
     },
   });
+
+  // Track daily progress: +2 XP
+  await trackDailyProgress(req.authUser.id, { xp: 2 });
+
   res.status(201).json({ phrase: saved });
 }));
 
@@ -624,6 +679,10 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
       notes: notes || null,
     },
   });
+
+  // Track daily progress: +1 word, +3 XP
+  await trackDailyProgress(req.authUser.id, { words: 1, xp: 3 });
+
   res.status(201).json({ item });
 }));
 
@@ -729,26 +788,59 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   });
 
   let currentStreak = 0;
+  let bestStreak = 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Build a set of active date strings for fast lookup
+  const activeDateSet = new Set();
+  for (const p of dailyProgress) {
+    if (p.journalsCount > 0 || p.minutesSpent > 0 || p.xpEarned > 0 || p.wordsLearned > 0) {
+      activeDateSet.add(new Date(p.day).toISOString().split('T')[0]);
+    }
+  }
+
+  // Calculate current streak
   for (let i = 0; i < 60; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
     const dateStr = checkDate.toISOString().split('T')[0];
-    const found = dailyProgress.find((p) => {
-      const pDate = new Date(p.day).toISOString().split('T')[0];
-      return pDate === dateStr;
-    });
-    if (found && (found.journalsCount > 0 || found.minutesSpent > 0)) {
+    if (activeDateSet.has(dateStr)) {
       currentStreak++;
     } else if (i === 0) {
-      // Today might not have activity yet, skip
-      continue;
+      continue; // Today might not have activity yet
     } else {
       break;
     }
   }
+
+  // Calculate best streak (longest consecutive run in last 365 days)
+  const allProgress = await prisma.progressDaily.findMany({
+    where: { userId: req.authUser.id },
+    orderBy: { day: 'asc' },
+  });
+  const allActiveDates = allProgress
+    .filter(p => p.journalsCount > 0 || p.minutesSpent > 0 || p.xpEarned > 0 || p.wordsLearned > 0)
+    .map(p => new Date(p.day).toISOString().split('T')[0])
+    .sort();
+
+  let tempStreak = 0;
+  for (let i = 0; i < allActiveDates.length; i++) {
+    if (i === 0) {
+      tempStreak = 1;
+    } else {
+      const prev = new Date(allActiveDates[i - 1]);
+      const curr = new Date(allActiveDates[i]);
+      const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) {
+        tempStreak++;
+      } else {
+        tempStreak = 1;
+      }
+    }
+    if (tempStreak > bestStreak) bestStreak = tempStreak;
+  }
+  if (currentStreak > bestStreak) bestStreak = currentStreak;
 
   // Average score
   const journals = await prisma.journal.findMany({
@@ -768,6 +860,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     totalPhrases,
     totalSessions,
     currentStreak,
+    bestStreak,
     avgScore,
     totalXp,
     onboardingCompleted: onboarding.completed,
@@ -826,6 +919,127 @@ router.get('/library/lessons/:id', asyncHandler(async (req, res) => {
     return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
   }
   res.status(200).json({ lesson });
+}));
+
+// ─── Leaderboard ─────────────────────────────────────
+router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
+  const scope = req.query.scope || 'weekly'; // 'weekly' or 'all-time'
+
+  let dateFilter = {};
+  if (scope === 'weekly') {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+    dateFilter = { day: { gte: weekAgo } };
+  }
+
+  // Get all users' XP totals
+  const userXp = await prisma.progressDaily.groupBy({
+    by: ['userId'],
+    where: dateFilter,
+    _sum: { xpEarned: true },
+    orderBy: { _sum: { xpEarned: 'desc' } },
+    take: 20,
+  });
+
+  // Get user details
+  const userIds = userXp.map(u => u.userId);
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, name: true },
+  });
+  const userMap = {};
+  for (const u of users) userMap[u.id] = u;
+
+  const items = userXp.map((entry, idx) => ({
+    rank: idx + 1,
+    userId: entry.userId,
+    name: userMap[entry.userId]?.name || 'Unknown',
+    score: entry._sum.xpEarned || 0,
+    isUser: entry.userId === req.authUser.id,
+  }));
+
+  // If current user isn't in top 20, add them
+  const userInList = items.some(i => i.isUser);
+  if (!userInList) {
+    const userTotal = await prisma.progressDaily.aggregate({
+      where: { userId: req.authUser.id, ...dateFilter },
+      _sum: { xpEarned: true },
+    });
+    items.push({
+      rank: items.length + 1,
+      userId: req.authUser.id,
+      name: req.authUser.name || 'You',
+      score: userTotal._sum.xpEarned || 0,
+      isUser: true,
+    });
+  }
+
+  res.status(200).json({ items, scope });
+}));
+
+// ─── Journal Mood ────────────────────────────────────
+router.post('/journals/:id/mood', requireAuth, asyncHandler(async (req, res) => {
+  const { mood } = req.body || {};
+  if (!mood) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'mood is required' });
+  }
+
+  const journal = await prisma.journal.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!journal) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Journal not found' });
+  }
+
+  // Store mood in journal feedback JSON
+  let feedbackObj = {};
+  if (journal.feedback) {
+    try { feedbackObj = JSON.parse(journal.feedback); } catch {}
+  }
+  feedbackObj.mood = mood;
+
+  await prisma.journal.update({
+    where: { id: req.params.id },
+    data: { feedback: JSON.stringify(feedbackObj) },
+  });
+
+  res.status(200).json({ message: 'Mood saved', mood });
+}));
+
+// ─── Progress Daily Detail ──────────────────────────
+router.get('/progress/daily/:date', requireAuth, asyncHandler(async (req, res) => {
+  const dateStr = req.params.date; // YYYY-MM-DD
+  const targetDate = new Date(dateStr);
+  targetDate.setHours(0, 0, 0, 0);
+
+  const progress = await prisma.progressDaily.findUnique({
+    where: { userId_day: { userId: req.authUser.id, day: targetDate } },
+  });
+
+  if (!progress) {
+    return res.status(200).json({ detail: null });
+  }
+
+  // Get journals written on that day
+  const nextDay = new Date(targetDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+
+  const journals = await prisma.journal.findMany({
+    where: {
+      userId: req.authUser.id,
+      createdAt: { gte: targetDate, lt: nextDay },
+      deletedAt: null,
+    },
+    select: { id: true, title: true, score: true, createdAt: true },
+  });
+
+  res.status(200).json({
+    detail: {
+      ...progress,
+      journals,
+    },
+  });
 }));
 
 // ─── Error Handler ───────────────────────────────────

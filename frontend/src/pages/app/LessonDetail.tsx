@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getLessonDetail, type LessonDetail } from '../../services/api/endpoints';
 
 const lessonSections = [
   { type: 'intro', titleKey: 'lesson_detail.section_intro', content: 'lesson_detail.intro_content', icon: 'info' },
@@ -16,13 +17,50 @@ const quizQuestions = [
 
 export const LessonDetailPage: React.FC = () => {
   const { t } = useTranslation();
+  const [lesson, setLesson] = useState<LessonDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const [completedSections, setCompletedSections] = useState<number[]>([]);
   const [currentQuiz, setCurrentQuiz] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const progress = Math.round((completedSections.length / lessonSections.length) * 100);
+  const id = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await getLessonDetail(id);
+        setLesson(res.lesson);
+      } catch (err) {
+        console.error('Failed to load lesson detail', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
+  let sectionsToRender = lessonSections;
+  if (lesson?.content) {
+    try {
+      const parsed = JSON.parse(lesson.content);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        sectionsToRender = parsed;
+      }
+    } catch (e) {
+      // Not JSON, ignore and use mock
+    }
+  }
+
+  const progress = Math.round((completedSections.length / sectionsToRender.length) * 100);
 
   const toggleSection = (idx: number) => {
     setCompletedSections(prev =>
@@ -42,6 +80,28 @@ export const LessonDetailPage: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <AppLayout activePath="#library">
+        <div className="flex items-center justify-center py-20">
+          <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!lesson) {
+    return (
+      <AppLayout activePath="#library">
+        <div className="flex flex-col items-center justify-center py-20">
+          <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
+          <p className="font-headline font-bold text-xl">{t('lesson_detail.not_found', { defaultValue: 'Lesson not found' })}</p>
+          <button onClick={() => window.location.hash = '#library'} className="mt-4 text-primary underline">Go back</button>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout activePath="#library">
       <div className="max-w-6xl mx-auto">
@@ -54,9 +114,14 @@ export const LessonDetailPage: React.FC = () => {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="font-headline font-extrabold text-2xl md:text-3xl lg:text-4xl tracking-tight -rotate-1 origin-left">
-                {t('lesson_detail.title')}
+                {lesson.title}
               </h2>
-              <p className="text-on-surface-variant font-medium text-xs md:text-sm mt-1">{t('lesson_detail.subtitle')}</p>
+              <p className="text-on-surface-variant font-medium text-xs md:text-sm mt-1">{lesson.description}</p>
+              <div className="flex gap-2 mt-3">
+                <span className="bg-surface-container-high px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase border border-black/10">{lesson.category}</span>
+                <span className="bg-surface-container-highest px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase border border-black/10">{lesson.level}</span>
+                <span className="bg-primary/10 text-primary px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase border border-primary/20">{lesson.duration} min</span>
+              </div>
             </div>
             <button onClick={() => setSaved(!saved)} className="shrink-0 p-2 md:p-3 border-2 border-black rounded-lg hover:bg-secondary-container transition-colors active:scale-95">
               <span className="material-symbols-outlined text-lg md:text-xl" style={{ fontVariationSettings: saved ? "'FILL' 1" : "'FILL' 0" }}>
@@ -81,7 +146,7 @@ export const LessonDetailPage: React.FC = () => {
             </div>
 
             {/* Lesson Sections */}
-            {lessonSections.map((section, idx) => (
+            {sectionsToRender.map((section: any, idx: number) => (
               <div key={idx} className={`sketch-card p-5 md:p-8 transition-all ${completedSections.includes(idx) ? 'bg-tertiary-container/10 border-tertiary' : 'bg-surface-container-lowest'}`}>
                 <div className="flex items-start gap-3 md:gap-4">
                   <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-black flex items-center justify-center shrink-0 ${completedSections.includes(idx) ? 'bg-tertiary-container' : 'bg-surface-container'}`}>
@@ -90,9 +155,9 @@ export const LessonDetailPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-headline font-bold text-base md:text-xl mb-2 md:mb-3">{t(section.titleKey)}</h3>
-                    <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed mb-3 md:mb-4">
-                      {t(section.content)}
+                    <h3 className="font-headline font-bold text-base md:text-xl mb-2 md:mb-3">{section.titleKey ? t(section.titleKey) : section.title}</h3>
+                    <p className="text-on-surface-variant text-xs md:text-sm leading-relaxed mb-3 md:mb-4 whitespace-pre-wrap">
+                      {section.contentKey ? t(section.contentKey) : section.content}
                     </p>
                     <button
                       onClick={() => toggleSection(idx)}

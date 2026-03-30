@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { apiRequest } from '../../services/api/client';
 
 const QUICK_PROMPTS = [
   { icon: 'lightbulb', key: 'prompt_meal' },
@@ -12,6 +13,8 @@ export const JournalWorkspacePage: React.FC = () => {
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [showHelper, setShowHelper] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
   const targetWords = 50;
@@ -33,9 +36,35 @@ export const JournalWorkspacePage: React.FC = () => {
     { word: 'Hang out', meaning: t('journal_workspace.vocab_suggest.hang_out') },
   ];
 
-  const handleSubmit = () => {
-    if (canSubmit) {
-      window.location.hash = '#vocab-review';
+  const handleSubmit = async () => {
+    if (canSubmit && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        const res = await apiRequest('/journals', {
+          method: 'POST',
+          body: JSON.stringify({ title: 'Daily Journal', content: text, status: 'draft', language: 'en' }),
+        });
+        window.location.hash = `#feedback?id=${res.journal.id}`;
+      } catch (err) {
+        console.error('Failed to submit journal', err);
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!text.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      await apiRequest('/journals', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Daily Journal', content: text, status: 'draft', language: 'en' }),
+      });
+      alert(t('journal_workspace.draft_saved_alert', { defaultValue: 'Draft saved!' }));
+    } catch (err) {
+      console.error('Failed to save draft', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -109,21 +138,23 @@ export const JournalWorkspacePage: React.FC = () => {
               </div>
               <div className="flex gap-2 md:gap-4 w-full sm:w-auto">
                 <button 
-                  className="flex-1 sm:flex-none px-4 md:px-6 lg:px-8 py-2 md:py-3 rounded-full border-2 border-black font-bold text-sm md:text-base hover:bg-surface-container transition-all active:scale-95"
+                  onClick={handleSaveDraft}
+                  disabled={wordCount === 0 || isSaving}
+                  className="flex-1 sm:flex-none px-4 md:px-6 lg:px-8 py-2 md:py-3 rounded-full border-2 border-black font-bold text-sm md:text-base hover:bg-surface-container transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {t('journal_workspace.save_draft')}
+                  {isSaving ? '...' : t('journal_workspace.save_draft')}
                 </button>
                 <button 
                   onClick={handleSubmit}
-                  disabled={!canSubmit}
+                  disabled={!canSubmit || isSubmitting}
                   className={`flex-1 sm:flex-none px-5 md:px-8 lg:px-10 py-2 md:py-3 rounded-full font-bold text-sm md:text-base flex items-center justify-center gap-2 transition-all ${
-                    canSubmit
+                    canSubmit && !isSubmitting
                       ? 'bg-black text-white hover:scale-105 active:scale-95'
                       : 'bg-surface-dim text-stone-400 cursor-not-allowed opacity-60'
                   }`}
                 >
-                  {t('journal_workspace.submit')}
-                  <span className="material-symbols-outlined text-sm md:text-base">arrow_forward</span>
+                  {isSubmitting ? '...' : t('journal_workspace.submit')}
+                  {!isSubmitting && <span className="material-symbols-outlined text-sm md:text-base">arrow_forward</span>}
                 </button>
               </div>
             </div>

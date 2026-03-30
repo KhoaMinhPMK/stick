@@ -1,19 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { apiRequest } from '../../services/api/client';
 
 export const JournalArchivePage: React.FC = () => {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<'all' | 'high-score' | 'bookmarked'>('all');
   const [search, setSearch] = useState('');
 
-  const archive = [
-    { title: "The Coffee Shop Phenomenon", date: "Oct 12, 2026", score: 92, preview: "Sitting in a bustling cafe, I realized how much of communication is non-verbal...", isBookmarked: true },
-    { title: "Review of \"Atomic Habits\"", date: "Oct 10, 2026", score: 85, preview: "The core thesis that small changes compound over time is incredibly applicable to...", isBookmarked: false },
-    { title: "Why I started learning English", date: "Oct 5, 2026", score: 78, preview: "It wasn't just about passing an exam. It was about accessing a world of information...", isBookmarked: false },
-    { title: "A letter to my future self", date: "Sep 28, 2026", score: 95, preview: "Dear future me, I hope you have finally mastered the present perfect tense...", isBookmarked: true },
-    { title: "The paradox of choice in modern dating", date: "Sep 20, 2026", score: 88, preview: "With endless apps and options, one might think finding a partner would be easier...", isBookmarked: false },
-  ];
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await apiRequest('/journals?limit=100');
+        setEntries(res.items || []);
+      } catch (err) {
+        console.error('Failed to load journals', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const filteredArchive = entries.filter(item => {
+    if (filter === 'high-score' && (item.score == null || item.score < 90)) return false;
+    if (filter === 'bookmarked' && !item.isBookmarked) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(item.title?.toLowerCase().includes(q) || item.content?.toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
 
   return (
     <AppLayout activePath="#history">
@@ -79,31 +99,44 @@ export const JournalArchivePage: React.FC = () => {
         </div>
 
         {/* Grid List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {archive.map((item, idx) => (
-             <div key={idx} className="sketch-card bg-surface-container-lowest flex flex-col transition-transform hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] cursor-pointer group" onClick={() => window.location.hash = '#history-detail'}>
-                {/* Score & Actions */}
-                <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                   <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center sketch-border text-center ${item.score >= 90 ? 'bg-primary text-white' : 'bg-surface-container text-black'}`}>
-                      <span className="font-headline font-black leading-none">{item.score}</span>
-                   </div>
-                   <div className="flex items-center gap-1">
-                      {item.isBookmarked && <span className="material-symbols-outlined text-primary text-xl">bookmark</span>}
-                      <button className="text-on-surface-variant hover:text-black opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="material-symbols-outlined">more_vert</span>
-                      </button>
-                   </div>
-                </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+          </div>
+        ) : filteredArchive.length === 0 ? (
+          <div className="text-center py-20 text-stone-400">
+            <span className="material-symbols-outlined text-6xl mb-4">history</span>
+            <p className="font-headline text-xl">No journals found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {filteredArchive.map((item, idx) => (
+               <div key={item.id || idx} className="sketch-card bg-surface-container-lowest flex flex-col transition-transform hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] cursor-pointer group" onClick={() => window.location.hash = `#history-detail?id=${item.id}`}>
+                  {/* Score & Actions */}
+                  <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                     <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center sketch-border text-center ${(item.score || 0) >= 90 ? 'bg-primary text-white' : 'bg-surface-container text-black'}`}>
+                        <span className="font-headline font-black leading-none">{item.score || '--'}</span>
+                     </div>
+                     <div className="flex items-center gap-1">
+                        {item.isBookmarked && <span className="material-symbols-outlined text-primary text-xl">bookmark</span>}
+                        <button className="text-on-surface-variant hover:text-black opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="material-symbols-outlined">more_vert</span>
+                        </button>
+                     </div>
+                  </div>
 
-                {/* Content */}
-                <div className="px-5 pb-6 flex-1 flex flex-col">
-                   <h3 className="font-headline font-black text-xl mb-2 line-clamp-2">{item.title}</h3>
-                   <p className="font-body text-stone-600 text-sm line-clamp-3 mb-4 flex-1">{item.preview}</p>
-                   <p className="font-headline text-xs font-bold text-stone-400 uppercase tracking-widest">{item.date}</p>
-                </div>
-             </div>
-          ))}
-        </div>
+                  {/* Content */}
+                  <div className="px-5 pb-6 flex-1 flex flex-col">
+                     <h3 className="font-headline font-black text-xl mb-2 line-clamp-2">{item.title}</h3>
+                     <p className="font-body text-stone-600 text-sm line-clamp-3 mb-4 flex-1">{item.content}</p>
+                     <p className="font-headline text-xs font-bold text-stone-400 uppercase tracking-widest">
+                       {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'})}
+                     </p>
+                  </div>
+               </div>
+            ))}
+          </div>
+        )}
 
       </div>
     </AppLayout>

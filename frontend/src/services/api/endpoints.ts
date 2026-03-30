@@ -209,6 +209,7 @@ export interface ProgressSummary {
   totalPhrases: number;
   totalSessions: number;
   currentStreak: number;
+  bestStreak: number;
   avgScore: number;
   totalXp: number;
   onboardingCompleted: boolean;
@@ -230,6 +231,31 @@ export async function getProgressSummary() {
 
 export async function getProgressDaily(days = 30) {
   return apiRequest<{ items: ProgressDailyItem[]; days: number }>(`/progress/daily?days=${days}`);
+}
+
+export async function getProgressDailyDetail(date: string) {
+  return apiRequest<{ detail: (ProgressDailyItem & { journals: { id: string; title: string; score: number | null; createdAt: string }[] }) | null }>(`/progress/daily/${date}`);
+}
+
+// ─── Leaderboard ─────────────────────────────────────
+export interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  score: number;
+  isUser: boolean;
+}
+
+export async function getLeaderboard(scope: 'weekly' | 'all-time' = 'weekly') {
+  return apiRequest<{ items: LeaderboardEntry[]; scope: string }>(`/leaderboard?scope=${scope}`);
+}
+
+// ─── Journal Mood ────────────────────────────────────
+export async function postJournalMood(journalId: string, mood: string) {
+  return apiRequest<{ message: string; mood: string }>(`/journals/${journalId}/mood`, {
+    method: 'POST',
+    body: { mood },
+  });
 }
 
 // ─── Library / Lessons ───────────────────────────────
@@ -258,3 +284,4 @@ export async function getLessons(category?: string, level?: string) {
 export async function getLessonDetail(id: string) {
   return apiRequest<{ lesson: LessonDetail }>(`/library/lessons/${id}`);
 }
+

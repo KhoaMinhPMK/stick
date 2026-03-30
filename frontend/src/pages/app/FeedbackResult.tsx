@@ -1,32 +1,72 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-
-const corrections = [
-  {
-    icon: 'check_circle',
-    title: 'feedback_result.uncountable_title',
-    desc: 'feedback_result.uncountable_desc',
-  },
-  {
-    icon: 'check_circle',
-    title: 'feedback_result.past_tense_title',
-    desc: 'feedback_result.past_tense_desc',
-  },
-  {
-    icon: 'check_circle',
-    title: 'feedback_result.flow_title',
-    desc: 'feedback_result.flow_desc',
-  },
-];
-
-const usefulWords = [
-  { word: 'Headed to', meaning: 'feedback_result.word_headed', level: 'B1' },
-  { word: 'A fair amount', meaning: 'feedback_result.word_fair_amount', level: 'B2' },
-];
+import { apiRequest } from '../../services/api/client';
 
 export const FeedbackResultPage: React.FC = () => {
   const { t } = useTranslation();
+  const [journal, setJournal] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const id = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await apiRequest(`/journals/${id}`);
+        setJournal(res.journal);
+      } catch (err) {
+        console.error('Failed to load journal result', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <AppLayout activePath="#journal">
+        <div className="flex items-center justify-center py-20">
+          <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!journal) {
+    return (
+      <AppLayout activePath="#journal">
+        <div className="flex flex-col items-center justify-center py-20">
+          <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
+          <p className="font-headline font-bold text-xl">{t('feedback_result.not_found', { defaultValue: 'Result not found' })}</p>
+          <button onClick={() => window.location.hash = '#journal-workspace'} className="mt-4 text-blue-500 underline">Go back</button>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  let parsedFeedback: any = {};
+  if (journal.feedback) {
+    try {
+      if (typeof journal.feedback === 'string') {
+        parsedFeedback = JSON.parse(journal.feedback);
+      } else {
+        parsedFeedback = journal.feedback;
+      }
+    } catch {}
+  }
+
+  const corrections = parsedFeedback.corrections || [];
+  const usefulWords = parsedFeedback.vocabularyBoosters || [];
+  const enhancedText = parsedFeedback.enhancedText || parsedFeedback.enhancedContent || journal.content;
+  const encouragement = parsedFeedback.encouragement || t('feedback_result.encouragement', { defaultValue: 'Keep up the great work!' });
 
   return (
     <AppLayout activePath="#journal">
@@ -51,9 +91,8 @@ export const FeedbackResultPage: React.FC = () => {
                     <span className="material-symbols-outlined text-stone-500 text-lg md:text-2xl">history_edu</span>
                     <h3 className="font-headline font-bold text-base md:text-xl uppercase tracking-tighter">{t('feedback_result.you_wrote')}</h3>
                   </div>
-                  <div className="p-4 md:p-6 bg-surface-dim/30 rounded-lg border-2 border-dashed border-stone-400 italic text-on-surface-variant text-sm md:text-lg leading-relaxed">
-                    "Yesterday I went to the park. I see many dogs and I played with one. Then I go home because I had{' '}
-                    <span className="bg-error/10 text-error px-1 rounded">many homeworks</span>."
+                  <div className="p-4 md:p-6 bg-surface-dim/30 rounded-lg border-2 border-dashed border-stone-400 italic text-on-surface-variant text-sm md:text-lg leading-relaxed whitespace-pre-wrap">
+                    "{journal.content}"
                   </div>
                 </section>
 
@@ -69,13 +108,8 @@ export const FeedbackResultPage: React.FC = () => {
                       <span className="font-label font-bold text-sm">{t('feedback_result.listen')}</span>
                     </button>
                   </div>
-                  <div className="p-5 md:p-8 bg-white sketch-card shadow-[4px_4px_0_0_#000] md:shadow-[10px_10px_0_0_#000] text-lg md:text-2xl font-medium leading-relaxed">
-                    "Yesterday I went to the park. I{' '}
-                    <span className="bg-tertiary-container/20 text-tertiary px-1 rounded">saw</span>{' '}
-                    a few dogs and played with one. Then I{' '}
-                    <span className="bg-tertiary-container/20 text-tertiary px-1 rounded">headed</span>{' '}
-                    home because I had{' '}
-                    <span className="underline decoration-tertiary decoration-2 md:decoration-4 underline-offset-4">a lot of homework</span>."
+                  <div className="p-5 md:p-8 bg-white sketch-card shadow-[4px_4px_0_0_#000] md:shadow-[10px_10px_0_0_#000] text-lg md:text-2xl font-medium leading-relaxed whitespace-pre-wrap">
+                    "{enhancedText}"
                   </div>
                 </section>
               </div>
@@ -89,11 +123,11 @@ export const FeedbackResultPage: React.FC = () => {
                   <span className="material-symbols-outlined text-lg md:text-2xl">lightbulb</span> {t('feedback_result.what_changed')}
                 </h3>
                 <ul className="space-y-3 md:space-y-4">
-                  {corrections.map((c, i) => (
+                  {corrections.map((c: any, i: number) => (
                     <li key={i} className="flex gap-2 md:gap-3 items-start">
-                      <span className="material-symbols-outlined text-tertiary mt-0.5 md:mt-1 text-lg md:text-xl">{c.icon}</span>
+                      <span className="material-symbols-outlined text-tertiary mt-0.5 md:mt-1 text-lg md:text-xl">check_circle</span>
                       <p className="text-on-surface-variant text-xs md:text-sm">
-                        <strong className="text-primary font-bold">{t(c.title)}:</strong> {t(c.desc)}
+                        <strong className="text-primary font-bold">{c.original} → {c.corrected}:</strong> {c.explanation}
                       </p>
                     </li>
                   ))}
@@ -106,11 +140,11 @@ export const FeedbackResultPage: React.FC = () => {
                   <span className="material-symbols-outlined text-lg md:text-2xl">stylus_note</span> {t('feedback_result.useful_words')}
                 </h3>
                 <div className="space-y-4 md:space-y-6">
-                  {usefulWords.map((w, i) => (
+                  {usefulWords.map((w: any, i: number) => (
                     <div key={i}>
                       <span className="font-headline font-black text-base md:text-lg block">{w.word}</span>
-                      <p className="text-xs md:text-sm text-on-surface-variant italic">{t(w.meaning)}</p>
-                      <span className="text-[10px] md:text-xs bg-black text-white px-2 py-0.5 mt-1 inline-block">{w.level} Level</span>
+                      <p className="text-xs md:text-sm text-on-surface-variant italic">{w.meaning}</p>
+                      {w.level && <span className="text-[10px] md:text-xs bg-black text-white px-2 py-0.5 mt-1 inline-block">{w.level} Level</span>}
                     </div>
                   ))}
                 </div>
@@ -126,7 +160,7 @@ export const FeedbackResultPage: React.FC = () => {
                 <span className="material-symbols-outlined text-4xl md:text-5xl lg:text-6xl text-black/40">sentiment_very_satisfied</span>
               </div>
               <h4 className="font-headline font-extrabold text-lg md:text-xl lg:text-2xl mb-1 md:mb-2">{t('feedback_result.great_progress')}</h4>
-              <p className="text-on-surface-variant text-xs md:text-sm px-2 md:px-4">{t('feedback_result.encouragement')}</p>
+              <p className="text-on-surface-variant text-xs md:text-sm px-2 md:px-4">{encouragement}</p>
             </div>
 
             {/* Actions */}

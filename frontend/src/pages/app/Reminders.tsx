@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
+import { getReminders, updateReminders } from '../../services/api/endpoints';
 
 const timeSlots = [
   { time: '08:00', labelKey: 'reminders.morning' },
@@ -21,6 +22,54 @@ export const RemindersPage: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState(1);
   const [selectedTone, setSelectedTone] = useState(0);
   const [showSaved, setShowSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await getReminders();
+        if (res.items && res.items.length > 0) {
+          const item = res.items[0];
+          setDailyEnabled(item.enabled);
+          
+          const timeIndex = timeSlots.findIndex(t => t.time === item.time);
+          if (timeIndex !== -1) setSelectedTime(timeIndex);
+          
+          if (item.label && item.label.startsWith('tone:')) {
+            const toneIdx = parseInt(item.label.split(':')[1] || '0', 10);
+            setSelectedTone(isNaN(toneIdx) ? 0 : toneIdx);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load reminders', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await updateReminders([
+        {
+          time: timeSlots[selectedTime].time,
+          days: 'mon,tue,wed,thu,fri,sat,sun',
+          enabled: dailyEnabled || weeklyEnabled,
+          label: `tone:${selectedTone}`,
+        }
+      ]);
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save reminders', err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked, onChange }) => (
     <button
@@ -138,8 +187,8 @@ export const RemindersPage: React.FC = () => {
               <button onClick={() => (window.location.hash = '#settings')} className="px-6 md:px-8 py-2 md:py-3 font-bold hover:underline transition-all text-sm md:text-base order-2 sm:order-1">
                 {t('reminders.discard')}
               </button>
-              <button onClick={() => { setShowSaved(true); setTimeout(() => setShowSaved(false), 2000); }} className="px-8 md:px-10 py-2.5 md:py-3 bg-black text-white rounded-full font-bold hover:scale-105 active:scale-95 transition-all shadow-xl text-sm md:text-base order-1 sm:order-2">
-                {t('reminders.save')}
+              <button onClick={handleSave} disabled={loading || saving} className={`px-8 md:px-10 py-2.5 md:py-3 bg-black text-white rounded-full font-bold hover:scale-105 active:scale-95 transition-all shadow-xl text-sm md:text-base order-1 sm:order-2 ${loading || saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                {saving ? 'Saving...' : t('reminders.save')}
               </button>
             </div>
           </div>

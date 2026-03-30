@@ -1,15 +1,72 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-
-const vocabBoosters = [
-  { word: 'Commuted', meaning: 'history_detail.vocab_commuted' },
-  { word: 'Crowded', meaning: 'history_detail.vocab_crowded' },
-  { word: 'Highlight', meaning: 'history_detail.vocab_highlight' },
-];
+import { apiRequest } from '../../services/api/client';
 
 export const HistoryDetailPage: React.FC = () => {
   const { t } = useTranslation();
+  const [journal, setJournal] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const id = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await apiRequest(`/journals/${id}`);
+        setJournal(res.journal);
+      } catch (err) {
+        console.error('Failed to load journal detail', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <AppLayout activePath="#history">
+        <div className="flex items-center justify-center py-20">
+          <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!journal) {
+    return (
+      <AppLayout activePath="#history">
+        <div className="flex flex-col items-center justify-center py-20">
+          <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
+          <p className="font-headline font-bold text-xl">{t('history_detail.not_found', { defaultValue: 'Journal not found' })}</p>
+          <button onClick={() => window.location.hash = '#progress'} className="mt-4 text-blue-500 underline">Go back</button>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  let parsedFeedback: any = null;
+  try {
+    if (typeof journal.feedback === 'string' && journal.feedback) {
+      parsedFeedback = JSON.parse(journal.feedback);
+    } else if (typeof journal.feedback === 'object') {
+      parsedFeedback = journal.feedback;
+    }
+  } catch (e) {
+    console.error('Failed to parse feedback', e);
+  }
+
+  const enhancedText = parsedFeedback?.enhancedText || parsedFeedback?.enhancedContent || "Feedback not generated yet.";
+  const vocabBoosters = parsedFeedback?.vocabularyBoosters || [];
+  const sentencePatterns = parsedFeedback?.sentencePattern ? [parsedFeedback.sentencePattern] : (parsedFeedback?.sentencePatterns || []);
+  const score = journal.score;
 
   return (
     <AppLayout activePath="#history">
@@ -34,7 +91,7 @@ export const HistoryDetailPage: React.FC = () => {
             </div>
           </div>
           <h2 className="font-headline text-2xl md:text-3xl lg:text-5xl font-extrabold tracking-tight mb-3 md:mb-4 leading-tight">
-            Friday, Oct 27 — <span className="italic text-secondary">"What was the best part of your morning commute today?"</span>
+            {new Date(journal.createdAt).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — <span className="italic text-secondary">"{journal.title}"</span>
           </h2>
           <div className="w-20 md:w-32 h-1.5 md:h-2 bg-primary rounded-full" />
         </section>
@@ -47,16 +104,16 @@ export const HistoryDetailPage: React.FC = () => {
               {/* Original Text */}
               <div className="sketch-card bg-surface-container-low p-5 md:p-8 relative">
                 <span className="absolute -top-3 md:-top-4 left-4 md:left-6 bg-surface px-3 md:px-4 font-headline font-bold border-2 border-black rounded-full text-[10px] md:text-sm">{t('history_detail.your_draft')}</span>
-                <p className="text-sm md:text-base leading-relaxed text-on-surface-variant font-medium mt-2">
-                  Today morning I go to work by train. The train is very busy but I find a seat. The best part was I see a dog through the window at the park. It look very happy and running fast. I feel good.
+                <p className="text-sm md:text-base leading-relaxed text-on-surface-variant font-medium mt-2 whitespace-pre-wrap">
+                  {journal.content}
                 </p>
               </div>
 
               {/* Enhanced Version */}
               <div className="sketch-card bg-surface-container-highest p-5 md:p-8 relative shadow-[4px_4px_0_0_#000] md:shadow-[8px_8px_0_0_#000]">
                 <span className="absolute -top-3 md:-top-4 left-4 md:left-6 bg-secondary-container px-3 md:px-4 font-headline font-bold border-2 border-black rounded-full text-[10px] md:text-sm">{t('history_detail.enhanced_version')}</span>
-                <p className="text-sm md:text-base leading-relaxed text-black font-bold mt-2">
-                  This morning, I commuted to work by train. Although the carriage was crowded, I managed to find a seat. The highlight was spotting a dog through the window at the park; it looked joyful while sprinting across the grass. It really brightened my mood.
+                <p className="text-sm md:text-base leading-relaxed text-black font-bold mt-2 whitespace-pre-wrap">
+                  {enhancedText}
                 </p>
                 <div className="mt-4 md:mt-8 flex justify-between items-center">
                   <button className="material-symbols-outlined text-black bg-white rounded-full p-1.5 md:p-2 border-2 border-black hover:scale-110 transition-transform text-lg md:text-2xl">volume_up</button>
@@ -73,32 +130,37 @@ export const HistoryDetailPage: React.FC = () => {
               </h3>
               <div className="space-y-6 md:space-y-12">
                 {/* Vocabulary Boosters */}
-                <div>
-                  <p className="font-label uppercase tracking-widest text-[10px] md:text-xs font-black text-secondary mb-3 md:mb-4">{t('history_detail.vocab_boosters')}</p>
-                  <div className="flex flex-wrap gap-3 md:gap-4">
-                    {vocabBoosters.map((v, i) => (
-                      <div
-                        key={i}
-                        className="bg-surface-container p-3 md:p-4 rounded-xl border-2 border-black hover:-rotate-2 transition-transform cursor-help"
-                      >
-                        <span className="font-bold block text-sm md:text-lg italic">{v.word}</span>
-                        <span className="text-[10px] md:text-sm opacity-70">{t(v.meaning)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Sentence Pattern */}
-                <div className="bg-secondary-container/30 p-4 md:p-6 rounded-2xl border-2 border-dashed border-black/30">
-                  <p className="font-label uppercase tracking-widest text-[10px] md:text-xs font-black text-secondary mb-3 md:mb-4">{t('history_detail.sentence_pattern')}</p>
-                  <div className="flex items-start gap-3 md:gap-4">
-                    <div className="w-8 h-8 md:w-10 md:h-10 shrink-0 bg-black text-white rounded-lg flex items-center justify-center font-bold text-sm md:text-base">?</div>
-                    <div>
-                      <h4 className="font-bold text-base md:text-xl mb-1 md:mb-2">"Although [Condition], I [Result]"</h4>
-                      <p className="text-on-surface-variant italic text-xs md:text-sm">{t('history_detail.pattern_example')}</p>
+                {vocabBoosters.length > 0 && (
+                  <div>
+                    <p className="font-label uppercase tracking-widest text-[10px] md:text-xs font-black text-secondary mb-3 md:mb-4">{t('history_detail.vocab_boosters')}</p>
+                    <div className="flex flex-wrap gap-3 md:gap-4">
+                      {vocabBoosters.map((v: any, i: number) => (
+                        <div
+                          key={i}
+                          className="bg-surface-container p-3 md:p-4 rounded-xl border-2 border-black hover:-rotate-2 transition-transform cursor-help"
+                          title={v.context || v.meaning}
+                        >
+                          <span className="font-bold block text-sm md:text-lg italic">{v.word}</span>
+                          <span className="text-[10px] md:text-sm opacity-70">{v.meaning || v.translation || t(v.meaning)}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Sentence Pattern */}
+                {sentencePatterns.length > 0 && sentencePatterns.map((pat: any, idx: number) => (
+                  <div key={idx} className="bg-secondary-container/30 p-4 md:p-6 rounded-2xl border-2 border-dashed border-black/30 mt-4">
+                    <p className="font-label uppercase tracking-widest text-[10px] md:text-xs font-black text-secondary mb-3 md:mb-4">{t('history_detail.sentence_pattern')}</p>
+                    <div className="flex items-start gap-3 md:gap-4">
+                      <div className="w-8 h-8 md:w-10 md:h-10 shrink-0 bg-black text-white rounded-lg flex items-center justify-center font-bold text-sm md:text-base">?</div>
+                      <div>
+                        <h4 className="font-bold text-base md:text-xl mb-1 md:mb-2">"{pat.pattern}"</h4>
+                        <p className="text-on-surface-variant italic text-xs md:text-sm">{pat.example}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -107,21 +169,23 @@ export const HistoryDetailPage: React.FC = () => {
           <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-4 md:space-y-6 lg:space-y-8">
             {/* Speaking Score */}
             <div className="sketch-card bg-tertiary-container text-white p-5 md:p-6 lg:p-8">
-              <h4 className="font-headline font-bold text-base md:text-xl mb-4 md:mb-6">{t('history_detail.speaking_score')}</h4>
+              <h4 className="font-headline font-bold text-base md:text-xl mb-4 md:mb-6">{t('history_detail.speaking_score', { defaultValue: 'Writing Score' })}</h4>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl md:text-5xl lg:text-6xl font-black">84</span>
-                <span className="text-lg md:text-2xl font-bold opacity-60">/100</span>
+                <span className="text-4xl md:text-5xl lg:text-6xl font-black">{score || '--'}</span>
+                {score != null && <span className="text-lg md:text-2xl font-bold opacity-60">/100</span>}
               </div>
               <p className="mt-3 md:mt-4 text-xs md:text-sm opacity-80 leading-snug">{t('history_detail.score_feedback')}</p>
-              <div className="mt-5 md:mt-8 space-y-2 md:space-y-3">
-                <div className="h-1.5 md:h-2 w-full bg-black/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white w-[84%]" />
+              {score != null && (
+                <div className="mt-5 md:mt-8 space-y-2 md:space-y-3">
+                  <div className="h-1.5 md:h-2 w-full bg-black/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-white transition-all" style={{ width: `${score}%` }} />
+                  </div>
+                  <div className="flex justify-between text-[10px] md:text-xs font-bold tracking-widest">
+                    <span>{t('history_detail.accuracy')}</span>
+                    <span>{score}%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-[10px] md:text-xs font-bold tracking-widest">
-                  <span>{t('history_detail.accuracy')}</span>
-                  <span>84%</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Reflection Note */}
