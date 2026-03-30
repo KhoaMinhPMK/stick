@@ -11,7 +11,7 @@ export const CompletionPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const journalId = useMemo(() => {
-    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
   }, []);
 
   useEffect(() => {

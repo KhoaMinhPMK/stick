@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
@@ -15,14 +15,29 @@ export const JournalWorkspacePage: React.FC = () => {
   const [showHelper, setShowHelper] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [journalId, setJournalId] = useState<string | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+
+  const journalIdFromUrl = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
+  }, []);
+
+  // Load existing draft if journalId is in URL
+  useEffect(() => {
+    if (!journalIdFromUrl) return;
+    setIsLoadingDraft(true);
+    setJournalId(journalIdFromUrl);
+    apiRequest<{ journal: { content: string } }>(`/journals/${journalIdFromUrl}`)
+      .then(res => setText(res.journal.content || ''))
+      .catch(err => console.error('Failed to load draft', err))
+      .finally(() => setIsLoadingDraft(false));
+  }, [journalIdFromUrl]);
 
   const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
   const targetWords = 50;
   const progress = Math.min(wordCount / targetWords, 1);
   const canSubmit = wordCount >= 10;
-
-  // Mock grammar score based on word count
-  const grammarScore = wordCount > 0 ? Math.min(95, 80 + Math.floor(wordCount / 5)) : 0;
 
   const quickStarters = [
     t('journal_workspace.quick_start_1'),
@@ -37,32 +52,52 @@ export const JournalWorkspacePage: React.FC = () => {
   ];
 
   const handleSubmit = async () => {
-    if (canSubmit && !isSubmitting) {
-      setIsSubmitting(true);
-      try {
-        const res = await apiRequest('/journals', {
+    if (!canSubmit || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      let id = journalId;
+      if (!id) {
+        const res = await apiRequest<{ journal: { id: string } }>('/journals', {
           method: 'POST',
-          body: JSON.stringify({ title: 'Daily Journal', content: text, status: 'draft', language: 'en' }),
-        }) as any;
-        window.location.hash = `#feedback?id=${res.journal.id}`;
-      } catch (err) {
-        console.error('Failed to submit journal', err);
-        setIsSubmitting(false);
+          body: { title: 'Daily Journal', content: text, status: 'draft', language: 'en' },
+        });
+        id = res.journal.id;
+      } else {
+        await apiRequest(`/journals/${id}`, {
+          method: 'PATCH',
+          body: { content: text },
+        });
       }
+      window.location.hash = `#feedback?journalId=${id}`;
+    } catch (err) {
+      console.error('Failed to submit journal', err);
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveDraft = async () => {
     if (!text.trim() || isSaving) return;
     setIsSaving(true);
+    setSaveStatus('idle');
     try {
-      await apiRequest('/journals', {
-        method: 'POST',
-        body: JSON.stringify({ title: 'Daily Journal', content: text, status: 'draft', language: 'en' }),
-      });
-      alert(t('journal_workspace.draft_saved_alert', { defaultValue: 'Draft saved!' }));
+      if (!journalId) {
+        const res = await apiRequest<{ journal: { id: string } }>('/journals', {
+          method: 'POST',
+          body: { title: 'Daily Journal', content: text, status: 'draft', language: 'en' },
+        });
+        setJournalId(res.journal.id);
+        window.history.replaceState(null, '', `#journal-workspace?journalId=${res.journal.id}`);
+      } else {
+        await apiRequest(`/journals/${journalId}`, {
+          method: 'PATCH',
+          body: { content: text },
+        });
+      }
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('Failed to save draft', err);
+      setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
@@ -82,6 +117,11 @@ export const JournalWorkspacePage: React.FC = () => {
 
   return (
     <AppLayout activePath="#journal">
+      {isLoadingDraft ? (
+        <div className="flex items-center justify-center py-20">
+          <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+        </div>
+      ) : (
       <div className="min-h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-5 md:gap-8 lg:gap-10">
         
         {/* Editor Column */}
@@ -129,12 +169,6 @@ export const JournalWorkspacePage: React.FC = () => {
                   <span className="text-[10px] md:text-xs uppercase font-bold tracking-widest text-on-surface-variant">{t('journal_workspace.word_count')}</span>
                   <span className="text-xl md:text-2xl lg:text-3xl font-black font-headline">{wordCount} / {targetWords}</span>
                 </div>
-                {wordCount > 0 && (
-                  <div className="flex flex-col">
-                    <span className="text-[10px] md:text-xs uppercase font-bold tracking-widest text-on-surface-variant">{t('journal_workspace.grammar_score')}</span>
-                    <span className="text-xl md:text-2xl lg:text-3xl font-black font-headline text-tertiary">{grammarScore}%</span>
-                  </div>
-                )}
               </div>
               <div className="flex gap-2 md:gap-4 w-full sm:w-auto">
                 <button 
@@ -142,7 +176,7 @@ export const JournalWorkspacePage: React.FC = () => {
                   disabled={wordCount === 0 || isSaving}
                   className="flex-1 sm:flex-none px-4 md:px-6 lg:px-8 py-2 md:py-3 rounded-full border-2 border-black font-bold text-sm md:text-base hover:bg-surface-container transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {isSaving ? '...' : t('journal_workspace.save_draft')}
+                  {isSaving ? '...' : saveStatus === 'saved' ? '\u2713 Saved' : saveStatus === 'error' ? 'Error' : t('journal_workspace.save_draft')}
                 </button>
                 <button 
                   onClick={handleSubmit}
@@ -266,6 +300,7 @@ export const JournalWorkspacePage: React.FC = () => {
           </button>
         )}
       </div>
+      )}
     </AppLayout>
   );
 };

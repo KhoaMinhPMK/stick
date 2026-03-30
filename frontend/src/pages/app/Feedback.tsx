@@ -5,33 +5,35 @@ import { apiRequest } from '../../services/api/client';
 
 export const FeedbackPage: React.FC = () => {
   const { t } = useTranslation();
-  const [isLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isPlayingUser, setIsPlayingUser] = useState(false);
   const [isPlayingModel, setIsPlayingModel] = useState(false);
 
-  const id = useMemo(() => {
-    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+  const journalId = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
   }, []);
 
   useEffect(() => {
     async function getFeedback() {
-      if (!id) {
+      if (!journalId) {
         window.location.hash = '#journal-workspace';
         return;
       }
       try {
         await apiRequest('/ai/feedback/text', {
           method: 'POST',
-          body: JSON.stringify({ journalId: id }),
+          body: { journalId },
         });
-        window.location.hash = `#feedback-result?id=${id}`;
+        window.location.hash = `#feedback-result?journalId=${journalId}`;
       } catch (err) {
         console.error('AI feedback failed', err);
-        window.location.hash = `#history-detail?id=${id}`;
+        window.location.hash = `#history-detail?id=${journalId}`;
+      } finally {
+        setIsLoading(false);
       }
     }
     getFeedback();
-  }, [id]);
+  }, [journalId]);
 
   // Example waveform data
   const waveform = [

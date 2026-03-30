@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import LandingPage from './pages/landing';
+import { ensureSession } from './services/api/auth';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { OnboardingFlow } from './pages/app/onboarding/OnboardingFlow';
 import { LevelSelectionPage } from './pages/app/LevelSelection';
@@ -50,7 +51,8 @@ function App() {
   useEffect(() => {
     // Simple hash-based router
     const handleHashChange = () => {
-      const hash = window.location.hash;
+      // Strip query params before route matching so '#feedback?journalId=x' routes correctly
+      const hash = window.location.hash.split('?')[0];
       if (hash === '#onboarding') {
         setCurrentView('onboarding');
         setOnboardingStep(0);
@@ -172,6 +174,14 @@ function App() {
       window.addEventListener('load', handleLoad);
       return () => window.removeEventListener('load', handleLoad);
     }
+  }, []);
+
+  // Bootstrap guest session silently — ensures protected API routes work
+  // even before user goes through onboarding
+  useEffect(() => {
+    ensureSession().catch(() => {
+      // Non-blocking: app still renders if session bootstrap fails
+    });
   }, []);
 
   const renderCurrentView = () => {

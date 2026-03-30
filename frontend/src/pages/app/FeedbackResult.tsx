@@ -9,7 +9,7 @@ export const FeedbackResultPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const id = useMemo(() => {
-    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
   }, []);
 
   useEffect(() => {
@@ -166,7 +166,7 @@ export const FeedbackResultPage: React.FC = () => {
             {/* Actions */}
             <div className="flex flex-col gap-3 md:gap-4">
               <button
-                onClick={() => (window.location.hash = '#speaking-intro')}
+                onClick={() => (window.location.hash = `#speaking-intro?journalId=${id}`)}
                 className="w-full py-4 md:py-6 sketch-border bg-primary text-white font-headline font-black text-base md:text-xl flex items-center justify-center gap-2 md:gap-3 hover:bg-stone-800 transition-colors active:scale-95"
               >
                 {t('feedback_result.practice_speaking')}
@@ -174,7 +174,7 @@ export const FeedbackResultPage: React.FC = () => {
               </button>
               <div className="grid grid-cols-1 gap-2 md:gap-3">
                 <button
-                  onClick={() => (window.location.hash = '#completion')}
+                  onClick={() => (window.location.hash = `#completion?journalId=${id}`)}
                   className="w-full py-3 md:py-4 sketch-border bg-surface-container-highest font-headline font-bold text-sm md:text-base hover:bg-secondary-container transition-colors flex items-center justify-center gap-2 active:scale-95"
                 >
                   {t('feedback_result.continue')} <span className="material-symbols-outlined text-sm md:text-base">arrow_forward</span>

@@ -378,11 +378,14 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
   let { journalId, content, language } = req.body || {};
 
   if (!content && journalId) {
-    const journal = await prisma.journal.findUnique({ where: { id: journalId } });
-    if (journal) {
-      content = journal.content;
-      language = journal.language;
+    const journal = await prisma.journal.findFirst({
+      where: { id: journalId, userId: req.authUser.id, deletedAt: null },
+    });
+    if (!journal) {
+      return res.status(403).json({ code: 'FORBIDDEN', message: 'Journal not found or access denied' });
     }
+    content = journal.content;
+    language = journal.language;
   }
 
   if (!content) {
@@ -408,7 +411,7 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
   if (journalId) {
     try {
       const updatedJournal = await prisma.journal.update({
-        where: { id: journalId },
+        where: { id: journalId, userId: req.authUser.id },
         data: {
           score: feedback.overallScore || null,
           feedback: JSON.stringify(feedback),

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
@@ -9,6 +9,10 @@ export const VocabularyReviewPage: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const journalId = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
+  }, []);
 
   useEffect(() => {
     async function loadVocab() {
@@ -33,7 +37,7 @@ export const VocabularyReviewPage: React.FC = () => {
     try {
       await apiRequest(`/vocab/notebook/${currentVocab.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ mastery: 'learning' })
+        body: { mastery: 'learning' },
       });
     } catch (err) {
       console.error(err);
@@ -48,7 +52,8 @@ export const VocabularyReviewPage: React.FC = () => {
   };
 
   const handleContinue = () => {
-    window.location.hash = '#speaking-intro';
+    const target = journalId ? `#speaking-intro?journalId=${journalId}` : '#speaking-intro';
+    window.location.hash = target;
   };
 
   return (

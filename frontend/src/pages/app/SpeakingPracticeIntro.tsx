@@ -1,19 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '../../layouts/AppLayout';
+import { apiRequest } from '../../services/api/client';
 
 export const SpeakingPracticeIntroPage: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [sentence, setSentence] = useState('');
+  const [loadingJournal, setLoadingJournal] = useState(false);
+
+  const journalId = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
+  }, []);
+
+  // Load journal to get enhanced sentence
+  useEffect(() => {
+    if (!journalId) return;
+    setLoadingJournal(true);
+    apiRequest<{ journal: { feedback: string | null; content: string } }>(`/journals/${journalId}`)
+      .then(res => {
+        const j = res.journal;
+        try {
+          const fb = typeof j.feedback === 'string' ? JSON.parse(j.feedback) : j.feedback;
+          setSentence(fb?.enhancedText || j.content || '');
+        } catch {
+          setSentence(j.content || '');
+        }
+      })
+      .catch(() => {/* non-blocking */})
+      .finally(() => setLoadingJournal(false));
+  }, [journalId]);
 
   const handleListen = () => {
+    if (!sentence) return;
+    if (!window.speechSynthesis) {
+      return; // fallback: button just stays inactive
+    }
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(sentence);
+    utt.lang = 'en-US';
+    utt.onstart = () => setIsPlaying(true);
+    utt.onend = () => setIsPlaying(false);
+    utt.onerror = () => setIsPlaying(false);
     setIsPlaying(true);
-    // Mocking audio playback duration
-    setTimeout(() => {
-      setIsPlaying(false);
-    }, 2000);
+    window.speechSynthesis.speak(utt);
   };
 
   const handleRecord = () => {
-    window.location.hash = '#journal-record';
+    window.location.hash = journalId ? `#journal-record?journalId=${journalId}` : '#journal-record';
   };
 
   return (
@@ -56,9 +88,15 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
               {/* The Target Sentence Card */}
               <div className="bg-surface-container p-6 md:p-10 sketch-border mx-auto max-w-2xl group transition-all hover:bg-surface-container-high shadow-[4px_4px_0_0_#000000]">
                 <p className="font-headline text-stone-500 text-xs md:text-sm mb-3 md:mb-5 uppercase tracking-widest font-bold">Your improved sentence</p>
-                <p className="text-2xl md:text-4xl font-headline font-bold text-primary italic leading-tight group-hover:scale-105 transition-transform duration-300">
-                  "I had a lot of homework."
-                </p>
+                {loadingJournal ? (
+                  <span className="material-symbols-outlined animate-spin text-2xl text-stone-400">progress_activity</span>
+                ) : sentence ? (
+                  <p className="text-2xl md:text-4xl font-headline font-bold text-primary italic leading-tight group-hover:scale-105 transition-transform duration-300">
+                    "{sentence}"
+                  </p>
+                ) : (
+                  <p className="text-base text-stone-400 italic">No sentence available — go back and complete your journal first.</p>
+                )}
               </div>
 
               <div className="font-body text-lg md:text-xl text-on-surface-variant max-w-lg mx-auto flex items-center justify-center gap-2">
@@ -71,7 +109,8 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
                 {/* Listen Button */}
                 <button 
                   onClick={handleListen}
-                  className={`flex justify-center items-center gap-3 px-8 py-4 md:px-10 md:py-5 w-full md:w-auto border-[3px] border-black rounded-full font-headline font-bold text-lg md:text-xl transition-all active:scale-95 group shadow-[2px_2px_0_0_#000000] hover:shadow-[1px_1px_0_0_#000000] hover:translate-x-[1px] hover:translate-y-[1px] ${isPlaying ? 'bg-secondary-container text-primary scale-105' : 'bg-surface hover:bg-secondary-container'}`}
+                  disabled={!sentence || isPlaying}
+                  className={`flex justify-center items-center gap-3 px-8 py-4 md:px-10 md:py-5 w-full md:w-auto border-[3px] border-black rounded-full font-headline font-bold text-lg md:text-xl transition-all active:scale-95 group shadow-[2px_2px_0_0_#000000] hover:shadow-[1px_1px_0_0_#000000] hover:translate-x-[1px] hover:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed ${isPlaying ? 'bg-secondary-container text-primary scale-105' : 'bg-surface hover:bg-secondary-container'}`}
                 >
                   <span className={`material-symbols-outlined text-3xl transition-transform ${isPlaying ? 'animate-pulse' : 'group-hover:rotate-12'}`} style={{fontVariationSettings: isPlaying ? "'FILL' 1" : "'FILL' 0"}}>
                     {isPlaying ? 'volume_up' : 'volume_up'}
