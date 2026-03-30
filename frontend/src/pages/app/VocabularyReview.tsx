@@ -93,7 +93,7 @@ export const VocabularyReviewPage: React.FC = () => {
             <div className="flex flex-col items-center justify-center text-center py-20 space-y-4">
               <span className="material-symbols-outlined text-6xl text-tertiary">celebration</span>
               <h2 className="font-headline text-2xl md:text-3xl font-bold">{vocabItems.length === 0 ? t('vocab_review.no_items', { defaultValue: 'Your notebook is empty!' }) : t('vocab_review.finished', { defaultValue: "You've reviewed all items!" })}</h2>
-              <button onClick={handleContinue} className="px-6 py-3 bg-black text-white rounded-full font-bold mt-4">
+              <button onClick={() => handleContinue()} className="px-6 py-3 bg-black text-white rounded-full font-bold mt-4">
                 {t('vocab_review.continue_to_speaking')}
               </button>
             </div>
