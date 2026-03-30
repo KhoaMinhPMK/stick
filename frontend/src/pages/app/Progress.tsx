@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, getProgressDaily, getProgressDailyDetail, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
+import { apiRequest } from '../../services/api/client';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -25,7 +26,21 @@ export const ProgressPage: React.FC = () => {
           getProgressDaily(90),
         ]);
         setSummary(sumRes);
-        setDailyData(dailyRes.items);
+
+        // If no daily data exists, trigger a one-time backfill from journals/vocab/phrases
+        if (dailyRes.items.length === 0) {
+          try {
+            await apiRequest('/progress/backfill', { method: 'POST' });
+            // Reload after backfill
+            const refreshed = await getProgressDaily(90);
+            setDailyData(refreshed.items);
+          } catch (backfillErr) {
+            console.error('Backfill failed:', backfillErr);
+            setDailyData([]);
+          }
+        } else {
+          setDailyData(dailyRes.items);
+        }
       } catch (err) {
         console.error('Failed to load progress:', err);
       } finally {
@@ -43,18 +58,26 @@ export const ProgressPage: React.FC = () => {
   const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
   const offset = firstDay === 0 ? 6 : firstDay - 1;
 
+  // Helper to safely get YYYY-MM-DD from a Date object without timezone shifting
+  const getLocalDateString = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   // Build day statuses from daily progress data
   const activeDates = new Set(
     dailyData
       .filter(d => (d.journalsCount > 0 || d.minutesSpent > 0 || d.xpEarned > 0 || d.wordsLearned > 0))
-      .map(d => new Date(d.day).toISOString().split('T')[0])
+      .map(d => getLocalDateString(new Date(d.day)))
   );
 
   const days: { day: number; status: DayStatus }[] = Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1;
     const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-    const dateStr = date.toISOString().split('T')[0];
-    const todayStr = now.toISOString().split('T')[0];
+    const dateStr = getLocalDateString(date);
+    const todayStr = getLocalDateString(now);
 
     if (dateStr === todayStr) return { day, status: 'today' as DayStatus };
     if (date > now) return { day, status: 'future' as DayStatus };
@@ -81,7 +104,8 @@ export const ProgressPage: React.FC = () => {
     setDayDetailLoading(true);
     setDayDetail(null);
     try {
-      const dateStr = new Date(viewDate.getFullYear(), viewDate.getMonth(), day).toISOString().split('T')[0];
+      const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+      const dateStr = getLocalDateString(date);
       const res = await getProgressDailyDetail(dateStr);
       setDayDetail(res.detail);
     } catch (err) {

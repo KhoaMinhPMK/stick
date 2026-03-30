@@ -886,6 +886,96 @@ router.get('/progress/daily', requireAuth, asyncHandler(async (req, res) => {
   res.status(200).json({ items: progress, days });
 }));
 
+// ─── Backfill ProgressDaily from historical data ─────
+router.post('/progress/backfill', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.authUser.id;
+
+  // Gather all journals
+  const journals = await prisma.journal.findMany({
+    where: { userId, deletedAt: null },
+    select: { id: true, createdAt: true },
+  });
+
+  // Gather vocab items
+  const vocabItems = await prisma.vocabNotebookItem.findMany({
+    where: { userId },
+    select: { createdAt: true },
+  });
+
+  // Gather saved phrases
+  const phrases = await prisma.savedPhrase.findMany({
+    where: { userId },
+    select: { createdAt: true },
+  });
+
+  // Gather learning sessions
+  const sessions = await prisma.learningSession.findMany({
+    where: { userId },
+    select: { completedAt: true, duration: true },
+  });
+
+  // Aggregate by day
+  const dayMap = {};
+  const getDay = (d) => {
+    const dt = new Date(d);
+    dt.setHours(0, 0, 0, 0);
+    return dt.toISOString().split('T')[0];
+  };
+
+  for (const j of journals) {
+    const k = getDay(j.createdAt);
+    if (!dayMap[k]) dayMap[k] = { journals: 0, words: 0, minutes: 0, xp: 0 };
+    dayMap[k].journals += 1;
+    dayMap[k].xp += 10;
+  }
+
+  for (const v of vocabItems) {
+    const k = getDay(v.createdAt);
+    if (!dayMap[k]) dayMap[k] = { journals: 0, words: 0, minutes: 0, xp: 0 };
+    dayMap[k].words += 1;
+    dayMap[k].xp += 3;
+  }
+
+  for (const p of phrases) {
+    const k = getDay(p.createdAt);
+    if (!dayMap[k]) dayMap[k] = { journals: 0, words: 0, minutes: 0, xp: 0 };
+    dayMap[k].xp += 2;
+  }
+
+  for (const s of sessions) {
+    const k = getDay(s.completedAt);
+    if (!dayMap[k]) dayMap[k] = { journals: 0, words: 0, minutes: 0, xp: 0 };
+    dayMap[k].minutes += Math.round((s.duration || 0) / 60);
+    dayMap[k].xp += 5;
+  }
+
+  // Upsert each day
+  let upserted = 0;
+  for (const [dateStr, data] of Object.entries(dayMap)) {
+    const day = new Date(dateStr + 'T00:00:00');
+    await prisma.progressDaily.upsert({
+      where: { userId_day: { userId, day } },
+      update: {
+        journalsCount: data.journals,
+        wordsLearned:  data.words,
+        minutesSpent:  data.minutes,
+        xpEarned:      data.xp,
+      },
+      create: {
+        userId,
+        day,
+        journalsCount: data.journals,
+        wordsLearned:  data.words,
+        minutesSpent:  data.minutes,
+        xpEarned:      data.xp,
+      },
+    });
+    upserted++;
+  }
+
+  res.status(200).json({ message: 'Backfill complete', daysProcessed: upserted });
+}));
+
 // ─── Library / Lessons ───────────────────────────────
 router.get('/library/lessons', asyncHandler(async (req, res) => {
   const category = req.query.category || undefined;
