@@ -109,7 +109,6 @@ export const VocabularyReviewPage: React.FC = () => {
               </div>
               <div className="flex gap-3 md:gap-4 mt-8 md:mt-10">
                 <button 
-                <button 
                   onClick={handleGotIt}
                   disabled={actionLoading}
                   className="flex-1 py-3 md:py-4 rounded-full border-[3px] border-black font-bold text-sm md:text-base lg:text-lg transition-all flex items-center justify-center gap-2 active:scale-95 bg-tertiary-container text-white hover:scale-[0.98]"
@@ -166,8 +165,8 @@ export const VocabularyReviewPage: React.FC = () => {
                 </p>
               </div>
             </div>
-              </div>
             </div>
+          </div>
           )}
         </div>
 
