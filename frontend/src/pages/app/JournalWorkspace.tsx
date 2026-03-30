@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { trackSessionStart, trackSubmissionSent } from '../../services/analytics/coreLoop';
 
 const QUICK_PROMPTS = [
   { icon: 'lightbulb', key: 'prompt_meal' },
@@ -18,6 +19,16 @@ export const JournalWorkspacePage: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [journalId, setJournalId] = useState<string | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const sessionTrackedRef = useRef(false);
+  const startTimeRef = useRef(Date.now());
+
+  // Track session start once
+  useEffect(() => {
+    if (!sessionTrackedRef.current) {
+      trackSessionStart({});
+      sessionTrackedRef.current = true;
+    }
+  }, []);
 
   const journalIdFromUrl = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -69,6 +80,7 @@ export const JournalWorkspacePage: React.FC = () => {
         });
       }
       window.location.hash = `#feedback?journalId=${id}`;
+      trackSubmissionSent({ wordCount, typingTimeMs: Date.now() - startTimeRef.current });
     } catch (err) {
       console.error('Failed to submit journal', err);
       setIsSubmitting(false);

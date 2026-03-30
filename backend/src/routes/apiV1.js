@@ -373,6 +373,26 @@ router.delete('/journals/:id', requireAuth, asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Journal deleted' });
 }));
 
+// ─── Journal Review Items (vocab boosters from feedback) ─────────────────────
+router.get('/journals/:id/review-items', requireAuth, asyncHandler(async (req, res) => {
+  const journal = await prisma.journal.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id, deletedAt: null },
+  });
+  if (!journal) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Journal not found' });
+  }
+  let items = [];
+  if (journal.feedback) {
+    try {
+      const fb = typeof journal.feedback === 'string' ? JSON.parse(journal.feedback) : journal.feedback;
+      items = Array.isArray(fb?.vocabularyBoosters) ? fb.vocabularyBoosters : [];
+    } catch {
+      // feedback malformed — return empty
+    }
+  }
+  res.status(200).json({ items, total: items.length });
+}));
+
 // ─── AI Feedback ─────────────────────────────────────
 router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
   let { journalId, content, language } = req.body || {};

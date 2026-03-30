@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { trackReviewDone } from '../../services/analytics/coreLoop';
 
 export const VocabularyReviewPage: React.FC = () => {
   const { t } = useTranslation();
@@ -9,6 +10,7 @@ export const VocabularyReviewPage: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [rememberedCount, setRememberedCount] = useState(0);
 
   const journalId = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -17,8 +19,15 @@ export const VocabularyReviewPage: React.FC = () => {
   useEffect(() => {
     async function loadVocab() {
       try {
-        const res = await apiRequest('/vocab/notebook') as any;
-        setVocabItems(res.items || []);
+        if (journalId) {
+          // Load session-specific vocab from journal feedback
+          const res = await apiRequest(`/journals/${journalId}/review-items`) as any;
+          setVocabItems(res.items || []);
+        } else {
+          // Fallback: global notebook
+          const res = await apiRequest('/vocab/notebook') as any;
+          setVocabItems(res.items || []);
+        }
       } catch (err) {
         console.error('Failed to load vocab', err);
       } finally {
@@ -26,7 +35,7 @@ export const VocabularyReviewPage: React.FC = () => {
       }
     }
     loadVocab();
-  }, []);
+  }, [journalId]);
 
   const currentVocab = vocabItems[currentIndex];
   const isFinished = currentIndex >= vocabItems.length && !loading;
@@ -35,10 +44,14 @@ export const VocabularyReviewPage: React.FC = () => {
     if (!currentVocab || actionLoading) return;
     setActionLoading(true);
     try {
-      await apiRequest(`/vocab/notebook/${currentVocab.id}`, {
-        method: 'PATCH',
-        body: { mastery: 'learning' },
-      });
+      // Only patch if this is a global notebook item (has an id stored in DB)
+      if (currentVocab.id) {
+        await apiRequest(`/vocab/notebook/${currentVocab.id}`, {
+          method: 'PATCH',
+          body: { mastery: 'learning' },
+        });
+      }
+      setRememberedCount(prev => prev + 1);
     } catch (err) {
       console.error(err);
     } finally {
@@ -51,7 +64,8 @@ export const VocabularyReviewPage: React.FC = () => {
     setCurrentIndex(prev => prev + 1);
   };
 
-  const handleContinue = () => {
+  const handleContinue = (skipped = false) => {
+    trackReviewDone({ rememberedCount, skipped });
     const target = journalId ? `#speaking-intro?journalId=${journalId}` : '#speaking-intro';
     window.location.hash = target;
   };
@@ -184,7 +198,7 @@ export const VocabularyReviewPage: React.FC = () => {
               <p className="font-headline font-bold text-sm md:text-base">Vocabulary Builder</p>
             </div>
             <button 
-              onClick={handleContinue}
+              onClick={() => handleContinue(true)}
               className="px-6 md:px-10 lg:px-12 py-3 md:py-4 bg-black text-white rounded-full font-headline font-black text-sm md:text-base lg:text-lg flex items-center gap-2 md:gap-3 hover:scale-105 transition-transform active:scale-95 sketch-border"
             >
               Skip

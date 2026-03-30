@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { parseFeedback } from '../../types/dto/ai-feedback';
 
 export const HistoryDetailPage: React.FC = () => {
   const { t } = useTranslation();
@@ -52,20 +53,10 @@ export const HistoryDetailPage: React.FC = () => {
     );
   }
 
-  let parsedFeedback: any = null;
-  try {
-    if (typeof journal.feedback === 'string' && journal.feedback) {
-      parsedFeedback = JSON.parse(journal.feedback);
-    } else if (typeof journal.feedback === 'object') {
-      parsedFeedback = journal.feedback;
-    }
-  } catch (e) {
-    console.error('Failed to parse feedback', e);
-  }
-
-  const enhancedText = parsedFeedback?.enhancedText || parsedFeedback?.enhancedContent || "Feedback not generated yet.";
-  const vocabBoosters = parsedFeedback?.vocabularyBoosters || [];
-  const sentencePatterns = parsedFeedback?.sentencePattern ? [parsedFeedback.sentencePattern] : (parsedFeedback?.sentencePatterns || []);
+  const feedbackDto = parseFeedback(journal.feedback);
+  const enhancedText = feedbackDto.enhancedText || 'Feedback not generated yet.';
+  const vocabBoosters = feedbackDto.vocabularyBoosters;
+  const sentencePatterns = feedbackDto.sentencePatterns;
   const score = journal.score;
 
   return (

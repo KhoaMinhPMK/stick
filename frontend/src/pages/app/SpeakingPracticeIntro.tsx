@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { trackAudioPlay } from '../../services/analytics/coreLoop';
 
 export const SpeakingPracticeIntroPage: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [sentence, setSentence] = useState('');
   const [loadingJournal, setLoadingJournal] = useState(false);
+  const playCountRef = useRef(0);
 
   const journalId = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -37,7 +39,11 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(sentence);
     utt.lang = 'en-US';
-    utt.onstart = () => setIsPlaying(true);
+    utt.onstart = () => {
+      setIsPlaying(true);
+      playCountRef.current += 1;
+      trackAudioPlay({ journalId: journalId || undefined, playCount: playCountRef.current });
+    };
     utt.onend = () => setIsPlaying(false);
     utt.onerror = () => setIsPlaying(false);
     setIsPlaying(true);

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, postJournalMood, type ProgressSummary } from '../../services/api/endpoints';
+import { trackCompletionView } from '../../services/analytics/coreLoop';
 
 export const CompletionPage: React.FC = () => {
   const { t } = useTranslation();
@@ -9,6 +10,7 @@ export const CompletionPage: React.FC = () => {
   const [moodSaved, setMoodSaved] = useState(false);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const completionTrackedRef = useRef(false);
 
   const journalId = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -19,6 +21,10 @@ export const CompletionPage: React.FC = () => {
       try {
         const res = await getProgressSummary();
         setSummary(res);
+        if (!completionTrackedRef.current) {
+          trackCompletionView({ journalId: journalId || undefined, streakCount: res.currentStreak });
+          completionTrackedRef.current = true;
+        }
       } catch (err) {
         console.error('Failed to load summary:', err);
       } finally {

@@ -9,6 +9,8 @@ interface RequestOptions {
   method?: HttpMethod;
   body?: unknown;
   token?: string | null;
+  /** Internal: skip 401-recovery to avoid infinite loop */
+  _noRetry?: boolean;
 }
 
 export interface ApiErrorShape {
@@ -37,7 +39,7 @@ export function persistAuth(accessToken: string, user: unknown) {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, token = getStoredToken() } = options;
+  const { method = 'GET', body, token = getStoredToken(), _noRetry = false } = options;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -53,6 +55,21 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   });
 
   const payload = await response.json().catch(() => ({}));
+
+  // 401 recovery: clear stale token and create a fresh guest session, then retry once
+  if (response.status === 401 && !_noRetry && path !== '/auth/firebase/login' && path !== '/auth/register' && path !== '/auth/login') {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    try {
+      // Lazily import to avoid circular deps at module level
+      const { createGuestSession } = await import('./auth');
+      const { accessToken } = await createGuestSession();
+      return apiRequest<T>(path, { ...options, token: accessToken, _noRetry: true });
+    } catch {
+      throw new ApiError(response.status, payload as ApiErrorShape);
+    }
+  }
+
   if (!response.ok) {
     throw new ApiError(response.status, payload as ApiErrorShape);
   }

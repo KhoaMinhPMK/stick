@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { parseFeedback } from '../../types/dto/ai-feedback';
+import { trackFeedbackView } from '../../services/analytics/coreLoop';
 
 export const FeedbackResultPage: React.FC = () => {
   const { t } = useTranslation();
   const [journal, setJournal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isPlayingEnhanced, setIsPlayingEnhanced] = useState(false);
+  const feedbackTrackedRef = useRef(false);
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -19,8 +23,13 @@ export const FeedbackResultPage: React.FC = () => {
         return;
       }
       try {
+        const loadStart = Date.now();
         const res = await apiRequest(`/journals/${id}`) as any;
         setJournal(res.journal);
+        if (!feedbackTrackedRef.current && res.journal) {
+          trackFeedbackView({ journalId: id!, latencyMs: Date.now() - loadStart, isFallback: false });
+          feedbackTrackedRef.current = true;
+        }
       } catch (err) {
         console.error('Failed to load journal result', err);
       } finally {
@@ -52,21 +61,23 @@ export const FeedbackResultPage: React.FC = () => {
     );
   }
 
-  let parsedFeedback: any = {};
-  if (journal.feedback) {
-    try {
-      if (typeof journal.feedback === 'string') {
-        parsedFeedback = JSON.parse(journal.feedback);
-      } else {
-        parsedFeedback = journal.feedback;
-      }
-    } catch {}
-  }
+  const feedbackDto = parseFeedback(journal.feedback);
+  const corrections = feedbackDto.corrections;
+  const usefulWords = feedbackDto.vocabularyBoosters;
+  const enhancedText = feedbackDto.enhancedText || journal.content;
+  const encouragement = feedbackDto.encouragement || t('feedback_result.encouragement', { defaultValue: 'Keep up the great work!' });
+  const score = journal.score || 0;
 
-  const corrections = parsedFeedback.corrections || [];
-  const usefulWords = parsedFeedback.vocabularyBoosters || [];
-  const enhancedText = parsedFeedback.enhancedText || parsedFeedback.enhancedContent || journal.content;
-  const encouragement = parsedFeedback.encouragement || t('feedback_result.encouragement', { defaultValue: 'Keep up the great work!' });
+  const handlePlayEnhanced = () => {
+    if (!enhancedText || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(enhancedText);
+    utt.lang = 'en-US';
+    utt.onstart = () => setIsPlayingEnhanced(true);
+    utt.onend = () => setIsPlayingEnhanced(false);
+    utt.onerror = () => setIsPlayingEnhanced(false);
+    window.speechSynthesis.speak(utt);
+  };
 
   return (
     <AppLayout activePath="#journal">
@@ -103,9 +114,9 @@ export const FeedbackResultPage: React.FC = () => {
                       <span className="material-symbols-outlined text-tertiary text-lg md:text-2xl">magic_button</span>
                       <h3 className="font-headline font-bold text-base md:text-xl uppercase tracking-tighter">{t('feedback_result.natural_version')}</h3>
                     </div>
-                    <button className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 sketch-border bg-surface hover:bg-secondary-container transition-all group self-start">
-                      <span className="material-symbols-outlined text-lg md:text-xl group-active:scale-90 transition-transform">volume_up</span>
-                      <span className="font-label font-bold text-sm">{t('feedback_result.listen')}</span>
+                    <button onClick={handlePlayEnhanced} className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 sketch-border bg-surface hover:bg-secondary-container transition-all group self-start disabled:opacity-50" disabled={!window.speechSynthesis}>
+                      <span className="material-symbols-outlined text-lg md:text-xl group-active:scale-90 transition-transform">{isPlayingEnhanced ? 'stop_circle' : 'volume_up'}</span>
+                      <span className="font-label font-bold text-sm">{isPlayingEnhanced ? t('feedback_result.playing', { defaultValue: 'Playing...' }) : t('feedback_result.listen')}</span>
                     </button>
                   </div>
                   <div className="p-5 md:p-8 bg-white sketch-card shadow-[4px_4px_0_0_#000] md:shadow-[10px_10px_0_0_#000] text-lg md:text-2xl font-medium leading-relaxed whitespace-pre-wrap">
@@ -192,10 +203,10 @@ export const FeedbackResultPage: React.FC = () => {
             <div className="p-4 md:p-6 border-2 border-dashed border-stone-400 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-label font-bold text-[10px] md:text-xs uppercase tracking-widest text-stone-500">{t('feedback_result.daily_goal')}</span>
-                <span className="font-label font-bold text-[10px] md:text-xs">80%</span>
+                <span className="font-label font-bold text-[10px] md:text-xs">{score}%</span>
               </div>
               <div className="h-2.5 md:h-3 w-full bg-surface-dim rounded-full overflow-hidden border border-black">
-                <div className="h-full bg-tertiary-container w-[80%] border-r border-black" />
+                <div className="h-full bg-tertiary-container border-r border-black" style={{ width: `${score}%` }} />
               </div>
               <p className="mt-2 md:mt-3 text-[10px] text-stone-500 font-medium italic">{t('feedback_result.streak_hint')}</p>
             </div>
