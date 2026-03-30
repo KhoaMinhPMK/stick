@@ -36,23 +36,40 @@ async function trackDailyProgress(userId, data = {}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   try {
-    await prisma.progressDaily.upsert({
-      where: { userId_day: { userId, day: today } },
-      update: {
-        journalsCount: { increment: data.journals || 0 },
-        wordsLearned:  { increment: data.words || 0 },
-        minutesSpent:  { increment: data.minutes || 0 },
-        xpEarned:      { increment: data.xp || 0 },
-      },
-      create: {
-        userId,
-        day: today,
-        journalsCount: data.journals || 0,
-        wordsLearned:  data.words || 0,
-        minutesSpent:  data.minutes || 0,
-        xpEarned:      data.xp || 0,
-      },
-    });
+    try {
+      await prisma.progressDaily.upsert({
+        where: { userId_day: { userId, day: today } },
+        update: {
+          journalsCount: { increment: data.journals || 0 },
+          wordsLearned:  { increment: data.words || 0 },
+          minutesSpent:  { increment: data.minutes || 0 },
+          xpEarned:      { increment: data.xp || 0 },
+        },
+        create: {
+          userId,
+          day: today,
+          journalsCount: data.journals || 0,
+          wordsLearned:  data.words || 0,
+          minutesSpent:  data.minutes || 0,
+          xpEarned:      data.xp || 0,
+        },
+      });
+    } catch (upsertErr) {
+      // P2002: unique constraint race condition — fall back to plain update
+      if (upsertErr?.code === 'P2002') {
+        await prisma.progressDaily.update({
+          where: { userId_day: { userId, day: today } },
+          data: {
+            journalsCount: { increment: data.journals || 0 },
+            wordsLearned:  { increment: data.words || 0 },
+            minutesSpent:  { increment: data.minutes || 0 },
+            xpEarned:      { increment: data.xp || 0 },
+          },
+        });
+      } else {
+        throw upsertErr;
+      }
+    }
   } catch (err) {
     console.error('trackDailyProgress error:', err.message);
   }
