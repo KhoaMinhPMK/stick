@@ -43,7 +43,7 @@ export const JournalWorkspacePage: React.FC = () => {
         const res = await apiRequest('/journals', {
           method: 'POST',
           body: JSON.stringify({ title: 'Daily Journal', content: text, status: 'draft', language: 'en' }),
-        });
+        }) as any;
         window.location.hash = `#feedback?id=${res.journal.id}`;
       } catch (err) {
         console.error('Failed to submit journal', err);

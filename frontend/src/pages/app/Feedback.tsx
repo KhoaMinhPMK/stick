@@ -5,7 +5,7 @@ import { apiRequest } from '../../services/api/client';
 
 export const FeedbackPage: React.FC = () => {
   const { t } = useTranslation();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading] = useState(true);
   const [isPlayingUser, setIsPlayingUser] = useState(false);
   const [isPlayingModel, setIsPlayingModel] = useState(false);
 

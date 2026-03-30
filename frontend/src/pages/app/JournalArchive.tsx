@@ -14,7 +14,7 @@ export const JournalArchivePage: React.FC = () => {
   useEffect(() => {
     async function load() {
       try {
-        const res = await apiRequest('/journals?limit=100');
+        const res = await apiRequest('/journals?limit=100') as any;
         setEntries(res.items || []);
       } catch (err) {
         console.error('Failed to load journals', err);

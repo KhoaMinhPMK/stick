@@ -19,7 +19,7 @@ export const FeedbackResultPage: React.FC = () => {
         return;
       }
       try {
-        const res = await apiRequest(`/journals/${id}`);
+        const res = await apiRequest(`/journals/${id}`) as any;
         setJournal(res.journal);
       } catch (err) {
         console.error('Failed to load journal result', err);

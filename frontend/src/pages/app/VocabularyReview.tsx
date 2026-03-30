@@ -13,7 +13,7 @@ export const VocabularyReviewPage: React.FC = () => {
   useEffect(() => {
     async function loadVocab() {
       try {
-        const res = await apiRequest('/vocab/notebook');
+        const res = await apiRequest('/vocab/notebook') as any;
         setVocabItems(res.items || []);
       } catch (err) {
         console.error('Failed to load vocab', err);

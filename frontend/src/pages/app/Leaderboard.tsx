@@ -36,7 +36,7 @@ export const LeaderboardPage: React.FC = () => {
   // Podium order: [2nd, 1st, 3rd]
   const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
 
-  const medalColors = ['#C0C0C0', '#FFD700', '#CD7F32']; // silver, gold, bronze
+
   const podiumHeights = ['h-24 md:h-32', 'h-32 md:h-48', 'h-20 md:h-24'];
   const podiumBg = ['bg-stone-200', 'bg-[#FFF5CC]', 'bg-orange-100'];
 
