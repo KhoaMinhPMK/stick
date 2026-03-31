@@ -3,7 +3,8 @@
   "packageManager": "yarn@3.6.4",
   "scripts": {
     "dev": "node src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "6.4.1",

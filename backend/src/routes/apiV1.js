@@ -18,6 +18,28 @@ const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// ─── Safe table helpers (work even if Prisma client not regenerated) ─────
+async function tableExists(tableName) {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`SELECT 1 FROM \`${tableName}\` LIMIT 1`);
+    return true;
+  } catch { return false; }
+}
+
+async function safeCountRaw(table, whereClause = '1=1') {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as cnt FROM \`${table}\` WHERE ${whereClause}`);
+    return Number(rows[0].cnt);
+  } catch { return 0; }
+}
+
+async function safeFindManyRaw(table, whereClause = '1=1', extra = '') {
+  try {
+    const rows = await prisma.$queryRawUnsafe(`SELECT * FROM \`${table}\` WHERE ${whereClause} ${extra}`);
+    return rows;
+  } catch { return []; }
+}
+
 async function getOrCreateOnboardingState(userId) {
   let state = await prisma.onboardingState.findUnique({
     where: { userId },
@@ -1419,64 +1441,55 @@ router.get('/daily-prompt/today', requireAuth, asyncHandler(async (req, res) => 
 // ─── Admin: Metrics ──────────────────────────────────
 router.get('/admin/metrics/cards', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const dateStr = req.query.date || new Date().toISOString().split('T')[0];
-  const targetDate = new Date(dateStr);
-  targetDate.setHours(0, 0, 0, 0);
-  const yesterday = new Date(targetDate);
-  yesterday.setDate(yesterday.getDate() - 1);
+  const todayStart = `${dateStr} 00:00:00`;
+  const todayEnd = `${dateStr} 23:59:59`;
 
-  const todayEnd = new Date(targetDate);
-  todayEnd.setHours(23, 59, 59, 999);
-  const yesterdayEnd = new Date(yesterday);
-  yesterdayEnd.setHours(23, 59, 59, 999);
+  const yd = new Date(dateStr);
+  yd.setDate(yd.getDate() - 1);
+  const ydStr = yd.toISOString().split('T')[0];
+  const ydStart = `${ydStr} 00:00:00`;
+  const ydEnd = `${ydStr} 23:59:59`;
 
-  const [todaySessions, yesterdaySessions] = await Promise.all([
-    prisma.progressDaily.count({ where: { day: targetDate } }),
-    prisma.progressDaily.count({ where: { day: yesterday } }),
-  ]);
+  // Sessions from ProgressDaily
+  const todaySessions = await safeCountRaw('ProgressDaily', `day = '${dateStr}'`);
+  const yesterdaySessions = await safeCountRaw('ProgressDaily', `day = '${ydStr}'`);
 
-  const todaySubmissions = await prisma.journal.count({
-    where: { status: 'submitted', createdAt: { gte: targetDate, lte: todayEnd } },
-  });
+  // Submissions
+  const todaySubmissions = await safeCountRaw('Journal', `status = 'submitted' AND createdAt >= '${todayStart}' AND createdAt <= '${todayEnd}'`);
   const completionRate = todaySessions > 0 ? todaySubmissions / todaySessions : 0;
 
-  const yesterdaySubmissions = await prisma.journal.count({
-    where: { status: 'submitted', createdAt: { gte: yesterday, lte: yesterdayEnd } },
-  });
+  const yesterdaySubmissions = await safeCountRaw('Journal', `status = 'submitted' AND createdAt >= '${ydStart}' AND createdAt <= '${ydEnd}'`);
   const yesterdayCompletionRate = yesterdaySessions > 0 ? yesterdaySubmissions / yesterdaySessions : 0;
 
-  const [aiErrors, aiTotal] = await Promise.all([
-    prisma.aILog.count({ where: { statusCode: { not: 200 }, createdAt: { gte: targetDate, lte: todayEnd } } }),
-    prisma.aILog.count({ where: { createdAt: { gte: targetDate, lte: todayEnd } } }),
-  ]);
+  // AI errors (safe — returns 0 if AILog table doesn't exist)
+  const aiErrors = await safeCountRaw('AILog', `statusCode != 200 AND createdAt >= '${todayStart}' AND createdAt <= '${todayEnd}'`);
+  const aiTotal = await safeCountRaw('AILog', `createdAt >= '${todayStart}' AND createdAt <= '${todayEnd}'`);
   const aiErrorRate = aiTotal > 0 ? aiErrors / aiTotal : 0;
 
-  // D1 return: users registered yesterday who came back today
+  // D1 return
   const yesterdayUsers = await prisma.user.findMany({
-    where: { createdAt: { gte: yesterday, lte: yesterdayEnd } },
+    where: { createdAt: { gte: new Date(ydStart), lte: new Date(ydEnd) } },
     select: { id: true },
   });
-  const yesterdayUserIds = yesterdayUsers.map(u => u.id);
+  const ydIds = yesterdayUsers.map(u => u.id);
   let day1ReturnRate = 0;
-  if (yesterdayUserIds.length > 0) {
-    const returnedCount = await prisma.progressDaily.count({
-      where: { userId: { in: yesterdayUserIds }, day: targetDate },
-    });
-    day1ReturnRate = returnedCount / yesterdayUserIds.length;
+  if (ydIds.length > 0) {
+    const placeholders = ydIds.map(id => `'${id}'`).join(',');
+    const returnedCount = await safeCountRaw('ProgressDaily', `userId IN (${placeholders}) AND day = '${dateStr}'`);
+    day1ReturnRate = returnedCount / ydIds.length;
   }
 
-  const twoDaysAgo = new Date(yesterday);
-  twoDaysAgo.setDate(twoDaysAgo.getDate() - 1);
-  const twoDaysAgoEnd = new Date(twoDaysAgo);
-  twoDaysAgoEnd.setHours(23, 59, 59, 999);
+  const td = new Date(ydStr);
+  td.setDate(td.getDate() - 1);
+  const tdStr = td.toISOString().split('T')[0];
   const twoDaysAgoUsers = await prisma.user.findMany({
-    where: { createdAt: { gte: twoDaysAgo, lte: twoDaysAgoEnd } },
+    where: { createdAt: { gte: new Date(`${tdStr} 00:00:00`), lte: new Date(`${tdStr} 23:59:59`) } },
     select: { id: true },
   });
   let prevD1 = 0;
   if (twoDaysAgoUsers.length > 0) {
-    const prevReturned = await prisma.progressDaily.count({
-      where: { userId: { in: twoDaysAgoUsers.map(u => u.id) }, day: yesterday },
-    });
+    const placeholders = twoDaysAgoUsers.map(u => `'${u.id}'`).join(',');
+    const prevReturned = await safeCountRaw('ProgressDaily', `userId IN (${placeholders}) AND day = '${ydStr}'`);
     prevD1 = prevReturned / twoDaysAgoUsers.length;
   }
 
@@ -1494,19 +1507,15 @@ router.get('/admin/metrics/cards', requireAuth, requireAdmin, asyncHandler(async
 
 router.get('/admin/metrics/funnel', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const { from, to } = req.query;
-  const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 86400000);
-  const toDate = to ? new Date(to) : new Date();
-  fromDate.setHours(0, 0, 0, 0);
-  toDate.setHours(23, 59, 59, 999);
+  const fromDate = from || new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const toDate = to || new Date().toISOString().split('T')[0];
+  const fStart = `${fromDate} 00:00:00`;
+  const tEnd = `${toDate} 23:59:59`;
 
-  const dateFilter = { gte: fromDate, lte: toDate };
-
-  const [sessions, submissions, aiLogs, completions] = await Promise.all([
-    prisma.progressDaily.count({ where: { day: { gte: fromDate, lte: toDate } } }),
-    prisma.journal.count({ where: { createdAt: dateFilter, status: { not: 'draft' } } }),
-    prisma.aILog.count({ where: { createdAt: dateFilter, statusCode: 200 } }),
-    prisma.journal.count({ where: { createdAt: dateFilter, status: 'submitted' } }),
-  ]);
+  const sessions = await safeCountRaw('ProgressDaily', `day >= '${fromDate}' AND day <= '${toDate}'`);
+  const submissions = await safeCountRaw('Journal', `status != 'draft' AND createdAt >= '${fStart}' AND createdAt <= '${tEnd}'`);
+  const aiLogs = await safeCountRaw('AILog', `statusCode = 200 AND createdAt >= '${fStart}' AND createdAt <= '${tEnd}'`);
+  const completions = await safeCountRaw('Journal', `status = 'submitted' AND createdAt >= '${fStart}' AND createdAt <= '${tEnd}'`);
 
   const steps = [
     { step: 'session_start', count: sessions },
@@ -1522,42 +1531,41 @@ router.get('/admin/metrics/funnel', requireAuth, requireAdmin, asyncHandler(asyn
 
 router.get('/admin/metrics/retention', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const { from, to } = req.query;
-  const fromDate = from ? new Date(from) : new Date(Date.now() - 10 * 86400000);
-  const toDate = to ? new Date(to) : new Date();
-  fromDate.setHours(0, 0, 0, 0);
-  toDate.setHours(23, 59, 59, 999);
+  const fromDate = from || new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0];
+  const toDate = to || new Date().toISOString().split('T')[0];
 
   const cohorts = [];
   const current = new Date(fromDate);
-  while (current <= toDate) {
-    const dayStart = new Date(current);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(current);
-    dayEnd.setHours(23, 59, 59, 999);
+  const end = new Date(toDate);
+
+  while (current <= end) {
+    const dayStr = current.toISOString().split('T')[0];
+    const dayStart = `${dayStr} 00:00:00`;
+    const dayEnd = `${dayStr} 23:59:59`;
 
     const users = await prisma.user.findMany({
-      where: { createdAt: { gte: dayStart, lte: dayEnd } },
+      where: { createdAt: { gte: new Date(dayStart), lte: new Date(dayEnd) } },
       select: { id: true },
     });
-    const userIds = users.map(u => u.id);
-    const totalUsers = userIds.length;
+    const totalUsers = users.length;
 
     if (totalUsers > 0) {
-      const d1Date = new Date(dayStart);
-      d1Date.setDate(d1Date.getDate() + 1);
-      const d2Date = new Date(dayStart);
-      d2Date.setDate(d2Date.getDate() + 2);
-      const d3Date = new Date(dayStart);
-      d3Date.setDate(d3Date.getDate() + 3);
+      const ids = users.map(u => `'${u.id}'`).join(',');
+      const d1 = new Date(current); d1.setDate(d1.getDate() + 1);
+      const d2 = new Date(current); d2.setDate(d2.getDate() + 2);
+      const d3 = new Date(current); d3.setDate(d3.getDate() + 3);
+      const d1Str = d1.toISOString().split('T')[0];
+      const d2Str = d2.toISOString().split('T')[0];
+      const d3Str = d3.toISOString().split('T')[0];
 
       const [d1Count, d2Count, d3Count] = await Promise.all([
-        prisma.progressDaily.count({ where: { userId: { in: userIds }, day: d1Date } }),
-        prisma.progressDaily.count({ where: { userId: { in: userIds }, day: d2Date } }),
-        prisma.progressDaily.count({ where: { userId: { in: userIds }, day: d3Date } }),
+        safeCountRaw('ProgressDaily', `userId IN (${ids}) AND day = '${d1Str}'`),
+        safeCountRaw('ProgressDaily', `userId IN (${ids}) AND day = '${d2Str}'`),
+        safeCountRaw('ProgressDaily', `userId IN (${ids}) AND day = '${d3Str}'`),
       ]);
 
       cohorts.push({
-        registeredDate: dayStart.toISOString().split('T')[0],
+        registeredDate: dayStr,
         totalUsers,
         d1: Math.round((d1Count / totalUsers) * 100) / 100,
         d2: Math.round((d2Count / totalUsers) * 100) / 100,
@@ -1578,27 +1586,18 @@ router.get('/admin/metrics/ai-health', requireAuth, requireAdmin, asyncHandler(a
   for (let i = 0; i < days; i++) {
     const date = new Date();
     date.setDate(date.getDate() - i);
-    date.setHours(0, 0, 0, 0);
-    const dateEnd = new Date(date);
-    dateEnd.setHours(23, 59, 59, 999);
+    const dateStr = date.toISOString().split('T')[0];
+    const dStart = `${dateStr} 00:00:00`;
+    const dEnd = `${dateStr} 23:59:59`;
 
-    const logs = await prisma.aILog.findMany({
-      where: { createdAt: { gte: date, lte: dateEnd } },
-      select: { latencyMs: true, statusCode: true },
-    });
-
+    const logs = await safeFindManyRaw('AILog', `createdAt >= '${dStart}' AND createdAt <= '${dEnd}'`, '');
     const totalRequests = logs.length;
     const errorCount = logs.filter(l => l.statusCode !== 200).length;
     const avgLatencyMs = totalRequests > 0
-      ? Math.round(logs.reduce((sum, l) => sum + l.latencyMs, 0) / totalRequests)
+      ? Math.round(logs.reduce((sum, l) => sum + (l.latencyMs || 0), 0) / totalRequests)
       : 0;
 
-    daily.push({
-      date: date.toISOString().split('T')[0],
-      avgLatencyMs,
-      errorCount,
-      totalRequests,
-    });
+    daily.push({ date: dateStr, avgLatencyMs, errorCount, totalRequests });
   }
 
   res.status(200).json({ daily });
@@ -1789,47 +1788,35 @@ router.get('/admin/ai-logs', requireAuth, requireAdmin, asyncHandler(async (req,
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
 
-  const where = {};
-  if (status === '200') where.statusCode = 200;
-  else if (status === '500') where.statusCode = { not: 200 };
-  if (from || to) {
-    where.createdAt = {};
-    if (from) where.createdAt.gte = new Date(from);
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23, 59, 59, 999);
-      where.createdAt.lte = toDate;
-    }
+  const conditions = ['1=1'];
+  if (status === '200') conditions.push('statusCode = 200');
+  else if (status === '500') conditions.push('statusCode != 200');
+  if (from) conditions.push(`createdAt >= '${from} 00:00:00'`);
+  if (to) conditions.push(`createdAt <= '${to} 23:59:59'`);
+
+  const whereClause = conditions.join(' AND ');
+  const total = await safeCountRaw('AILog', whereClause);
+  const offset = (pageNum - 1) * limitNum;
+  const logs = await safeFindManyRaw('AILog', whereClause, `ORDER BY createdAt DESC LIMIT ${limitNum} OFFSET ${offset}`);
+
+  const userIds = [...new Set(logs.map(l => l.userId).filter(Boolean))];
+  let userMap = {};
+  if (userIds.length > 0) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true },
+    });
+    userMap = Object.fromEntries(users.map(u => [u.id, u.name]));
   }
 
-  const [logs, total] = await Promise.all([
-    prisma.aILog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (pageNum - 1) * limitNum,
-      take: limitNum,
-    }),
-    prisma.aILog.count({ where }),
-  ]);
-
-  const userIds = [...new Set(logs.map(l => l.userId))];
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, name: true },
-  });
-  const userMap = Object.fromEntries(users.map(u => [u.id, u.name]));
-
-  const items = logs.map(l => ({
-    ...l,
-    userName: userMap[l.userId] || 'Unknown',
-  }));
-
+  const items = logs.map(l => ({ ...l, userName: userMap[l.userId] || 'Unknown' }));
   res.status(200).json({ items, total, page: pageNum, limit: limitNum });
 }));
 
 router.get('/admin/ai-logs/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const log = await prisma.aILog.findUnique({ where: { id: req.params.id } });
-  if (!log) return res.status(404).json({ code: 'NOT_FOUND', message: 'AI Log not found' });
+  const logs = await safeFindManyRaw('AILog', `id = '${req.params.id}'`, 'LIMIT 1');
+  if (logs.length === 0) return res.status(404).json({ code: 'NOT_FOUND', message: 'AI Log not found' });
+  const log = logs[0];
 
   const user = await prisma.user.findUnique({
     where: { id: log.userId },
@@ -1841,7 +1828,7 @@ router.get('/admin/ai-logs/:id', requireAuth, requireAdmin, asyncHandler(async (
 
 // ─── Admin: Config ───────────────────────────────────
 router.get('/admin/config', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const items = await prisma.appConfig.findMany({ orderBy: { key: 'asc' } });
+  const items = await safeFindManyRaw('AppConfig', '1=1', 'ORDER BY `key` ASC');
   res.status(200).json({ items });
 }));
 
@@ -1851,11 +1838,17 @@ router.put('/admin/config/:key', requireAuth, requireAdmin, asyncHandler(async (
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'value is required' });
   }
 
-  const config = await prisma.appConfig.upsert({
-    where: { key: req.params.key },
-    update: { value: String(value), updatedBy: req.authUser.id },
-    create: { key: req.params.key, value: String(value), updatedBy: req.authUser.id },
-  });
+  const keyParam = req.params.key;
+  const existing = await safeFindManyRaw('AppConfig', `\`key\` = '${keyParam}'`, 'LIMIT 1');
+  let config;
+  if (existing.length > 0) {
+    await prisma.$queryRawUnsafe(`UPDATE \`AppConfig\` SET value = '${String(value)}', updatedBy = '${req.authUser.id}', updatedAt = NOW() WHERE \`key\` = '${keyParam}'`);
+    config = { ...existing[0], value: String(value), updatedBy: req.authUser.id };
+  } else {
+    const id = require('crypto').randomUUID();
+    await prisma.$queryRawUnsafe(`INSERT INTO \`AppConfig\` (id, \`key\`, value, updatedBy, createdAt, updatedAt) VALUES ('${id}', '${keyParam}', '${String(value)}', '${req.authUser.id}', NOW(), NOW())`);
+    config = { id, key: keyParam, value: String(value), updatedBy: req.authUser.id };
+  }
 
   res.status(200).json({ config });
 }));
