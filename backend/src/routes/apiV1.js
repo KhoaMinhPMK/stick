@@ -1252,9 +1252,15 @@ router.post('/admin/login', asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
-  const user = await prisma.user.findFirst({
-    where: { email: normalizedEmail, isGuest: false },
-  });
+  // Use raw SQL to ensure `role` and `status` are always fetched,
+  // even if Prisma client was generated before these columns were added.
+  const rows = await prisma.$queryRaw`
+    SELECT id, email, name, passwordHash, isGuest, role, status, createdAt
+    FROM \`User\`
+    WHERE email = ${normalizedEmail} AND isGuest = 0
+    LIMIT 1
+  `;
+  const user = rows[0] || null;
   if (!user || user.passwordHash !== hashPassword(String(password))) {
     return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Email or password incorrect' });
   }

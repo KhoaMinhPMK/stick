@@ -52,6 +52,15 @@ async function getUserFromBearer(authHeader) {
     return null;
   }
 
+  // Ensure role/status are always present regardless of Prisma client version
+  const userRows = await prisma.$queryRaw`
+    SELECT role, status FROM \`User\` WHERE id = ${session.user.id} LIMIT 1
+  `;
+  if (userRows[0]) {
+    session.user.role = userRows[0].role;
+    session.user.status = userRows[0].status;
+  }
+
   return { user: session.user, token };
 }
 
