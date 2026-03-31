@@ -55,7 +55,8 @@ app.use((err, req, res, _next) => {
   console.error('Unhandled Error:', err);
   res.status(500).json({
     code: 'INTERNAL_SERVER_ERROR',
-    message: 'An unexpected error occurred',
+    message: err.message || 'An unexpected error occurred',
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   });
 });
 
