@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { createLearningSession } from '../../services/api/endpoints';
 
 interface ListeningContent {
   sentence: string;
@@ -19,6 +20,7 @@ export const ListeningPracticePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [checked, setChecked] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const sessionSavedRef = useRef(false);
 
   useEffect(() => {
     apiRequest<{ sentence?: string; content?: string }>('/ai/reading-content?topic=daily+conversation&level=intermediate')
@@ -71,7 +73,23 @@ export const ListeningPracticePage: React.FC = () => {
 
   const allFilled = content ? content.blanks.every(b => !!answers[b]) : false;
 
-  const handleCheck = () => setChecked(true);
+  const handleCheck = () => {
+    setChecked(true);
+    if (!sessionSavedRef.current && content) {
+      sessionSavedRef.current = true;
+      const wordsArr = content.sentence.split(' ');
+      const correctCount = content.blanks.filter(b => {
+        const expected = wordsArr[b]?.replace(/[.,;!?]/g, '').toLowerCase();
+        return answers[b]?.toLowerCase() === expected;
+      }).length;
+      createLearningSession({
+        type: 'listening',
+        title: 'Listening Practice',
+        summary: `${correctCount}/${content.blanks.length} blanks correct`,
+        score: Math.round((correctCount / content.blanks.length) * 100),
+      }).catch(() => {});
+    }
+  };
 
   if (loading) {
     return (

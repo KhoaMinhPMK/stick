@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { createLearningSession } from '../../services/api/endpoints';
 
 interface QuizQuestion {
   question: string;
@@ -18,6 +19,7 @@ export const GrammarPracticePage: React.FC = () => {
   const [checked, setChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState(0);
+  const sessionSavedRef = useRef(false);
 
   useEffect(() => {
     apiRequest<{ questions: QuizQuestion[] }>('/ai/grammar-quiz?count=5')
@@ -28,6 +30,19 @@ export const GrammarPracticePage: React.FC = () => {
 
   const current = questions[currentIndex];
   const isFinished = currentIndex >= questions.length && questions.length > 0;
+
+  // Save learning session when quiz is completed
+  useEffect(() => {
+    if (isFinished && !sessionSavedRef.current) {
+      sessionSavedRef.current = true;
+      createLearningSession({
+        type: 'grammar',
+        title: 'Grammar Quiz',
+        summary: `Score: ${score}/${questions.length}`,
+        score: Math.round((score / questions.length) * 100),
+      }).catch(() => {});
+    }
+  }, [isFinished, score, questions.length]);
 
   const handleCheck = () => {
     if (selected !== null && current) {

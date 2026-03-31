@@ -11,10 +11,13 @@ function generateId(prefix) {
 
 async function createSession(userId) {
   const accessToken = crypto.randomBytes(24).toString('hex');
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30); // 30-day expiry
   await prisma.session.create({
     data: {
       userId,
       token: accessToken,
+      expiresAt,
     },
   });
   return accessToken;
@@ -49,6 +52,13 @@ async function getUserFromBearer(authHeader) {
   });
 
   if (!session || !session.user) {
+    return null;
+  }
+
+  // Check session expiry
+  if (session.expiresAt && session.expiresAt < new Date()) {
+    // Clean up expired session
+    await prisma.session.delete({ where: { id: session.id } }).catch(() => {});
     return null;
   }
 

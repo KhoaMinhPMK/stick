@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { createLearningSession } from '../../services/api/endpoints';
 
 interface ReadingArticle {
   title: string;
@@ -17,6 +18,8 @@ export const ReadingModePage: React.FC = () => {
   const [article, setArticle] = useState<ReadingArticle | null>(null);
   const [loading, setLoading] = useState(true);
   const [lookingUp, setLookingUp] = useState(false);
+  const startTimeRef = useRef(Date.now());
+  const sessionSavedRef = useRef(false);
 
   useEffect(() => {
     apiRequest<{ title?: string; content?: string; article?: string }>('/ai/reading-content?topic=language+learning&level=intermediate')
@@ -82,7 +85,19 @@ export const ReadingModePage: React.FC = () => {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-start justify-between mb-8">
           <div>
-            <button onClick={() => window.history.back()} className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors mb-4 group">
+            <button onClick={() => {
+              if (!sessionSavedRef.current && article) {
+                sessionSavedRef.current = true;
+                const duration = Math.round((Date.now() - startTimeRef.current) / 1000);
+                createLearningSession({
+                  type: 'reading',
+                  title: article.title || 'Reading Practice',
+                  summary: `Read for ${Math.round(duration / 60)} min`,
+                  duration,
+                }).catch(() => {});
+              }
+              window.history.back();
+            }} className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors mb-4 group">
               <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
               <span className="font-headline font-bold text-sm">{t('reading_mode.back')}</span>
             </button>

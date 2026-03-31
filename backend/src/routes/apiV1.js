@@ -108,6 +108,180 @@ async function trackDailyProgress(userId, data = {}) {
   }
 }
 
+/**
+ * Create an in-app notification for a user.
+ */
+async function createNotification(userId, { type, title, body, data }) {
+  try {
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: type || 'system',
+        title,
+        body,
+        data: data ? JSON.stringify(data) : null,
+      },
+    });
+  } catch (err) {
+    console.error('createNotification error:', err.message);
+  }
+}
+
+/**
+ * Check and unlock achievements for a user.
+ * Call after journal submit, feedback, streak update, vocab/phrase save.
+ */
+async function checkAndUnlockAchievements(userId) {
+  try {
+    const definitions = await prisma.achievementDefinition.findMany();
+    const existing = await prisma.userAchievement.findMany({
+      where: { userId },
+    });
+    const unlockedKeys = new Set();
+    for (const ua of existing) {
+      const def = definitions.find(d => d.id === ua.achievementId);
+      if (def) unlockedKeys.add(def.key);
+    }
+
+    // Gather user stats
+    const journalCount = await prisma.journal.count({
+      where: { userId, deletedAt: null, status: 'submitted' },
+    });
+
+    // Calculate current streak
+    const progressDays = await prisma.progressDaily.findMany({
+      where: { userId },
+      orderBy: { day: 'desc' },
+      take: 365,
+    });
+    let currentStreak = 0;
+    if (progressDays.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let checkDate = new Date(today);
+      for (const pd of progressDays) {
+        const pdDate = new Date(pd.day);
+        pdDate.setHours(0, 0, 0, 0);
+        const diff = Math.round((checkDate - pdDate) / 86400000);
+        if (diff <= 1) {
+          currentStreak++;
+          checkDate = pdDate;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    const vocabCount = await prisma.vocabNotebookItem.count({ where: { userId } });
+    const phraseCount = await prisma.savedPhrase.count({ where: { userId } });
+
+    // Best journal score
+    const bestJournal = await prisma.journal.findFirst({
+      where: { userId, deletedAt: null, status: 'submitted', score: { not: null } },
+      orderBy: { score: 'desc' },
+    });
+    const bestScore = bestJournal?.score || 0;
+
+    // Check each definition
+    const newlyUnlocked = [];
+    for (const def of definitions) {
+      if (unlockedKeys.has(def.key)) continue;
+
+      let progress = 0;
+      let qualified = false;
+
+      switch (def.key) {
+        case 'first_journal':
+          progress = Math.min(journalCount, def.threshold);
+          qualified = journalCount >= def.threshold;
+          break;
+        case 'journal_5':
+        case 'journal_25':
+          progress = Math.min(journalCount, def.threshold);
+          qualified = journalCount >= def.threshold;
+          break;
+        case 'streak_3':
+        case 'streak_7':
+        case 'streak_30':
+          progress = Math.min(currentStreak, def.threshold);
+          qualified = currentStreak >= def.threshold;
+          break;
+        case 'vocab_10':
+        case 'vocab_50':
+          progress = Math.min(vocabCount, def.threshold);
+          qualified = vocabCount >= def.threshold;
+          break;
+        case 'perfect_score':
+          progress = bestScore >= 90 ? 1 : 0;
+          qualified = bestScore >= 90;
+          break;
+        case 'phrase_collector':
+          progress = Math.min(phraseCount, def.threshold);
+          qualified = phraseCount >= def.threshold;
+          break;
+        default:
+          // Unknown key — try generic category matching
+          if (def.category === 'journal') {
+            progress = Math.min(journalCount, def.threshold);
+            qualified = journalCount >= def.threshold;
+          } else if (def.category === 'streak') {
+            progress = Math.min(currentStreak, def.threshold);
+            qualified = currentStreak >= def.threshold;
+          } else if (def.category === 'vocabulary') {
+            progress = Math.min(vocabCount + phraseCount, def.threshold);
+            qualified = (vocabCount + phraseCount) >= def.threshold;
+          }
+          break;
+      }
+
+      // Update progress for non-unlocked achievements
+      const existingUa = existing.find(ua => ua.achievementId === def.id);
+      if (existingUa && existingUa.progress !== progress) {
+        await prisma.userAchievement.update({
+          where: { id: existingUa.id },
+          data: { progress },
+        }).catch(() => {});
+      }
+
+      if (qualified) {
+        await prisma.userAchievement.upsert({
+          where: { userId_achievementId: { userId, achievementId: def.id } },
+          update: { progress: def.threshold, unlockedAt: new Date() },
+          create: { userId, achievementId: def.id, progress: def.threshold },
+        });
+
+        // Award XP
+        if (def.xpReward > 0) {
+          await trackDailyProgress(userId, { xp: def.xpReward });
+        }
+
+        newlyUnlocked.push(def);
+      } else if (!existingUa) {
+        // Create a progress record so frontend can show partial progress
+        await prisma.userAchievement.create({
+          data: { userId, achievementId: def.id, progress },
+        }).catch(() => {}); // ignore if already exists
+      }
+    }
+
+    // Create notifications for newly unlocked achievements
+    for (const def of newlyUnlocked) {
+      await createNotification(userId, {
+        type: 'achievement',
+        title: `🏆 ${def.title}`,
+        body: def.description,
+        data: { achievementKey: def.key, xpReward: def.xpReward },
+      });
+    }
+
+    return newlyUnlocked;
+  } catch (err) {
+    console.error('checkAndUnlockAchievements error:', err.message);
+    return [];
+  }
+}
+
 // ─── Health ───────────────────────────────────────────
 router.get('/health', (_req, res) => {
   res.status(200).json({
@@ -366,6 +540,9 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
   // Track daily progress: +1 journal, +10 XP
   await trackDailyProgress(req.authUser.id, { journals: 1, xp: 10 });
 
+  // Check achievements after journal creation
+  checkAndUnlockAchievements(req.authUser.id).catch(() => {});
+
   res.status(201).json({ journal });
 }));
 
@@ -564,12 +741,48 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
           metadata: JSON.stringify({ journalId }),
         },
       });
+
+      // Check achievements after feedback (may unlock perfect_score, journal milestones)
+      checkAndUnlockAchievements(req.authUser.id).catch(() => {});
     } catch (err) {
       console.error('Failed to update journal after AI feedback:', err.message);
     }
   }
 
   res.status(200).json({ feedback });
+}));
+
+// ─── Learning Sessions (create from practice modes) ─────────────────────
+router.post('/learning-sessions', requireAuth, asyncHandler(async (req, res) => {
+  const { type, title, summary, score, duration, metadata } = req.body || {};
+  if (!type || !title) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'type and title are required' });
+  }
+  const allowedTypes = ['grammar', 'reading', 'listening', 'speaking', 'journal'];
+  if (!allowedTypes.includes(type)) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: `type must be one of: ${allowedTypes.join(', ')}` });
+  }
+
+  const session = await prisma.learningSession.create({
+    data: {
+      userId: req.authUser.id,
+      type,
+      title: String(title),
+      summary: summary ? String(summary) : null,
+      score: typeof score === 'number' ? score : null,
+      duration: typeof duration === 'number' ? duration : null,
+      metadata: metadata ? JSON.stringify(metadata) : null,
+    },
+  });
+
+  // Track XP for practice completion
+  const xpMap = { grammar: 5, reading: 5, listening: 5, speaking: 5 };
+  const xp = xpMap[type] || 0;
+  if (xp > 0) {
+    await trackDailyProgress(req.authUser.id, { xp });
+  }
+
+  res.status(201).json({ session });
 }));
 
 // ─── Settings ────────────────────────────────────────
@@ -770,6 +983,9 @@ router.post('/phrases', requireAuth, asyncHandler(async (req, res) => {
   // Track daily progress: +2 XP
   await trackDailyProgress(req.authUser.id, { xp: 2 });
 
+  // Check achievements (phrase_collector)
+  checkAndUnlockAchievements(req.authUser.id).catch(() => {});
+
   res.status(201).json({ phrase: saved });
 }));
 
@@ -815,6 +1031,9 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
 
   // Track daily progress: +1 word, +3 XP
   await trackDailyProgress(req.authUser.id, { words: 1, xp: 3 });
+
+  // Check achievements (vocab milestones)
+  checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
   res.status(201).json({ item });
 }));
@@ -1226,6 +1445,9 @@ router.post('/journals/:id/mood', requireAuth, asyncHandler(async (req, res) => 
     where: { id: req.params.id },
     data: { feedback: JSON.stringify(feedbackObj) },
   });
+
+  // Check achievements on completion (streak milestones may trigger here)
+  checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
   res.status(200).json({ message: 'Mood saved', mood });
 }));

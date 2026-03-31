@@ -202,6 +202,21 @@ export async function getHistoryDetail(id: string) {
   return apiRequest<{ session: LearningSession }>(`/history/${id}`);
 }
 
+// ─── Learning Sessions ──────────────────────────────
+export async function createLearningSession(data: {
+  type: string;
+  title: string;
+  summary?: string;
+  score?: number;
+  duration?: number;
+  metadata?: Record<string, unknown>;
+}) {
+  return apiRequest<{ session: LearningSession }>('/learning-sessions', {
+    method: 'POST',
+    body: data,
+  });
+}
+
 // ─── Progress ────────────────────────────────────────
 export interface ProgressSummary {
   totalJournals: number;
@@ -283,5 +298,23 @@ export async function getLessons(category?: string, level?: string) {
 
 export async function getLessonDetail(id: string) {
   return apiRequest<{ lesson: LessonDetail }>(`/library/lessons/${id}`);
+}
+
+// ─── Daily Prompt ────────────────────────────────────
+export interface DailyPromptResponse {
+  prompt: {
+    id: string;
+    promptEn: string;
+    promptVi: string;
+    followUp: string | null;
+    level: string;
+  } | null;
+  fallback: boolean;
+  promptEn?: string;
+  promptVi?: string;
+}
+
+export async function getDailyPrompt() {
+  return apiRequest<DailyPromptResponse>('/daily-prompt/today');
 }
 

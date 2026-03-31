@@ -1,23 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getProgressSummary, type ProgressSummary } from '../../services/api/endpoints';
+import { getProgressSummary, getDailyPrompt, type ProgressSummary, type DailyPromptResponse } from '../../services/api/endpoints';
 import { trackPromptView } from '../../services/analytics/coreLoop';
 
 export const JournalPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
+  const [dailyPrompt, setDailyPrompt] = useState<DailyPromptResponse | null>(null);
 
   useEffect(() => {
     getProgressSummary()
       .then(res => {
         setSummary(res);
-        trackPromptView({ dayNumber: (res.totalJournals || 0) + 1 });
+      })
+      .catch(() => {});
+
+    getDailyPrompt()
+      .then(res => {
+        setDailyPrompt(res);
+        trackPromptView({
+          dayNumber: undefined, // will be set after summary loads
+          promptId: res.prompt?.id,
+        });
       })
       .catch(() => {});
   }, []);
 
   const dayNumber = summary ? (summary.totalJournals || 0) + 1 : '...';
+  const isVi = i18n.language === 'vi';
+
+  // Get prompt text from daily prompt or fallback
+  const promptText = dailyPrompt
+    ? (dailyPrompt.prompt
+      ? (isVi ? dailyPrompt.prompt.promptVi : dailyPrompt.prompt.promptEn)
+      : (isVi ? dailyPrompt.promptVi : dailyPrompt.promptEn) || '')
+    : '';
+  const followUp = dailyPrompt?.prompt?.followUp || '';
+  const promptId = dailyPrompt?.prompt?.id || undefined;
 
   return (
     <AppLayout activePath="#journal">
@@ -44,6 +64,24 @@ export const JournalPage: React.FC = () => {
               </div>
 
               <div className="space-y-4 md:space-y-6 py-4 md:py-6">
+                {/* Daily Prompt */}
+                {promptText && (
+                  <div className="p-4 md:p-5 bg-primary/5 border-2 border-primary/20 rounded-xl space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                      {t('journal.todays_prompt', "Today's Prompt")}
+                    </span>
+                    <p className="font-headline font-bold text-base md:text-lg text-on-surface leading-snug">
+                      {promptText}
+                    </p>
+                    {followUp && (
+                      <p className="text-sm text-on-surface-variant italic">
+                        {followUp}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <h3 className="font-headline font-bold text-lg md:text-xl text-center md:text-left">
                   {t('journal.journey_today')}
                 </h3>
@@ -71,7 +109,10 @@ export const JournalPage: React.FC = () => {
 
               <div className="pt-2 md:pt-4">
                 <button 
-                  onClick={() => { window.location.hash = '#journal-workspace'; }}
+                  onClick={() => {
+                    const params = promptId ? `?promptId=${promptId}` : '';
+                    window.location.hash = `#journal-workspace${params}`;
+                  }}
                   className="w-full md:w-auto px-8 md:px-12 py-3 md:py-4 bg-secondary-container hover:bg-on-secondary-fixed-variant hover:text-white transition-all duration-300 font-headline font-black text-lg md:text-xl sketch-border flex items-center justify-center gap-3 md:gap-4 group active:scale-95 mx-auto md:mx-0"
                 >
                   {t('journal.begin_activity')}
