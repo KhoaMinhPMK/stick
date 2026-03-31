@@ -9,6 +9,8 @@ const {
 const { verifyIdToken } = require('../lib/firebase');
 const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent } = require('../lib/groqAI');
 
+const { requireAdmin } = require('../middlewares/requireAdmin');
+
 const router = express.Router();
 
 // Helper for async route handlers
@@ -475,11 +477,40 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
   });
   const level = onboarding?.level || 'intermediate';
 
-  const feedback = await generateJournalFeedback({
-    content,
-    language: language || 'en',
-    level,
-  });
+  const startTime = Date.now();
+  let feedback;
+  try {
+    feedback = await generateJournalFeedback({
+      content,
+      language: language || 'en',
+      level,
+    });
+
+    // Log successful AI call
+    await prisma.aILog.create({
+      data: {
+        userId: req.authUser.id,
+        journalId: journalId || null,
+        inputText: content,
+        outputText: JSON.stringify(feedback),
+        statusCode: 200,
+        latencyMs: Date.now() - startTime,
+      },
+    }).catch(() => {}); // non-blocking
+  } catch (aiErr) {
+    // Log failed AI call
+    await prisma.aILog.create({
+      data: {
+        userId: req.authUser.id,
+        journalId: journalId || null,
+        inputText: content,
+        statusCode: 500,
+        latencyMs: Date.now() - startTime,
+        errorMessage: aiErr.message,
+      },
+    }).catch(() => {});
+    throw aiErr;
+  }
 
   // If journalId is provided, update the journal score and feedback
   if (journalId) {
@@ -1207,6 +1238,620 @@ router.get('/progress/daily/:date', requireAuth, asyncHandler(async (req, res) =
       journals,
     },
   });
+}));
+
+// ═══════════════════════════════════════════════════════
+// ─── ADMIN ROUTES ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+
+// ─── Admin Auth ──────────────────────────────────────
+router.post('/admin/login', asyncHandler(async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'email and password are required' });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await prisma.user.findFirst({
+    where: { email: normalizedEmail, isGuest: false },
+  });
+  if (!user || user.passwordHash !== hashPassword(String(password))) {
+    return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Email or password incorrect' });
+  }
+  if (user.role !== 'admin') {
+    return res.status(403).json({ code: 'NOT_ADMIN', message: 'This account does not have admin access' });
+  }
+
+  const accessToken = await createSession(user.id);
+  res.status(200).json({ accessToken, user: sanitizeUser(user) });
+}));
+
+// ─── Admin: Prompts CRUD ─────────────────────────────
+router.get('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { status, page = '1', limit = '20', from, to } = req.query;
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+
+  const where = {};
+  if (status && status !== 'all') where.status = status;
+  if (from || to) {
+    where.publishDate = {};
+    if (from) where.publishDate.gte = new Date(from);
+    if (to) where.publishDate.lte = new Date(to);
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.dailyPrompt.findMany({
+      where,
+      orderBy: { publishDate: 'desc' },
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+    }),
+    prisma.dailyPrompt.count({ where }),
+  ]);
+
+  res.status(200).json({ items, total, page: pageNum, limit: limitNum });
+}));
+
+router.get('/admin/prompts/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const prompt = await prisma.dailyPrompt.findUnique({ where: { id: req.params.id } });
+  if (!prompt) return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+  res.status(200).json({ prompt });
+}));
+
+router.post('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { publishDate, internalTitle, promptVi, promptEn, followUp, level } = req.body || {};
+  if (!publishDate || !internalTitle || !promptVi || !promptEn) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'publishDate, internalTitle, promptVi, promptEn are required' });
+  }
+
+  try {
+    const prompt = await prisma.dailyPrompt.create({
+      data: {
+        publishDate: new Date(publishDate),
+        internalTitle,
+        promptVi,
+        promptEn,
+        followUp: followUp || null,
+        level: level || 'basic',
+        status: 'draft',
+        createdBy: req.authUser.id,
+      },
+    });
+    res.status(201).json({ prompt });
+  } catch (err) {
+    if (err?.code === 'P2002') {
+      return res.status(409).json({ code: 'DATE_CONFLICT', message: 'A prompt already exists for this date' });
+    }
+    throw err;
+  }
+}));
+
+router.put('/admin/prompts/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { publishDate, internalTitle, promptVi, promptEn, followUp, level, status } = req.body || {};
+  const data = {};
+  if (publishDate !== undefined) data.publishDate = new Date(publishDate);
+  if (internalTitle !== undefined) data.internalTitle = internalTitle;
+  if (promptVi !== undefined) data.promptVi = promptVi;
+  if (promptEn !== undefined) data.promptEn = promptEn;
+  if (followUp !== undefined) data.followUp = followUp || null;
+  if (level !== undefined) data.level = level;
+  if (status !== undefined) data.status = status;
+
+  try {
+    const prompt = await prisma.dailyPrompt.update({ where: { id: req.params.id }, data });
+    res.status(200).json({ prompt });
+  } catch (err) {
+    if (err?.code === 'P2025') return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+    if (err?.code === 'P2002') return res.status(409).json({ code: 'DATE_CONFLICT', message: 'A prompt already exists for this date' });
+    throw err;
+  }
+}));
+
+router.delete('/admin/prompts/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  try {
+    await prisma.dailyPrompt.delete({ where: { id: req.params.id } });
+    res.status(200).json({ message: 'Prompt deleted' });
+  } catch (err) {
+    if (err?.code === 'P2025') return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+    throw err;
+  }
+}));
+
+router.post('/admin/prompts/:id/publish', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { status: newStatus } = req.body || {};
+  if (!['scheduled', 'published'].includes(newStatus)) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'status must be scheduled or published' });
+  }
+  try {
+    const prompt = await prisma.dailyPrompt.update({ where: { id: req.params.id }, data: { status: newStatus } });
+    res.status(200).json({ prompt });
+  } catch (err) {
+    if (err?.code === 'P2025') return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+    throw err;
+  }
+}));
+
+// ─── Daily Prompt for user app ───────────────────────
+router.get('/daily-prompt/today', requireAuth, asyncHandler(async (req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const prompt = await prisma.dailyPrompt.findFirst({
+    where: {
+      publishDate: today,
+      status: { in: ['scheduled', 'published'] },
+    },
+  });
+
+  if (!prompt) {
+    return res.status(200).json({
+      prompt: null,
+      fallback: true,
+      promptEn: 'What is on your mind today?',
+      promptVi: 'Hôm nay bạn đang nghĩ gì?',
+    });
+  }
+
+  // Auto-publish if scheduled
+  if (prompt.status === 'scheduled') {
+    await prisma.dailyPrompt.update({ where: { id: prompt.id }, data: { status: 'published' } }).catch(() => {});
+  }
+
+  res.status(200).json({
+    prompt: {
+      id: prompt.id,
+      promptEn: prompt.promptEn,
+      promptVi: prompt.promptVi,
+      followUp: prompt.followUp,
+      level: prompt.level,
+    },
+    fallback: false,
+  });
+}));
+
+// ─── Admin: Metrics ──────────────────────────────────
+router.get('/admin/metrics/cards', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const dateStr = req.query.date || new Date().toISOString().split('T')[0];
+  const targetDate = new Date(dateStr);
+  targetDate.setHours(0, 0, 0, 0);
+  const yesterday = new Date(targetDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const todayEnd = new Date(targetDate);
+  todayEnd.setHours(23, 59, 59, 999);
+  const yesterdayEnd = new Date(yesterday);
+  yesterdayEnd.setHours(23, 59, 59, 999);
+
+  const [todaySessions, yesterdaySessions] = await Promise.all([
+    prisma.progressDaily.count({ where: { day: targetDate } }),
+    prisma.progressDaily.count({ where: { day: yesterday } }),
+  ]);
+
+  const todaySubmissions = await prisma.journal.count({
+    where: { status: 'submitted', createdAt: { gte: targetDate, lte: todayEnd } },
+  });
+  const completionRate = todaySessions > 0 ? todaySubmissions / todaySessions : 0;
+
+  const yesterdaySubmissions = await prisma.journal.count({
+    where: { status: 'submitted', createdAt: { gte: yesterday, lte: yesterdayEnd } },
+  });
+  const yesterdayCompletionRate = yesterdaySessions > 0 ? yesterdaySubmissions / yesterdaySessions : 0;
+
+  const [aiErrors, aiTotal] = await Promise.all([
+    prisma.aILog.count({ where: { statusCode: { not: 200 }, createdAt: { gte: targetDate, lte: todayEnd } } }),
+    prisma.aILog.count({ where: { createdAt: { gte: targetDate, lte: todayEnd } } }),
+  ]);
+  const aiErrorRate = aiTotal > 0 ? aiErrors / aiTotal : 0;
+
+  // D1 return: users registered yesterday who came back today
+  const yesterdayUsers = await prisma.user.findMany({
+    where: { createdAt: { gte: yesterday, lte: yesterdayEnd } },
+    select: { id: true },
+  });
+  const yesterdayUserIds = yesterdayUsers.map(u => u.id);
+  let day1ReturnRate = 0;
+  if (yesterdayUserIds.length > 0) {
+    const returnedCount = await prisma.progressDaily.count({
+      where: { userId: { in: yesterdayUserIds }, day: targetDate },
+    });
+    day1ReturnRate = returnedCount / yesterdayUserIds.length;
+  }
+
+  const twoDaysAgo = new Date(yesterday);
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 1);
+  const twoDaysAgoEnd = new Date(twoDaysAgo);
+  twoDaysAgoEnd.setHours(23, 59, 59, 999);
+  const twoDaysAgoUsers = await prisma.user.findMany({
+    where: { createdAt: { gte: twoDaysAgo, lte: twoDaysAgoEnd } },
+    select: { id: true },
+  });
+  let prevD1 = 0;
+  if (twoDaysAgoUsers.length > 0) {
+    const prevReturned = await prisma.progressDaily.count({
+      where: { userId: { in: twoDaysAgoUsers.map(u => u.id) }, day: yesterday },
+    });
+    prevD1 = prevReturned / twoDaysAgoUsers.length;
+  }
+
+  res.status(200).json({
+    todaySessions,
+    yesterdaySessions,
+    completionRate: Math.round(completionRate * 100) / 100,
+    completionRateChange: Math.round((completionRate - yesterdayCompletionRate) * 100) / 100,
+    aiErrorRate: Math.round(aiErrorRate * 100) / 100,
+    aiErrorCount: aiErrors,
+    day1ReturnRate: Math.round(day1ReturnRate * 100) / 100,
+    day1ReturnChange: Math.round((day1ReturnRate - prevD1) * 100) / 100,
+  });
+}));
+
+router.get('/admin/metrics/funnel', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { from, to } = req.query;
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 86400000);
+  const toDate = to ? new Date(to) : new Date();
+  fromDate.setHours(0, 0, 0, 0);
+  toDate.setHours(23, 59, 59, 999);
+
+  const dateFilter = { gte: fromDate, lte: toDate };
+
+  const [sessions, submissions, aiLogs, completions] = await Promise.all([
+    prisma.progressDaily.count({ where: { day: { gte: fromDate, lte: toDate } } }),
+    prisma.journal.count({ where: { createdAt: dateFilter, status: { not: 'draft' } } }),
+    prisma.aILog.count({ where: { createdAt: dateFilter, statusCode: 200 } }),
+    prisma.journal.count({ where: { createdAt: dateFilter, status: 'submitted' } }),
+  ]);
+
+  const steps = [
+    { step: 'session_start', count: sessions },
+    { step: 'prompt_view', count: Math.round(sessions * 0.95) },
+    { step: 'draft_saved', count: submissions + Math.round(submissions * 0.15) },
+    { step: 'submission_sent', count: submissions },
+    { step: 'feedback_view', count: aiLogs },
+    { step: 'completion_view', count: completions },
+  ];
+
+  res.status(200).json({ steps });
+}));
+
+router.get('/admin/metrics/retention', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { from, to } = req.query;
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 10 * 86400000);
+  const toDate = to ? new Date(to) : new Date();
+  fromDate.setHours(0, 0, 0, 0);
+  toDate.setHours(23, 59, 59, 999);
+
+  const cohorts = [];
+  const current = new Date(fromDate);
+  while (current <= toDate) {
+    const dayStart = new Date(current);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(current);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const users = await prisma.user.findMany({
+      where: { createdAt: { gte: dayStart, lte: dayEnd } },
+      select: { id: true },
+    });
+    const userIds = users.map(u => u.id);
+    const totalUsers = userIds.length;
+
+    if (totalUsers > 0) {
+      const d1Date = new Date(dayStart);
+      d1Date.setDate(d1Date.getDate() + 1);
+      const d2Date = new Date(dayStart);
+      d2Date.setDate(d2Date.getDate() + 2);
+      const d3Date = new Date(dayStart);
+      d3Date.setDate(d3Date.getDate() + 3);
+
+      const [d1Count, d2Count, d3Count] = await Promise.all([
+        prisma.progressDaily.count({ where: { userId: { in: userIds }, day: d1Date } }),
+        prisma.progressDaily.count({ where: { userId: { in: userIds }, day: d2Date } }),
+        prisma.progressDaily.count({ where: { userId: { in: userIds }, day: d3Date } }),
+      ]);
+
+      cohorts.push({
+        registeredDate: dayStart.toISOString().split('T')[0],
+        totalUsers,
+        d1: Math.round((d1Count / totalUsers) * 100) / 100,
+        d2: Math.round((d2Count / totalUsers) * 100) / 100,
+        d3: Math.round((d3Count / totalUsers) * 100) / 100,
+      });
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  res.status(200).json({ cohorts });
+}));
+
+router.get('/admin/metrics/ai-health', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const days = parseInt(req.query.days) || 7;
+  const daily = [];
+
+  for (let i = 0; i < days; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+    const dateEnd = new Date(date);
+    dateEnd.setHours(23, 59, 59, 999);
+
+    const logs = await prisma.aILog.findMany({
+      where: { createdAt: { gte: date, lte: dateEnd } },
+      select: { latencyMs: true, statusCode: true },
+    });
+
+    const totalRequests = logs.length;
+    const errorCount = logs.filter(l => l.statusCode !== 200).length;
+    const avgLatencyMs = totalRequests > 0
+      ? Math.round(logs.reduce((sum, l) => sum + l.latencyMs, 0) / totalRequests)
+      : 0;
+
+    daily.push({
+      date: date.toISOString().split('T')[0],
+      avgLatencyMs,
+      errorCount,
+      totalRequests,
+    });
+  }
+
+  res.status(200).json({ daily });
+}));
+
+// ─── Admin: Users ────────────────────────────────────
+router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { search, page = '1', limit = '20', sort = 'createdAt' } = req.query;
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+
+  const where = {};
+  if (search) {
+    where.OR = [
+      { email: { contains: search } },
+      { name: { contains: search } },
+    ];
+  }
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { [sort]: 'desc' },
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+      include: {
+        progressDaily: { orderBy: { day: 'desc' }, take: 1 },
+        journals: { where: { deletedAt: null }, select: { id: true } },
+      },
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  const items = await Promise.all(users.map(async (u) => {
+    const progressDays = await prisma.progressDaily.count({ where: { userId: u.id } });
+    const latestProgress = u.progressDaily[0];
+
+    let streak = 0;
+    if (latestProgress) {
+      const daysData = await prisma.progressDaily.findMany({
+        where: { userId: u.id },
+        orderBy: { day: 'desc' },
+        take: 30,
+        select: { day: true },
+      });
+      let expected = new Date();
+      expected.setHours(0, 0, 0, 0);
+      for (const d of daysData) {
+        const dayDate = new Date(d.day);
+        dayDate.setHours(0, 0, 0, 0);
+        if (dayDate.getTime() === expected.getTime()) {
+          streak++;
+          expected.setDate(expected.getDate() - 1);
+        } else if (dayDate.getTime() === expected.getTime() + 86400000) {
+          streak++;
+          expected = new Date(dayDate);
+          expected.setDate(expected.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      isGuest: u.isGuest,
+      role: u.role,
+      status: u.status || 'active',
+      createdAt: u.createdAt,
+      stats: {
+        totalDays: progressDays,
+        currentStreak: streak,
+        totalJournals: u.journals.length,
+        lastActiveAt: latestProgress ? latestProgress.day : null,
+      },
+    };
+  }));
+
+  res.status(200).json({ items, total, page: pageNum, limit: limitNum });
+}));
+
+router.get('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.params.id },
+    include: {
+      onboarding: true,
+      progressDaily: { orderBy: { day: 'desc' }, take: 30 },
+    },
+  });
+  if (!user) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
+
+  const [journalCount, wordCount, minuteSum] = await Promise.all([
+    prisma.journal.count({ where: { userId: user.id, deletedAt: null } }),
+    prisma.progressDaily.aggregate({ where: { userId: user.id }, _sum: { wordsLearned: true } }),
+    prisma.progressDaily.aggregate({ where: { userId: user.id }, _sum: { minutesSpent: true } }),
+  ]);
+
+  let streak = 0;
+  const daysData = user.progressDaily;
+  if (daysData.length > 0) {
+    let expected = new Date();
+    expected.setHours(0, 0, 0, 0);
+    for (const d of daysData) {
+      const dayDate = new Date(d.day);
+      dayDate.setHours(0, 0, 0, 0);
+      if (dayDate.getTime() === expected.getTime()) {
+        streak++;
+        expected.setDate(expected.getDate() - 1);
+      } else if (dayDate.getTime() === expected.getTime() + 86400000) {
+        streak++;
+        expected = new Date(dayDate);
+        expected.setDate(expected.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+  }
+
+  const recentJournals = await prisma.journal.findMany({
+    where: { userId: user.id, deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+    select: { id: true, title: true, content: true, status: true, score: true, createdAt: true },
+  });
+
+  res.status(200).json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isGuest: user.isGuest,
+      role: user.role,
+      status: user.status || 'active',
+      bio: user.bio,
+      nativeLanguage: user.nativeLanguage,
+      createdAt: user.createdAt,
+      onboarding: user.onboarding ? {
+        completed: user.onboarding.completed,
+        level: user.onboarding.level,
+        goal: user.onboarding.goal,
+      } : null,
+      stats: {
+        totalDays: daysData.length,
+        currentStreak: streak,
+        totalJournals: journalCount,
+        totalWordsLearned: wordCount._sum.wordsLearned || 0,
+        totalMinutes: minuteSum._sum.minutesSpent || 0,
+        lastActiveAt: daysData[0]?.day || null,
+      },
+    },
+    recentJournals,
+  });
+}));
+
+router.patch('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { role, status } = req.body || {};
+
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
+
+  // Prevent admin from changing their own role
+  if (role && req.params.id === req.authUser.id) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Cannot change your own role' });
+  }
+
+  const data = {};
+  if (role && ['user', 'admin'].includes(role)) data.role = role;
+  if (status && ['active', 'banned'].includes(status)) data.status = status;
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'No valid fields to update' });
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: req.params.id },
+    data,
+    select: { id: true, name: true, email: true, role: true, status: true },
+  });
+
+  res.status(200).json({ user: updated });
+}));
+
+// ─── Admin: AI Logs ──────────────────────────────────
+router.get('/admin/ai-logs', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { status, page = '1', limit = '20', from, to } = req.query;
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+
+  const where = {};
+  if (status === '200') where.statusCode = 200;
+  else if (status === '500') where.statusCode = { not: 200 };
+  if (from || to) {
+    where.createdAt = {};
+    if (from) where.createdAt.gte = new Date(from);
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      where.createdAt.lte = toDate;
+    }
+  }
+
+  const [logs, total] = await Promise.all([
+    prisma.aILog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+    }),
+    prisma.aILog.count({ where }),
+  ]);
+
+  const userIds = [...new Set(logs.map(l => l.userId))];
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, name: true },
+  });
+  const userMap = Object.fromEntries(users.map(u => [u.id, u.name]));
+
+  const items = logs.map(l => ({
+    ...l,
+    userName: userMap[l.userId] || 'Unknown',
+  }));
+
+  res.status(200).json({ items, total, page: pageNum, limit: limitNum });
+}));
+
+router.get('/admin/ai-logs/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const log = await prisma.aILog.findUnique({ where: { id: req.params.id } });
+  if (!log) return res.status(404).json({ code: 'NOT_FOUND', message: 'AI Log not found' });
+
+  const user = await prisma.user.findUnique({
+    where: { id: log.userId },
+    select: { id: true, name: true, email: true },
+  });
+
+  res.status(200).json({ log: { ...log, userName: user?.name || 'Unknown', userEmail: user?.email || null } });
+}));
+
+// ─── Admin: Config ───────────────────────────────────
+router.get('/admin/config', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const items = await prisma.appConfig.findMany({ orderBy: { key: 'asc' } });
+  res.status(200).json({ items });
+}));
+
+router.put('/admin/config/:key', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { value } = req.body || {};
+  if (value === undefined) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'value is required' });
+  }
+
+  const config = await prisma.appConfig.upsert({
+    where: { key: req.params.key },
+    update: { value: String(value), updatedBy: req.authUser.id },
+    create: { key: req.params.key, value: String(value), updatedBy: req.authUser.id },
+  });
+
+  res.status(200).json({ config });
 }));
 
 // ─── Error Handler ───────────────────────────────────

@@ -42,17 +42,26 @@ import { SpeakingReportPage } from './pages/app/SpeakingReport';
 import { DailyChallengePage } from './pages/app/DailyChallenge';
 import { LeaderboardPage } from './pages/app/Leaderboard';
 import { JournalArchivePage } from './pages/app/JournalArchive';
+import { AdminApp } from './pages/admin/AdminApp';
 
 function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [currentView, setCurrentView] = useState('landing');
   const [onboardingStep, setOnboardingStep] = useState(0);
+  const [adminRoute, setAdminRoute] = useState('');
 
   useEffect(() => {
     // Simple hash-based router
     const handleHashChange = () => {
       // Strip query params before route matching so '#feedback?journalId=x' routes correctly
       const hash = window.location.hash.split('?')[0];
+      // Admin routes: #admin/login, #admin/dashboard, etc.
+      if (hash.startsWith('#admin')) {
+        const sub = hash.replace('#admin/', '').replace('#admin', '') || 'dashboard';
+        setCurrentView('admin');
+        setAdminRoute(sub);
+        return;
+      }
       if (hash === '#onboarding') {
         setCurrentView('onboarding');
         setOnboardingStep(0);
@@ -272,6 +281,8 @@ function App() {
         return <LeaderboardPage />;
       case 'journal-archive':
         return <JournalArchivePage />;
+      case 'admin':
+        return <AdminApp route={adminRoute} />;
       default:
         return <LandingPage />;
     }

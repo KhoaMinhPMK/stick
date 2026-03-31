@@ -1,0 +1,169 @@
+import { apiRequest } from './client';
+import type {
+  DailyPromptDTO,
+  CreatePromptDTO,
+  PromptFilterParams,
+  MetricCardsDTO,
+  FunnelDTO,
+  RetentionDTO,
+  AIHealthDTO,
+  AdminUserDTO,
+  AdminUserDetailDTO,
+  AILogDTO,
+  AppConfigDTO,
+  PaginatedResponse,
+  AdminLoginResponse,
+  UserFilterParams,
+  AILogFilterParams,
+} from '../../types/dto/admin.dto';
+
+const ADMIN_TOKEN_KEY = 'stick_admin_token';
+const ADMIN_USER_KEY = 'stick_admin_user';
+
+export function getAdminToken(): string | null {
+  return localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function getAdminUser(): { id: string; name: string; email: string; role: string } | null {
+  try {
+    const raw = localStorage.getItem(ADMIN_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearAdminAuth() {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_USER_KEY);
+}
+
+function adminRequest<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+  const token = getAdminToken();
+  return apiRequest<T>(path, { ...options, token, _noRetry: true } as Parameters<typeof apiRequest>[1]);
+}
+
+// ─── Auth ─────────────────────────────
+export async function adminLogin(email: string, password: string): Promise<AdminLoginResponse> {
+  const res = await apiRequest<AdminLoginResponse>('/admin/login', {
+    method: 'POST',
+    body: { email, password },
+    token: null,
+  } as Parameters<typeof apiRequest>[1]);
+  localStorage.setItem(ADMIN_TOKEN_KEY, res.accessToken);
+  localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(res.user));
+  return res;
+}
+
+export function adminLogout() {
+  clearAdminAuth();
+  window.location.hash = '#admin/login';
+}
+
+// ─── Prompts ──────────────────────────
+export function getPrompts(params: PromptFilterParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.status && params.status !== 'all') qs.set('status', params.status);
+  if (params.page) qs.set('page', params.page);
+  if (params.limit) qs.set('limit', params.limit);
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  const query = qs.toString();
+  return adminRequest<PaginatedResponse<DailyPromptDTO>>(`/admin/prompts${query ? `?${query}` : ''}`);
+}
+
+export function getPrompt(id: string) {
+  return adminRequest<{ prompt: DailyPromptDTO }>(`/admin/prompts/${id}`);
+}
+
+export function createPrompt(data: CreatePromptDTO) {
+  return adminRequest<{ prompt: DailyPromptDTO }>('/admin/prompts', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export function updatePrompt(id: string, data: Partial<CreatePromptDTO> & { status?: string }) {
+  return adminRequest<{ prompt: DailyPromptDTO }>(`/admin/prompts/${id}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export function deletePrompt(id: string) {
+  return adminRequest<{ message: string }>(`/admin/prompts/${id}`, { method: 'DELETE' });
+}
+
+export function publishPrompt(id: string, status: 'scheduled' | 'published') {
+  return adminRequest<{ prompt: DailyPromptDTO }>(`/admin/prompts/${id}/publish`, {
+    method: 'POST',
+    body: { status },
+  });
+}
+
+// ─── Metrics ──────────────────────────
+export function getMetricCards(date: string) {
+  return adminRequest<MetricCardsDTO>(`/admin/metrics/cards?date=${date}`);
+}
+
+export function getMetricFunnel(from: string, to: string) {
+  return adminRequest<FunnelDTO>(`/admin/metrics/funnel?from=${from}&to=${to}`);
+}
+
+export function getRetention(from: string, to: string) {
+  return adminRequest<RetentionDTO>(`/admin/metrics/retention?from=${from}&to=${to}`);
+}
+
+export function getAIHealth(days = 7) {
+  return adminRequest<AIHealthDTO>(`/admin/metrics/ai-health?days=${days}`);
+}
+
+// ─── Users ────────────────────────────
+export function getUsers(params: UserFilterParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set('search', params.search);
+  if (params.page) qs.set('page', params.page);
+  if (params.limit) qs.set('limit', params.limit);
+  if (params.sort) qs.set('sort', params.sort);
+  const query = qs.toString();
+  return adminRequest<PaginatedResponse<AdminUserDTO>>(`/admin/users${query ? `?${query}` : ''}`);
+}
+
+export function getUser(id: string) {
+  return adminRequest<AdminUserDetailDTO>(`/admin/users/${id}`);
+}
+
+export function patchUser(id: string, data: { role?: string; status?: string }) {
+  return adminRequest<{ user: { id: string; name: string; email: string | null; role: string; status: string } }>(
+    `/admin/users/${id}`,
+    { method: 'PATCH', body: data },
+  );
+}
+
+// ─── AI Logs ──────────────────────────
+export function getAILogs(params: AILogFilterParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.page) qs.set('page', params.page);
+  if (params.limit) qs.set('limit', params.limit);
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  const query = qs.toString();
+  return adminRequest<PaginatedResponse<AILogDTO>>(`/admin/ai-logs${query ? `?${query}` : ''}`);
+}
+
+export function getAILog(id: string) {
+  return adminRequest<{ log: AILogDTO }>(`/admin/ai-logs/${id}`);
+}
+
+// ─── Config ───────────────────────────
+export function getConfigs() {
+  return adminRequest<{ items: AppConfigDTO[] }>('/admin/config');
+}
+
+export function updateConfig(key: string, value: string) {
+  return adminRequest<{ config: AppConfigDTO }>(`/admin/config/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: { value },
+  });
+}

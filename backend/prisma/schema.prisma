@@ -20,6 +20,8 @@ model User {
   nativeLanguage   String?
   firebaseUid      String?   @unique
   firebaseProvider String?
+  role             String    @default("user")  // "user" | "admin"
+  status           String    @default("active") // "active" | "banned"
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -237,4 +239,49 @@ model Lesson {
   updatedAt   DateTime @updatedAt
 
   @@index([category, level])
+}
+
+// ─── Daily Prompts (Admin-managed) ───────────────────
+model DailyPrompt {
+  id            String   @id @default(uuid())
+  publishDate   DateTime @db.Date
+  status        String   @default("draft")     // "draft" | "scheduled" | "published"
+  internalTitle String
+  promptVi      String   @db.Text
+  promptEn      String   @db.Text
+  followUp      String?  @db.Text
+  level         String   @default("basic")     // "basic" | "intermediate" | "advanced"
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([publishDate])
+  @@index([status, publishDate])
+}
+
+// ─── AI Logs ─────────────────────────────────────────
+model AILog {
+  id           String   @id @default(uuid())
+  userId       String
+  journalId    String?
+  inputText    String   @db.Text
+  outputText   String?  @db.Text
+  model        String   @default("llama-3.3-70b-versatile")
+  statusCode   Int      @default(200)
+  latencyMs    Int      @default(0)
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([statusCode])
+}
+
+// ─── App Config ──────────────────────────────────────
+model AppConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   @db.LongText
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

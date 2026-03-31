@@ -26,6 +26,7 @@ function sanitizeUser(user) {
     name: user.name,
     email: user.email,
     isGuest: Boolean(user.isGuest),
+    role: user.role || 'user',
     bio: user.bio || '',
     nativeLanguage: user.nativeLanguage || '',
     createdAt: user.createdAt,
