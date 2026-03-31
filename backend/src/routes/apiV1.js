@@ -36,7 +36,16 @@ async function safeCountRaw(table, whereClause = '1=1') {
 async function safeFindManyRaw(table, whereClause = '1=1', extra = '') {
   try {
     const rows = await prisma.$queryRawUnsafe(`SELECT * FROM \`${table}\` WHERE ${whereClause} ${extra}`);
-    return rows;
+    // Serialize dates & BigInts for JSON
+    return rows.map(row => {
+      const out = {};
+      for (const [k, v] of Object.entries(row)) {
+        if (v instanceof Date) out[k] = v.toISOString();
+        else if (typeof v === 'bigint') out[k] = Number(v);
+        else out[k] = v;
+      }
+      return out;
+    });
   } catch { return []; }
 }
 
@@ -509,28 +518,22 @@ router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
     });
 
     // Log successful AI call
-    await prisma.aILog.create({
-      data: {
-        userId: req.authUser.id,
-        journalId: journalId || null,
-        inputText: content,
-        outputText: JSON.stringify(feedback),
-        statusCode: 200,
-        latencyMs: Date.now() - startTime,
-      },
-    }).catch(() => {}); // non-blocking
+    const logId = require('crypto').randomUUID();
+    const latency = Date.now() - startTime;
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`AILog\` (id, userId, journalId, inputText, outputText, statusCode, latencyMs, createdAt)
+       VALUES (?, ?, ?, ?, ?, 200, ?, NOW())`,
+      logId, req.authUser.id, journalId || null, content, JSON.stringify(feedback), latency
+    ).catch(() => {}); // non-blocking
   } catch (aiErr) {
     // Log failed AI call
-    await prisma.aILog.create({
-      data: {
-        userId: req.authUser.id,
-        journalId: journalId || null,
-        inputText: content,
-        statusCode: 500,
-        latencyMs: Date.now() - startTime,
-        errorMessage: aiErr.message,
-      },
-    }).catch(() => {});
+    const logId2 = require('crypto').randomUUID();
+    const latency2 = Date.now() - startTime;
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`AILog\` (id, userId, journalId, inputText, statusCode, latencyMs, errorMessage, createdAt)
+       VALUES (?, ?, ?, ?, 500, ?, ?, NOW())`,
+      logId2, req.authUser.id, journalId || null, content, latency2, aiErr.message
+    ).catch(() => {});
     throw aiErr;
   }
 
@@ -1300,31 +1303,23 @@ router.get('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req,
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
 
-  const where = {};
-  if (status && status !== 'all') where.status = status;
-  if (from || to) {
-    where.publishDate = {};
-    if (from) where.publishDate.gte = new Date(from);
-    if (to) where.publishDate.lte = new Date(to);
-  }
+  const conditions = ['1=1'];
+  if (status && status !== 'all') conditions.push(`status = '${status}'`);
+  if (from) conditions.push(`publishDate >= '${from}'`);
+  if (to) conditions.push(`publishDate <= '${to}'`);
+  const whereClause = conditions.join(' AND ');
 
-  const [items, total] = await Promise.all([
-    prisma.dailyPrompt.findMany({
-      where,
-      orderBy: { publishDate: 'desc' },
-      skip: (pageNum - 1) * limitNum,
-      take: limitNum,
-    }),
-    prisma.dailyPrompt.count({ where }),
-  ]);
+  const offset = (pageNum - 1) * limitNum;
+  const items = await safeFindManyRaw('DailyPrompt', whereClause, `ORDER BY publishDate DESC LIMIT ${limitNum} OFFSET ${offset}`);
+  const total = await safeCountRaw('DailyPrompt', whereClause);
 
   res.status(200).json({ items, total, page: pageNum, limit: limitNum });
 }));
 
 router.get('/admin/prompts/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const prompt = await prisma.dailyPrompt.findUnique({ where: { id: req.params.id } });
-  if (!prompt) return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
-  res.status(200).json({ prompt });
+  const rows = await safeFindManyRaw('DailyPrompt', `id = '${req.params.id}'`, 'LIMIT 1');
+  if (rows.length === 0) return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+  res.status(200).json({ prompt: rows[0] });
 }));
 
 router.post('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
@@ -1333,22 +1328,21 @@ router.post('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'publishDate, internalTitle, promptVi, promptEn are required' });
   }
 
+  const id = require('crypto').randomUUID();
+  const safeVi = String(promptVi).replace(/'/g, "\\'");
+  const safeEn = String(promptEn).replace(/'/g, "\\'");
+  const safeTitle = String(internalTitle).replace(/'/g, "\\'");
+  const safeFollowUp = followUp ? `'${String(followUp).replace(/'/g, "\\'")}'` : 'NULL';
+
   try {
-    const prompt = await prisma.dailyPrompt.create({
-      data: {
-        publishDate: new Date(publishDate),
-        internalTitle,
-        promptVi,
-        promptEn,
-        followUp: followUp || null,
-        level: level || 'basic',
-        status: 'draft',
-        createdBy: req.authUser.id,
-      },
-    });
-    res.status(201).json({ prompt });
+    await prisma.$queryRawUnsafe(`
+      INSERT INTO \`DailyPrompt\` (id, publishDate, internalTitle, promptVi, promptEn, followUp, level, status, createdBy, createdAt, updatedAt)
+      VALUES ('${id}', '${publishDate}', '${safeTitle}', '${safeVi}', '${safeEn}', ${safeFollowUp}, '${level || 'basic'}', 'draft', '${req.authUser.id}', NOW(), NOW())
+    `);
+    const rows = await safeFindManyRaw('DailyPrompt', `id = '${id}'`, 'LIMIT 1');
+    res.status(201).json({ prompt: rows[0] || { id } });
   } catch (err) {
-    if (err?.code === 'P2002') {
+    if (err?.message?.includes('Duplicate entry')) {
       return res.status(409).json({ code: 'DATE_CONFLICT', message: 'A prompt already exists for this date' });
     }
     throw err;
@@ -1357,33 +1351,34 @@ router.post('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req
 
 router.put('/admin/prompts/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const { publishDate, internalTitle, promptVi, promptEn, followUp, level, status } = req.body || {};
-  const data = {};
-  if (publishDate !== undefined) data.publishDate = new Date(publishDate);
-  if (internalTitle !== undefined) data.internalTitle = internalTitle;
-  if (promptVi !== undefined) data.promptVi = promptVi;
-  if (promptEn !== undefined) data.promptEn = promptEn;
-  if (followUp !== undefined) data.followUp = followUp || null;
-  if (level !== undefined) data.level = level;
-  if (status !== undefined) data.status = status;
+  const sets = [];
+  if (publishDate !== undefined) sets.push(`publishDate = '${publishDate}'`);
+  if (internalTitle !== undefined) sets.push(`internalTitle = '${String(internalTitle).replace(/'/g, "\\'")}'`);
+  if (promptVi !== undefined) sets.push(`promptVi = '${String(promptVi).replace(/'/g, "\\'")}'`);
+  if (promptEn !== undefined) sets.push(`promptEn = '${String(promptEn).replace(/'/g, "\\'")}'`);
+  if (followUp !== undefined) sets.push(followUp ? `followUp = '${String(followUp).replace(/'/g, "\\'")}'` : `followUp = NULL`);
+  if (level !== undefined) sets.push(`level = '${level}'`);
+  if (status !== undefined) sets.push(`status = '${status}'`);
+  sets.push('updatedAt = NOW()');
+
+  if (sets.length === 1) return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'No fields to update' });
 
   try {
-    const prompt = await prisma.dailyPrompt.update({ where: { id: req.params.id }, data });
-    res.status(200).json({ prompt });
+    const result = await prisma.$queryRawUnsafe(`UPDATE \`DailyPrompt\` SET ${sets.join(', ')} WHERE id = '${req.params.id}'`);
+    const rows = await safeFindManyRaw('DailyPrompt', `id = '${req.params.id}'`, 'LIMIT 1');
+    if (rows.length === 0) return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+    res.status(200).json({ prompt: rows[0] });
   } catch (err) {
-    if (err?.code === 'P2025') return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
-    if (err?.code === 'P2002') return res.status(409).json({ code: 'DATE_CONFLICT', message: 'A prompt already exists for this date' });
+    if (err?.message?.includes('Duplicate entry')) return res.status(409).json({ code: 'DATE_CONFLICT', message: 'A prompt already exists for this date' });
     throw err;
   }
 }));
 
 router.delete('/admin/prompts/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  try {
-    await prisma.dailyPrompt.delete({ where: { id: req.params.id } });
-    res.status(200).json({ message: 'Prompt deleted' });
-  } catch (err) {
-    if (err?.code === 'P2025') return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
-    throw err;
-  }
+  const existing = await safeFindManyRaw('DailyPrompt', `id = '${req.params.id}'`, 'LIMIT 1');
+  if (existing.length === 0) return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+  await prisma.$queryRawUnsafe(`DELETE FROM \`DailyPrompt\` WHERE id = '${req.params.id}'`);
+  res.status(200).json({ message: 'Prompt deleted' });
 }));
 
 router.post('/admin/prompts/:id/publish', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
@@ -1391,28 +1386,20 @@ router.post('/admin/prompts/:id/publish', requireAuth, requireAdmin, asyncHandle
   if (!['scheduled', 'published'].includes(newStatus)) {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'status must be scheduled or published' });
   }
-  try {
-    const prompt = await prisma.dailyPrompt.update({ where: { id: req.params.id }, data: { status: newStatus } });
-    res.status(200).json({ prompt });
-  } catch (err) {
-    if (err?.code === 'P2025') return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
-    throw err;
-  }
+  const existing = await safeFindManyRaw('DailyPrompt', `id = '${req.params.id}'`, 'LIMIT 1');
+  if (existing.length === 0) return res.status(404).json({ code: 'NOT_FOUND', message: 'Prompt not found' });
+  await prisma.$queryRawUnsafe(`UPDATE \`DailyPrompt\` SET status = '${newStatus}', updatedAt = NOW() WHERE id = '${req.params.id}'`);
+  const rows = await safeFindManyRaw('DailyPrompt', `id = '${req.params.id}'`, 'LIMIT 1');
+  res.status(200).json({ prompt: rows[0] });
 }));
 
 // ─── Daily Prompt for user app ───────────────────────
 router.get('/daily-prompt/today', requireAuth, asyncHandler(async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date().toISOString().split('T')[0];
 
-  const prompt = await prisma.dailyPrompt.findFirst({
-    where: {
-      publishDate: today,
-      status: { in: ['scheduled', 'published'] },
-    },
-  });
+  const rows = await safeFindManyRaw('DailyPrompt', `publishDate = '${today}' AND status IN ('scheduled', 'published')`, 'LIMIT 1');
 
-  if (!prompt) {
+  if (rows.length === 0) {
     return res.status(200).json({
       prompt: null,
       fallback: true,
@@ -1421,9 +1408,10 @@ router.get('/daily-prompt/today', requireAuth, asyncHandler(async (req, res) => 
     });
   }
 
+  const prompt = rows[0];
   // Auto-publish if scheduled
   if (prompt.status === 'scheduled') {
-    await prisma.dailyPrompt.update({ where: { id: prompt.id }, data: { status: 'published' } }).catch(() => {});
+    await prisma.$queryRawUnsafe(`UPDATE \`DailyPrompt\` SET status = 'published', updatedAt = NOW() WHERE id = '${prompt.id}'`).catch(() => {});
   }
 
   res.status(200).json({
