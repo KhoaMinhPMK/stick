@@ -257,11 +257,6 @@ async function checkAndUnlockAchievements(userId) {
         }
 
         newlyUnlocked.push(def);
-      } else if (!existingUa) {
-        // Create a progress record so frontend can show partial progress
-        await prisma.userAchievement.create({
-          data: { userId, achievementId: def.id, progress },
-        }).catch(() => {}); // ignore if already exists
       }
     }
 
@@ -539,9 +534,6 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
 
   // Track daily progress: +1 journal, +10 XP
   await trackDailyProgress(req.authUser.id, { journals: 1, xp: 10 });
-
-  // Check achievements after journal creation
-  checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
   res.status(201).json({ journal });
 }));
@@ -917,12 +909,16 @@ router.get('/achievements', requireAuth, asyncHandler(async (req, res) => {
     userMap[ua.achievementId] = ua;
   }
 
-  const items = definitions.map((def) => ({
-    ...def,
-    unlocked: !!userMap[def.id],
-    unlockedAt: userMap[def.id]?.unlockedAt || null,
-    progress: userMap[def.id]?.progress || 0,
-  }));
+  const items = definitions.map((def) => {
+    const ua = userMap[def.id];
+    const progress = ua?.progress || 0;
+    return {
+      ...def,
+      unlocked: !!(ua && progress >= def.threshold),
+      unlockedAt: (ua && progress >= def.threshold) ? ua.unlockedAt : null,
+      progress,
+    };
+  });
 
   res.status(200).json({ items, total: items.length });
 }));
