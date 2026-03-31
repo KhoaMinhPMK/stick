@@ -1597,6 +1597,10 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
 
+  // Map frontend sort values to Prisma column names
+  const sortMap = { recent: 'createdAt', streak: 'createdAt', active: 'updatedAt', createdAt: 'createdAt', name: 'name' };
+  const orderField = sortMap[sort] || 'createdAt';
+
   const where = {};
   if (search) {
     where.OR = [
@@ -1608,7 +1612,7 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      orderBy: { [sort]: 'desc' },
+      orderBy: { [orderField]: 'desc' },
       skip: (pageNum - 1) * limitNum,
       take: limitNum,
       include: {
