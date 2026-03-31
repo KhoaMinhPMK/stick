@@ -300,6 +300,21 @@ export async function getLessonDetail(id: string) {
   return apiRequest<{ lesson: LessonDetail }>(`/library/lessons/${id}`);
 }
 
+// GAP-15: Lesson completion tracking
+export async function completeLessonProgress(lessonId: string, duration?: number) {
+  return apiRequest<{ session: LearningSession }>(`/library/lessons/${lessonId}/complete`, {
+    method: 'POST',
+    body: { duration },
+  });
+}
+
+// GAP-13: Account deletion
+export async function deleteAccount() {
+  return apiRequest<{ message: string }>('/me', {
+    method: 'DELETE',
+  });
+}
+
 // ─── Daily Prompt ────────────────────────────────────
 export interface DailyPromptResponse {
   prompt: {

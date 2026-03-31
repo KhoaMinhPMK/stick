@@ -11,6 +11,25 @@ const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, ge
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
+// Rate limiter for AI routes (expensive Groq calls)
+let rateLimit;
+try {
+  rateLimit = require('express-rate-limit');
+} catch {
+  // Fallback: no-op middleware if not installed
+  rateLimit = null;
+}
+
+const aiRateLimiter = rateLimit
+  ? rateLimit({
+      windowMs: 60 * 1000, // 1 minute
+      max: 10, // 10 AI requests per minute per IP
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { code: 'RATE_LIMITED', message: 'Too many AI requests, please try again in a minute' },
+    })
+  : (_req, _res, next) => next();
+
 const router = express.Router();
 
 // Helper for async route handlers
@@ -539,8 +558,16 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 router.get('/journals', requireAuth, asyncHandler(async (req, res) => {
+  const where = { userId: req.authUser.id, deletedAt: null };
+
+  // GAP-17: filter by status (draft, submitted, etc.)
+  const statusFilter = req.query.status;
+  if (statusFilter && typeof statusFilter === 'string') {
+    where.status = statusFilter;
+  }
+
   const journals = await prisma.journal.findMany({
-    where: { userId: req.authUser.id, deletedAt: null },
+    where,
     orderBy: { createdAt: 'desc' },
   });
   res.status(200).json({ items: journals, total: journals.length });
@@ -628,7 +655,7 @@ router.get('/daily-challenge', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // ─── Grammar Quiz ────────────────────────────────────
-router.get('/ai/grammar-quiz', requireAuth, asyncHandler(async (req, res) => {
+router.get('/ai/grammar-quiz', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
   const count = Math.min(parseInt(req.query.count) || 5, 10);
   const onboarding = await prisma.onboardingState.findUnique({
     where: { userId: req.authUser.id },
@@ -639,7 +666,7 @@ router.get('/ai/grammar-quiz', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // ─── Reading Content ─────────────────────────────────
-router.get('/ai/reading-content', requireAuth, asyncHandler(async (req, res) => {
+router.get('/ai/reading-content', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
   const topic = req.query.topic || '';
   const onboarding = await prisma.onboardingState.findUnique({
     where: { userId: req.authUser.id },
@@ -650,7 +677,7 @@ router.get('/ai/reading-content', requireAuth, asyncHandler(async (req, res) => 
 }));
 
 // ─── AI Feedback ─────────────────────────────────────
-router.post('/ai/feedback/text', requireAuth, asyncHandler(async (req, res) => {
+router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
   let { journalId, content, language } = req.body || {};
 
   if (!content && journalId) {
@@ -1359,6 +1386,42 @@ router.get('/library/lessons/:id', asyncHandler(async (req, res) => {
   res.status(200).json({ lesson });
 }));
 
+// ─── GAP-15: Lesson completion tracking ──────────────
+router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (req, res) => {
+  const lesson = await prisma.lesson.findFirst({
+    where: { id: req.params.id, published: true },
+  });
+  if (!lesson) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+
+  const { duration } = req.body || {};
+  const session = await prisma.learningSession.create({
+    data: {
+      userId: req.authUser.id,
+      type: 'lesson',
+      title: lesson.title,
+      summary: `Completed lesson: ${lesson.category} / ${lesson.level}`,
+      score: 100,
+      duration: typeof duration === 'number' ? duration : null,
+      metadata: JSON.stringify({ lessonId: lesson.id, category: lesson.category, level: lesson.level }),
+    },
+  });
+
+  // Update daily progress
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  await prisma.progressDaily.upsert({
+    where: { userId_day: { userId: req.authUser.id, day: today } },
+    create: { userId: req.authUser.id, day: today, xpEarned: 15, minutesSpent: lesson.duration || 0 },
+    update: { xpEarned: { increment: 15 }, minutesSpent: { increment: lesson.duration || 0 } },
+  });
+
+  await checkAndUnlockAchievements(req.authUser.id);
+
+  res.status(201).json({ session });
+}));
+
 // ─── Leaderboard ─────────────────────────────────────
 router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
   const scope = req.query.scope || 'weekly'; // 'weekly' or 'all-time'
@@ -1397,18 +1460,29 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
     isUser: entry.userId === req.authUser.id,
   }));
 
-  // If current user isn't in top 20, add them
+  // If current user isn't in top 20, calculate their real rank
   const userInList = items.some(i => i.isUser);
   if (!userInList) {
     const userTotal = await prisma.progressDaily.aggregate({
       where: { userId: req.authUser.id, ...dateFilter },
       _sum: { xpEarned: true },
     });
+    const userXpTotal = userTotal._sum.xpEarned || 0;
+
+    // Count how many users have more XP than current user
+    const usersAbove = await prisma.progressDaily.groupBy({
+      by: ['userId'],
+      where: dateFilter,
+      _sum: { xpEarned: true },
+      having: { xpEarned: { _sum: { gt: userXpTotal } } },
+    });
+    const realRank = usersAbove.length + 1;
+
     items.push({
-      rank: items.length + 1,
+      rank: realRank,
       userId: req.authUser.id,
       name: req.authUser.name || 'You',
-      score: userTotal._sum.xpEarned || 0,
+      score: userXpTotal,
       isUser: true,
     });
   }
@@ -1723,10 +1797,13 @@ router.get('/admin/metrics/funnel', requireAuth, requireAdmin, asyncHandler(asyn
   const aiLogs = await safeCountRaw('AILog', `statusCode = 200 AND createdAt >= '${fStart}' AND createdAt <= '${tEnd}'`);
   const completions = await safeCountRaw('Journal', `status = 'submitted' AND createdAt >= '${fStart}' AND createdAt <= '${tEnd}'`);
 
+  // Use real data instead of estimates
+  const drafts = await safeCountRaw('Journal', `status = 'draft' AND createdAt >= '${fStart}' AND createdAt <= '${tEnd}'`);
+
   const steps = [
     { step: 'session_start', count: sessions },
-    { step: 'prompt_view', count: Math.round(sessions * 0.95) },
-    { step: 'draft_saved', count: submissions + Math.round(submissions * 0.15) },
+    { step: 'prompt_view', count: sessions }, // every session sees a prompt
+    { step: 'draft_saved', count: drafts + submissions },
     { step: 'submission_sent', count: submissions },
     { step: 'feedback_view', count: aiLogs },
     { step: 'completion_view', count: completions },
@@ -2061,6 +2138,32 @@ router.put('/admin/config/:key', requireAuth, requireAdmin, asyncHandler(async (
   }
 
   res.status(200).json({ config });
+}));
+
+// ─── Account Deletion ────────────────────────────────
+router.delete('/me', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.authUser.id;
+
+  // Delete all user data (cascade handles most via Prisma schema)
+  // But some tables may not cascade — clean up manually
+  await prisma.session.deleteMany({ where: { userId } });
+  await prisma.notification.deleteMany({ where: { userId } });
+  await prisma.userAchievement.deleteMany({ where: { userId } });
+  await prisma.savedPhrase.deleteMany({ where: { userId } });
+  await prisma.vocabNotebookItem.deleteMany({ where: { userId } });
+  await prisma.learningSession.deleteMany({ where: { userId } });
+  await prisma.progressDaily.deleteMany({ where: { userId } });
+  await prisma.journal.deleteMany({ where: { userId } });
+  await prisma.reminder.deleteMany({ where: { userId } });
+
+  // Delete settings & onboarding
+  await prisma.userSettings.deleteMany({ where: { userId } }).catch(() => {});
+  await prisma.onboardingState.deleteMany({ where: { userId } }).catch(() => {});
+
+  // Finally delete the user
+  await prisma.user.delete({ where: { id: userId } });
+
+  res.status(200).json({ message: 'Account deleted successfully' });
 }));
 
 // ─── Error Handler ───────────────────────────────────

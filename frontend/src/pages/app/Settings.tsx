@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getSettings, updateSettings } from '../../services/api/endpoints';
+import { getSettings, updateSettings, deleteAccount } from '../../services/api/endpoints';
 
 const speeds = ['Slow', 'Normal', 'Fast'];
 const languages = [
@@ -17,6 +17,8 @@ export const SettingsPage: React.FC = () => {
   const [selectedLang, setSelectedLang] = useState(0);
   const [dailyGoal, setDailyGoal] = useState(15);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,6 +61,19 @@ export const SettingsPage: React.FC = () => {
   const handleReset = () => {
     setShowResetConfirm(false);
     window.location.hash = '#onboarding';
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      localStorage.clear();
+      window.location.hash = '#landing';
+      window.location.reload();
+    } catch {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   if (loading) {
@@ -192,6 +207,16 @@ export const SettingsPage: React.FC = () => {
                 {t('settings.reset_button')}
               </button>
             </div>
+
+            {/* Delete Account */}
+            <div className="w-full max-w-md p-5 md:p-8 border-2 border-error/40 border-dashed rounded-3xl text-center mt-6">
+              <span className="material-symbols-outlined text-3xl md:text-4xl text-error mb-3 md:mb-4 block">delete_forever</span>
+              <h4 className="font-headline font-bold text-base md:text-xl mb-1 md:mb-2">{t('settings.delete_title', { defaultValue: 'Delete Account' })}</h4>
+              <p className="font-body text-xs md:text-sm text-on-surface-variant mb-4 md:mb-6">{t('settings.delete_desc', { defaultValue: 'Permanently delete your account and all data. This action cannot be undone.' })}</p>
+              <button onClick={() => setShowDeleteConfirm(true)} className="sketch-border px-6 md:px-8 py-2 md:py-3 bg-error text-white hover:bg-red-700 transition-all font-headline font-bold uppercase tracking-widest text-[10px] md:text-sm active:scale-95">
+                {t('settings.delete_button', { defaultValue: 'Delete Account' })}
+              </button>
+            </div>
             <div className="mt-8 md:mt-12 opacity-30 flex flex-col items-center gap-1 md:gap-2">
               <div className="text-2xl md:text-3xl font-black italic font-headline">STICK</div>
               <p className="text-[10px] md:text-xs font-medium">v4.2.0-sketch-stable</p>
@@ -236,6 +261,25 @@ export const SettingsPage: React.FC = () => {
             </button>
             <button onClick={handleReset} className="flex-1 py-2.5 sketch-border bg-error text-white font-headline font-bold text-sm hover:bg-red-700 transition-colors active:scale-95">
               Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Delete Account Confirm Modal */}
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+        <div className="bg-surface-container-lowest sketch-card p-6 md:p-8 max-w-sm w-full text-center">
+          <span className="material-symbols-outlined text-4xl text-error mb-3 block">delete_forever</span>
+          <h3 className="font-headline font-bold text-lg md:text-xl mb-2">{t('settings.delete_title', { defaultValue: 'Delete Account' })}</h3>
+          <p className="text-on-surface-variant text-xs md:text-sm mb-6">{t('settings.delete_confirm_desc', { defaultValue: 'All your journals, progress, and data will be permanently removed. Are you sure?' })}</p>
+          <div className="flex gap-3">
+            <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 sketch-border bg-surface-container font-headline font-bold text-sm hover:bg-surface-container-high transition-colors active:scale-95">
+              Cancel
+            </button>
+            <button onClick={handleDeleteAccount} disabled={deleting} className="flex-1 py-2.5 sketch-border bg-error text-white font-headline font-bold text-sm hover:bg-red-700 transition-colors active:scale-95 disabled:opacity-50">
+              {deleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>

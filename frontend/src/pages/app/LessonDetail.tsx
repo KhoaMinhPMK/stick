@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getLessonDetail, type LessonDetail } from '../../services/api/endpoints';
+import { getLessonDetail, completeLessonProgress, type LessonDetail } from '../../services/api/endpoints';
 
 const lessonSections = [
   { type: 'intro', titleKey: 'lesson_detail.section_intro', content: 'lesson_detail.intro_content', icon: 'info' },
@@ -25,6 +25,8 @@ export const LessonDetailPage: React.FC = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [saved, setSaved] = useState(false);
+  const completionSentRef = useRef(false);
+  const startTimeRef = useRef(Date.now());
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
@@ -61,6 +63,17 @@ export const LessonDetailPage: React.FC = () => {
   }
 
   const progress = Math.round((completedSections.length / sectionsToRender.length) * 100);
+
+  // GAP-15: Send completion to backend when all sections are done
+  useEffect(() => {
+    if (progress === 100 && id && !completionSentRef.current) {
+      completionSentRef.current = true;
+      const durationSec = Math.round((Date.now() - startTimeRef.current) / 1000);
+      completeLessonProgress(id, durationSec).catch(() => {
+        completionSentRef.current = false; // allow retry
+      });
+    }
+  }, [progress, id]);
 
   const toggleSection = (idx: number) => {
     setCompletedSections(prev =>
