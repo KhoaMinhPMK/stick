@@ -1626,7 +1626,6 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
       take: limitNum,
       include: {
         progressDaily: { orderBy: { day: 'desc' }, take: 1 },
-        journals: { where: { deletedAt: null }, select: { id: true } },
       },
     }),
     prisma.user.count({ where }),
@@ -1635,6 +1634,7 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
   const items = await Promise.all(users.map(async (u) => {
     const progressDays = await prisma.progressDaily.count({ where: { userId: u.id } });
     const latestProgress = u.progressDaily[0];
+    const journalCount = await prisma.journal.count({ where: { userId: u.id, deletedAt: null } });
 
     let streak = 0;
     if (latestProgress) {
@@ -1673,7 +1673,7 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
       stats: {
         totalDays: progressDays,
         currentStreak: streak,
-        totalJournals: u.journals.length,
+        totalJournals: journalCount,
         lastActiveAt: latestProgress ? latestProgress.day : null,
       },
     };
