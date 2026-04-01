@@ -439,18 +439,27 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@prisma/client@npm:6.4.1":
-  version: 6.4.1
-  resolution: "@prisma/client@npm:6.4.1"
+"@prisma/client-runtime-utils@npm:7.6.0":
+  version: 7.6.0
+  resolution: "@prisma/client-runtime-utils@npm:7.6.0"
+  checksum: 367be50cc6345407d0231a7c57e715b48eb988dc18d66f4c88f45bf5cb08262c7c4e145f8f8515218cfb4c088226f23415b0e7bab9af4bff739eb243af33d8b8
+  languageName: node
+  linkType: hard
+
+"@prisma/client@npm:latest":
+  version: 7.6.0
+  resolution: "@prisma/client@npm:7.6.0"
+  dependencies:
+    "@prisma/client-runtime-utils": 7.6.0
   peerDependencies:
     prisma: "*"
-    typescript: ">=5.1.0"
+    typescript: ">=5.4.0"
   peerDependenciesMeta:
     prisma:
       optional: true
     typescript:
       optional: true
-  checksum: 74860bb51c29f8c4834f931ef853deafe1c88e513c46a9589f38cec1fd9f24ddca3ce7991a31287dbc4de29756f5dd2997acd628c2772c1d09cd17b91b48f4d9
+  checksum: 369e94bbef747df1e8b15d6990345d85034fcfcccd9be3eba77fb24ca72f9ec6f6bfe50b8d929ef4e1512ea03b9aa350698f45104c8cb417c683d394615f74ef
   languageName: node
   linkType: hard
 
@@ -754,7 +763,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "backend@workspace:."
   dependencies:
-    "@prisma/client": 6.4.1
+    "@prisma/client": latest
     cors: ^2.8.6
     dotenv: ^17.3.1
     express: ^5.2.1
