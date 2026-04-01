@@ -175,6 +175,25 @@ export async function deleteVocabItem(id: string) {
   });
 }
 
+// ─── Vocab SRS ───────────────────────────────────────
+export interface VocabSRSItem extends VocabItem {
+  nextReviewAt: string | null;
+  easeFactor: number;
+  reviewInterval: number;
+  reviewCount: number;
+}
+
+export async function getDueVocab(limit = 20) {
+  return apiRequest<{ items: VocabSRSItem[]; total: number }>(`/vocab/notebook/due?limit=${limit}`);
+}
+
+export async function reviewVocabItem(id: string, quality: number) {
+  return apiRequest<{ item: VocabSRSItem }>(`/vocab/notebook/${id}/review`, {
+    method: 'POST',
+    body: { quality },
+  });
+}
+
 // ─── History ─────────────────────────────────────────
 export interface LearningSession {
   id: string;

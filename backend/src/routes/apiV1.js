@@ -1061,6 +1061,81 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
   res.status(201).json({ item });
 }));
 
+// ─── Vocab: Due for review (SRS) ─────────────────────
+router.get('/vocab/notebook/due', requireAuth, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const now = new Date();
+
+  // Items due: nextReviewAt <= now OR nextReviewAt is null (never reviewed)
+  const items = await prisma.vocabNotebookItem.findMany({
+    where: {
+      userId: req.authUser.id,
+      mastery: { not: 'mastered' },
+      OR: [
+        { nextReviewAt: null },
+        { nextReviewAt: { lte: now } },
+      ],
+    },
+    orderBy: { nextReviewAt: 'asc' },
+    take: limit,
+  });
+  res.status(200).json({ items, total: items.length });
+}));
+
+// ─── Vocab: Review with SM-2 algorithm ───────────────
+router.post('/vocab/notebook/:id/review', requireAuth, asyncHandler(async (req, res) => {
+  const existing = await prisma.vocabNotebookItem.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id },
+  });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Vocab item not found' });
+  }
+
+  // quality: 0-5 (0=forgot, 3=correct with difficulty, 5=perfect recall)
+  const quality = Math.max(0, Math.min(5, parseInt(req.body.quality) || 0));
+
+  let { easeFactor, reviewInterval, reviewCount } = existing;
+  easeFactor = easeFactor || 2.5;
+  reviewInterval = reviewInterval || 0;
+  reviewCount = reviewCount || 0;
+
+  // SM-2 Algorithm
+  if (quality >= 3) {
+    // Correct response
+    if (reviewCount === 0) {
+      reviewInterval = 1;
+    } else if (reviewCount === 1) {
+      reviewInterval = 6;
+    } else {
+      reviewInterval = Math.round(reviewInterval * easeFactor);
+    }
+    reviewCount += 1;
+    easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
+  } else {
+    // Incorrect — reset
+    reviewCount = 0;
+    reviewInterval = 1;
+    // easeFactor stays the same
+  }
+
+  const nextReviewAt = new Date();
+  nextReviewAt.setDate(nextReviewAt.getDate() + reviewInterval);
+
+  // Determine mastery level
+  let mastery = 'new';
+  if (reviewCount >= 5 && quality >= 4) {
+    mastery = 'mastered';
+  } else if (reviewCount >= 1) {
+    mastery = 'learning';
+  }
+
+  const updated = await prisma.vocabNotebookItem.update({
+    where: { id: req.params.id },
+    data: { easeFactor, reviewInterval, reviewCount, nextReviewAt, mastery },
+  });
+  res.status(200).json({ item: updated });
+}));
+
 router.patch('/vocab/notebook/:id', requireAuth, asyncHandler(async (req, res) => {
   const existing = await prisma.vocabNotebookItem.findFirst({
     where: { id: req.params.id, userId: req.authUser.id },

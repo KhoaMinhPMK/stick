@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { getDueVocab, reviewVocabItem } from '../../services/api/endpoints';
 import { trackReviewDone } from '../../services/analytics/coreLoop';
 
 export const VocabularyReviewPage: React.FC = () => {
@@ -24,8 +25,8 @@ export const VocabularyReviewPage: React.FC = () => {
           const res = await apiRequest(`/journals/${journalId}/review-items`) as any;
           setVocabItems(res.items || []);
         } else {
-          // Fallback: global notebook
-          const res = await apiRequest('/vocab/notebook') as any;
+          // SRS: load due items for spaced repetition
+          const res = await getDueVocab(20);
           setVocabItems(res.items || []);
         }
       } catch (err) {
@@ -44,12 +45,9 @@ export const VocabularyReviewPage: React.FC = () => {
     if (!currentVocab || actionLoading) return;
     setActionLoading(true);
     try {
-      // Only patch if this is a global notebook item (has an id stored in DB)
       if (currentVocab.id) {
-        await apiRequest(`/vocab/notebook/${currentVocab.id}`, {
-          method: 'PATCH',
-          body: { mastery: 'learning' },
-        });
+        // SRS review: quality 5 = perfect recall
+        await reviewVocabItem(currentVocab.id, 5);
       }
       setRememberedCount(prev => prev + 1);
     } catch (err) {
@@ -60,8 +58,20 @@ export const VocabularyReviewPage: React.FC = () => {
     }
   };
 
-  const handleReviewLater = () => {
-    setCurrentIndex(prev => prev + 1);
+  const handleReviewLater = async () => {
+    if (!currentVocab || actionLoading) return;
+    setActionLoading(true);
+    try {
+      if (currentVocab.id) {
+        // SRS review: quality 1 = forgot / needs review
+        await reviewVocabItem(currentVocab.id, 1);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+      setCurrentIndex(prev => prev + 1);
+    }
   };
 
   const handleContinue = (skipped = false) => {
