@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, type ProgressSummary } from '../../services/api/endpoints';
 import { apiRequest } from '../../services/api/client';
+import { logout } from '../../services/api/auth';
 
 interface UserProfile {
   id: string;
@@ -171,6 +172,20 @@ export const ProfilePage: React.FC = () => {
 
         {/* Footer Quote */}
         <section className="flex justify-center pt-6 md:pt-12">
+          <button
+            onClick={async () => {
+              await logout();
+              window.location.hash = '#landing';
+              window.location.reload();
+            }}
+            className="w-full max-w-xs py-3 md:py-4 sketch-border bg-surface-container-highest font-headline font-bold text-sm md:text-base hover:bg-error-container hover:text-error transition-colors flex items-center justify-center gap-2 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-lg">logout</span>
+            {t('settings.logout', { defaultValue: 'Log Out' })}
+          </button>
+        </section>
+
+        <section className="flex justify-center pt-4 md:pt-8">
           <div className="text-center max-w-sm opacity-60">
             <span className="material-symbols-outlined text-4xl md:text-5xl text-black/20 mb-3 md:mb-4 block">sentiment_very_satisfied</span>
             <p className="italic text-on-surface-variant text-xs md:text-sm">{t('profile.footer_quote')}</p>
