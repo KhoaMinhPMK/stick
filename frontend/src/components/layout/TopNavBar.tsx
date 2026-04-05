@@ -25,6 +25,18 @@ export const TopNavBar: React.FC = () => {
     { href: '#pricing', label: t('nav.pricing') },
   ];
 
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    const id = href.replace('#', '');
+    const el = document.getElementById(id);
+    if (el) {
+      const navHeight = 80;
+      const top = el.getBoundingClientRect().top + window.scrollY - navHeight;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
+    setMobileMenuOpen(false);
+  };
+
   return (
     <nav className="fixed top-0 left-0 right-0 w-full border-b-4 border-black dark:border-stone-100 bg-[#fdf9f0]/95 backdrop-blur-sm z-50">
       <div className="flex justify-between items-center w-full px-4 md:px-8 py-3 md:py-4 max-w-7xl mx-auto">
@@ -45,7 +57,7 @@ export const TopNavBar: React.FC = () => {
         
         <div className="hidden md:flex gap-8 items-center">
           {navLinks.map(link => (
-            <a key={link.href} className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href={link.href}>
+            <a key={link.href} className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href={link.href} onClick={(e) => scrollToSection(e, link.href)}>
               {link.label}
             </a>
           ))}
@@ -89,7 +101,7 @@ export const TopNavBar: React.FC = () => {
               key={link.href}
               href={link.href}
               className="block text-stone-700 font-medium font-headline py-2 hover:text-black transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => scrollToSection(e, link.href)}
             >
               {link.label}
             </a>
