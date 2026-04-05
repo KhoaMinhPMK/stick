@@ -17,7 +17,7 @@ export const ClosingCTASection: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <button 
-            onClick={() => window.location.hash = '#onboarding'}
+            onClick={() => window.location.hash = localStorage.getItem('stick_access_token') ? '#dashboard' : '#onboarding'}
             className="group px-6 py-3 md:px-10 md:py-5 bg-white text-black font-bold rounded-full text-base md:text-lg hover:bg-black hover:text-white transition-all duration-300 transform hover:-translate-y-2 hover:shadow-[0_10px_0_rgba(0,0,0,1)] active:translate-y-0 active:shadow-[0_2px_0_rgba(0,0,0,1)] sketch-border flex items-center gap-3"
           >
             {t("closing.cta")}

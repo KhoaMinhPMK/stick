@@ -4,7 +4,9 @@
     "features": "Features",
     "validation": "Validation",
     "pricing": "Pricing",
-    "start_free": "Start free"
+    "start_free": "Start free",
+    "login": "Log in",
+    "go_dashboard": "Dashboard"
   },
   "hero": {
     "badge": "Beta Pilot Access",

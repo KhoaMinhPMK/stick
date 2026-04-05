@@ -8,6 +8,7 @@ export const TopNavBar: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isLoggedIn = !!localStorage.getItem('stick_access_token');
 
   useEffect(() => {
     setMounted(true);
@@ -83,13 +84,31 @@ export const TopNavBar: React.FC = () => {
               <span className="leading-none block mt-[2px]">{i18n.language.startsWith('vi') ? 'VI' : 'EN'}</span>
             </button>
           )}
-          <Button 
-            variant="sketch"
-            onClick={() => window.location.hash = '#onboarding'}
-            className="hidden sm:inline-flex"
-          >
-            {t('nav.start_free')}
-          </Button>
+          {isLoggedIn ? (
+            <Button 
+              variant="sketch"
+              onClick={() => window.location.hash = '#dashboard'}
+              className="hidden sm:inline-flex"
+            >
+              {t('nav.go_dashboard', { defaultValue: 'Dashboard' })}
+            </Button>
+          ) : (
+            <>
+              <button
+                onClick={() => window.location.hash = '#login'}
+                className="hidden sm:inline-flex items-center font-bold font-headline text-sm md:text-base text-stone-700 hover:text-black transition-colors"
+              >
+                {t('nav.login', { defaultValue: 'Log in' })}
+              </button>
+              <Button 
+                variant="sketch"
+                onClick={() => window.location.hash = '#onboarding'}
+                className="hidden sm:inline-flex"
+              >
+                {t('nav.start_free')}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -106,13 +125,31 @@ export const TopNavBar: React.FC = () => {
               {link.label}
             </a>
           ))}
-          <Button 
-            variant="sketch"
-            onClick={() => { window.location.hash = '#onboarding'; setMobileMenuOpen(false); }}
-            className="w-full sm:hidden"
-          >
-            {t('nav.start_free')}
-          </Button>
+          {isLoggedIn ? (
+            <Button 
+              variant="sketch"
+              onClick={() => { window.location.hash = '#dashboard'; setMobileMenuOpen(false); }}
+              className="w-full sm:hidden"
+            >
+              {t('nav.go_dashboard', { defaultValue: 'Dashboard' })}
+            </Button>
+          ) : (
+            <>
+              <button
+                onClick={() => { window.location.hash = '#login'; setMobileMenuOpen(false); }}
+                className="block w-full text-left text-stone-700 font-medium font-headline py-2 hover:text-black transition-colors sm:hidden"
+              >
+                {t('nav.login', { defaultValue: 'Log in' })}
+              </button>
+              <Button 
+                variant="sketch"
+                onClick={() => { window.location.hash = '#onboarding'; setMobileMenuOpen(false); }}
+                className="w-full sm:hidden"
+              >
+                {t('nav.start_free')}
+              </Button>
+            </>
+          )}
         </div>
       )}
     </nav>

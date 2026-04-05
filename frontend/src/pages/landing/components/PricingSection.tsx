@@ -23,7 +23,7 @@ export const PricingSection: React.FC = () => {
               <li className="flex items-center gap-2"><Icon name="check" className="text-xs" /> {t('pricing.f3')}</li>
             </ul>
             <button 
-              onClick={() => window.location.hash = '#onboarding'}
+              onClick={() => window.location.hash = localStorage.getItem('stick_access_token') ? '#dashboard' : '#onboarding'}
               className="w-full py-3 border-2 border-black rounded-full font-bold hover:bg-surface-container-low transition-colors"
             >
               {t('pricing.btn_f')}
@@ -45,7 +45,7 @@ export const PricingSection: React.FC = () => {
               <li className="flex items-center gap-2"><Icon name="check" className="text-xs font-bold" /> {t('pricing.p4')}</li>
             </ul>
             <button 
-              onClick={() => window.location.hash = '#onboarding'}
+              onClick={() => window.location.hash = localStorage.getItem('stick_access_token') ? '#dashboard' : '#onboarding'}
               className="w-full py-3 bg-black text-white rounded-full font-bold hover:opacity-90 transition-opacity"
             >
               {t('pricing.btn_p')}

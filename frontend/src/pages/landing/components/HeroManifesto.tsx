@@ -21,7 +21,7 @@ export const HeroManifesto: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
               variant="primary" 
-              onClick={() => window.location.hash = '#onboarding'}
+              onClick={() => window.location.hash = localStorage.getItem('stick_access_token') ? '#dashboard' : '#onboarding'}
             >
               {t('hero.cta_primary')} →
             </Button>

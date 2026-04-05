@@ -4,7 +4,9 @@
     "features": "Tính năng",
     "validation": "Kiểm chứng",
     "pricing": "Bảng giá",
-    "start_free": "Dùng miễn phí"
+    "start_free": "Dùng miễn phí",
+    "login": "Đăng nhập",
+    "go_dashboard": "Vào học"
   },
   "hero": {
     "badge": "Truy cập bản Beta",
