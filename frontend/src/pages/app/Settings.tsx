@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getSettings, updateSettings, deleteAccount } from '../../services/api/endpoints';
+import { logout } from '../../services/api/auth';
 
 const speeds = ['Slow', 'Normal', 'Fast'];
 const languages = [
@@ -217,6 +218,19 @@ export const SettingsPage: React.FC = () => {
                 {t('settings.delete_button', { defaultValue: 'Delete Account' })}
               </button>
             </div>
+
+            {/* Logout */}
+            <button
+              onClick={async () => {
+                await logout();
+                window.location.hash = '#landing';
+                window.location.reload();
+              }}
+              className="w-full max-w-md mt-6 py-3 md:py-4 sketch-border bg-surface-container-highest font-headline font-bold text-sm md:text-base hover:bg-secondary-container transition-colors flex items-center justify-center gap-2 active:scale-95"
+            >
+              <span className="material-symbols-outlined text-lg">logout</span>
+              {t('settings.logout', { defaultValue: 'Log Out' })}
+            </button>
             <div className="mt-8 md:mt-12 opacity-30 flex flex-col items-center gap-1 md:gap-2">
               <div className="text-2xl md:text-3xl font-black italic font-headline">STICK</div>
               <p className="text-[10px] md:text-xs font-medium">v4.2.0-sketch-stable</p>

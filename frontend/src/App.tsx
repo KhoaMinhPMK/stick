@@ -186,8 +186,17 @@ function App() {
   }, []);
 
   // Bootstrap guest session silently — ensures protected API routes work
-  // even before user goes through onboarding
+  // even before user goes through onboarding.
+  // If user already has a token, skip landing → go straight to dashboard.
   useEffect(() => {
+    const existingToken = localStorage.getItem('stick_access_token');
+    if (existingToken) {
+      // User already authenticated — if still on landing, redirect to dashboard
+      const hash = window.location.hash.split('?')[0];
+      if (!hash || hash === '#' || hash === '#landing') {
+        window.location.hash = '#dashboard';
+      }
+    }
     ensureSession().catch(() => {
       // Non-blocking: app still renders if session bootstrap fails
     });

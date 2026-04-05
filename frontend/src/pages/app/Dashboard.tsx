@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getProgressSummary, getProgressDaily, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
+import { getProgressSummary, getProgressDaily, getDueVocab, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 
 export const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -10,6 +10,7 @@ export const DashboardPage: React.FC = () => {
   const periodRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
+  const [dueVocabCount, setDueVocabCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,12 +25,14 @@ export const DashboardPage: React.FC = () => {
     async function fetchData() {
       try {
         setLoading(true);
-        const [summaryRes, dailyRes] = await Promise.all([
+        const [summaryRes, dailyRes, dueRes] = await Promise.all([
           getProgressSummary(),
           getProgressDaily(14),
+          getDueVocab(1).catch(() => ({ items: [], total: 0 })),
         ]);
         setSummary(summaryRes);
         setDailyData(dailyRes.items);
+        setDueVocabCount(dueRes.total);
       } catch (err) {
         console.error('Dashboard fetch error:', err);
       } finally {
@@ -134,9 +137,9 @@ export const DashboardPage: React.FC = () => {
           <div className="w-12 h-12 md:w-14 md:h-14 bg-white border-[3px] border-black rounded-full flex items-center justify-center mb-1 md:mb-1 sketch-card">
             <span className="material-symbols-outlined text-black text-2xl md:text-2xl" data-icon="book_5">book_5</span>
           </div>
-          <h4 className="font-headline text-3xl md:text-4xl font-black">{summary?.totalWords || 0}</h4>
+          <h4 className="font-headline text-3xl md:text-4xl font-black">{dueVocabCount}</h4>
           <p className="font-headline text-base md:text-base font-bold">{t('dashboard.words_to_review')}</p>
-          <p className="text-xs md:text-sm opacity-90">{t('dashboard.review_hint')}</p>
+          <p className="text-xs md:text-sm opacity-90">{dueVocabCount > 0 ? t('dashboard.review_hint') : t('dashboard.no_review_hint', { defaultValue: 'All caught up! 🎉' })}</p>
         </div>
 
         {/* Speaking Practice Card */}

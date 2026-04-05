@@ -107,7 +107,16 @@ export const HistoryDetailPage: React.FC = () => {
                   {enhancedText}
                 </p>
                 <div className="mt-4 md:mt-8 flex justify-between items-center">
-                  <button className="material-symbols-outlined text-black bg-white rounded-full p-1.5 md:p-2 border-2 border-black hover:scale-110 transition-transform text-lg md:text-2xl">volume_up</button>
+                  <button
+                    onClick={() => {
+                      if (!enhancedText || !window.speechSynthesis) return;
+                      window.speechSynthesis.cancel();
+                      const utt = new SpeechSynthesisUtterance(enhancedText);
+                      utt.lang = 'en-US';
+                      window.speechSynthesis.speak(utt);
+                    }}
+                    className="material-symbols-outlined text-black bg-white rounded-full p-1.5 md:p-2 border-2 border-black hover:scale-110 transition-transform text-lg md:text-2xl cursor-pointer"
+                  >volume_up</button>
                   <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest opacity-40">AI-Grammar Polish</span>
                 </div>
               </div>
@@ -166,6 +175,7 @@ export const HistoryDetailPage: React.FC = () => {
                 {score != null && <span className="text-lg md:text-2xl font-bold opacity-60">/100</span>}
               </div>
               <p className="mt-3 md:mt-4 text-xs md:text-sm opacity-80 leading-snug">{t('history_detail.score_feedback')}</p>
+              <p className="mt-2 text-[10px] md:text-xs opacity-60 italic">{t('history_detail.score_explanation', { defaultValue: 'Score is based on grammar accuracy, vocabulary richness, and natural expression.' })}</p>
               {score != null && (
                 <div className="mt-5 md:mt-8 space-y-2 md:space-y-3">
                   <div className="h-1.5 md:h-2 w-full bg-black/20 rounded-full overflow-hidden">

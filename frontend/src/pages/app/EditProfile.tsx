@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
@@ -9,9 +9,11 @@ export const EditProfilePage: React.FC = () => {
   const [bio, setBio] = useState('');
   const [email, setEmail] = useState('');
   const [nativeLang, setNativeLang] = useState('Vietnamese');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -75,9 +77,30 @@ export const EditProfilePage: React.FC = () => {
         <div className="sketch-card p-6 md:p-8 mb-6 flex flex-col sm:flex-row items-center gap-5 md:gap-8">
           <div className="relative shrink-0">
             <div className="w-24 h-24 md:w-32 md:h-32 sketch-border overflow-hidden bg-surface-container-high flex items-center justify-center">
-              <span className="material-symbols-outlined text-4xl md:text-5xl text-black/30">person</span>
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-4xl md:text-5xl text-black/30">person</span>
+              )}
             </div>
-            <button className="absolute -bottom-2 -right-2 bg-primary text-white p-2 rounded-full border-2 border-surface hover:scale-110 transition-transform active:scale-95">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = () => setAvatarPreview(reader.result as string);
+                  reader.readAsDataURL(file);
+                }
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-2 -right-2 bg-primary text-white p-2 rounded-full border-2 border-surface hover:scale-110 transition-transform active:scale-95"
+            >
               <span className="material-symbols-outlined text-sm">photo_camera</span>
             </button>
           </div>

@@ -70,7 +70,10 @@ export const ProfilePage: React.FC = () => {
                       <span className="material-symbols-outlined text-4xl md:text-5xl text-black/30">person</span>
                     )}
                   </div>
-                  <button className="absolute -bottom-1.5 -right-1.5 md:-bottom-2 md:-right-2 bg-primary text-surface p-1 md:p-2 rounded-full flex items-center justify-center border-2 border-surface">
+                  <button
+                    onClick={() => (window.location.hash = '#edit-profile')}
+                    className="absolute -bottom-1.5 -right-1.5 md:-bottom-2 md:-right-2 bg-primary text-surface p-1 md:p-2 rounded-full flex items-center justify-center border-2 border-surface z-10"
+                  >
                     <span className="material-symbols-outlined text-xs md:text-sm">edit</span>
                   </button>
                 </div>

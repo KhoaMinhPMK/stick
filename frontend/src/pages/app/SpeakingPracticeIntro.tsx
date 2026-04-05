@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { trackAudioPlay } from '../../services/analytics/coreLoop';
 
 export const SpeakingPracticeIntroPage: React.FC = () => {
+  const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
   const [sentence, setSentence] = useState('');
   const [loadingJournal, setLoadingJournal] = useState(false);
@@ -71,7 +73,7 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
                 </div>
                 {/* Speech Bubble */}
                 <div className="absolute -top-6 -right-10 md:-top-4 md:-right-16 bg-white sketch-border px-4 py-3 wobble-text shadow-sm z-10 pointer-events-none">
-                  <p className="font-headline font-bold text-sm md:text-base text-black whitespace-nowrap">You got this!</p>
+                  <p className="font-headline font-bold text-sm md:text-base text-black whitespace-nowrap">{t('speaking_intro.encouragement', { defaultValue: 'You got this!' })}</p>
                 </div>
               </div>
             </div>
@@ -80,16 +82,16 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
             <div className="text-center space-y-8 md:space-y-10">
               <div className="space-y-3">
                 <span className="font-headline text-tertiary font-bold tracking-widest text-xs md:text-sm uppercase py-1 px-3 bg-tertiary-container/10 border-2 border-tertiary rounded-full inline-block">
-                  Next Step: Speak It
+                  {t('speaking_intro.step_label', { defaultValue: 'Next Step: Speak It' })}
                 </span>
                 <h2 className="font-headline text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-primary wobble-text italic">
-                  Ready to try aloud?
+                  {t('speaking_intro.title', { defaultValue: 'Ready to try aloud?' })}
                 </h2>
               </div>
 
               {/* The Target Sentence Card */}
               <div className="bg-surface-container p-6 md:p-10 sketch-border mx-auto max-w-2xl group transition-all hover:bg-surface-container-high shadow-[4px_4px_0_0_#000000]">
-                <p className="font-headline text-stone-500 text-xs md:text-sm mb-3 md:mb-5 uppercase tracking-widest font-bold">Your improved sentence</p>
+                <p className="font-headline text-stone-500 text-xs md:text-sm mb-3 md:mb-5 uppercase tracking-widest font-bold">{t('speaking_intro.improved_sentence', { defaultValue: 'Your improved sentence' })}</p>
                 {loadingJournal ? (
                   <span className="material-symbols-outlined animate-spin text-2xl text-stone-400">progress_activity</span>
                 ) : sentence ? (
@@ -97,13 +99,13 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
                     "{sentence}"
                   </p>
                 ) : (
-                  <p className="text-base text-stone-400 italic">No sentence available — go back and complete your journal first.</p>
+                  <p className="text-base text-stone-400 italic">{t('speaking_intro.no_sentence', { defaultValue: 'No sentence available — go back and complete your journal first.' })}</p>
                 )}
               </div>
 
               <div className="font-body text-lg md:text-xl text-on-surface-variant max-w-lg mx-auto flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined text-secondary text-sm md:text-base" style={{fontVariationSettings: "'FILL' 1"}}>tips_and_updates</span>
-                <span className="italic font-medium text-primary">No pressure. Just try.</span>
+                <span className="italic font-medium text-primary">{t('speaking_intro.no_pressure', { defaultValue: 'No pressure. Just try.' })}</span>
               </div>
 
               {/* Primary Actions */}
@@ -117,7 +119,7 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
                   <span className={`material-symbols-outlined text-3xl transition-transform ${isPlaying ? 'animate-pulse' : 'group-hover:rotate-12'}`} style={{fontVariationSettings: isPlaying ? "'FILL' 1" : "'FILL' 0"}}>
                     {isPlaying ? 'volume_up' : 'volume_up'}
                   </span>
-                  {isPlaying ? 'Playing...' : 'Listen first'}
+                  {isPlaying ? t('speaking_intro.playing', { defaultValue: 'Playing...' }) : t('speaking_intro.listen_first', { defaultValue: 'Listen first' })}
                 </button>
                 
                 {/* Record Button */}
@@ -128,7 +130,7 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
                   <span className="material-symbols-outlined text-3xl group-hover:scale-110 transition-transform" style={{ fontVariationSettings: "'FILL' 1" }}>
                     mic
                   </span>
-                  Record now
+                  {t('speaking_intro.record_now', { defaultValue: 'Record now' })}
                 </button>
               </div>
             </div>
@@ -144,7 +146,7 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
 
           {/* Context Footer */}
           <div className="mt-8 md:mt-12 text-center text-on-surface-variant font-label space-y-3 animate-fade-in-up delay-[400ms]">
-            <p className="font-medium text-sm md:text-base">This session focuses on past tense fluency.</p>
+            <p className="font-medium text-sm md:text-base">{t('speaking_intro.session_focus', { defaultValue: 'This session focuses on past tense fluency.' })}</p>
             {/* Progress indicators matching core loop */}
             <div className="flex items-center justify-center gap-2">
               <span className="w-2 h-2 rounded-full bg-secondary-container opacity-50"></span>

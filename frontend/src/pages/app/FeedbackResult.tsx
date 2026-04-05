@@ -70,6 +70,12 @@ export const FeedbackResultPage: React.FC = () => {
 
   const handlePlayEnhanced = () => {
     if (!enhancedText || !window.speechSynthesis) return;
+    // Toggle: if already playing, stop instead of restarting
+    if (isPlayingEnhanced) {
+      window.speechSynthesis.cancel();
+      setIsPlayingEnhanced(false);
+      return;
+    }
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(enhancedText);
     utt.lang = 'en-US';

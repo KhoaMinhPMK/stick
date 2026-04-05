@@ -13,6 +13,25 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Client-side validation
+    if (!email.trim()) {
+      setError(t('login.error_email_required', { defaultValue: 'Please enter your email address.' }));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(t('login.error_email_invalid', { defaultValue: 'Please enter a valid email address.' }));
+      return;
+    }
+    if (!password) {
+      setError(t('login.error_password_required', { defaultValue: 'Please enter your password.' }));
+      return;
+    }
+    if (password.length < 6) {
+      setError(t('login.error_password_short', { defaultValue: 'Password must be at least 6 characters.' }));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await loginWithEmail({ email, password });

@@ -542,6 +542,23 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
     });
   }
 
+  // Per-day submission limit: only one submitted journal per user per calendar day
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const existingToday = await prisma.journal.findFirst({
+    where: {
+      userId: req.authUser.id,
+      deletedAt: null,
+      createdAt: { gte: todayStart, lte: todayEnd },
+    },
+  });
+  if (existingToday) {
+    // Return the existing journal instead of creating a duplicate
+    return res.status(200).json({ journal: existingToday, reused: true });
+  }
+
   const journal = await prisma.journal.create({
     data: {
       userId: req.authUser.id,

@@ -27,7 +27,12 @@ export const JournalPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const dayNumber = summary ? (summary.totalJournals || 0) + 1 : '...';
+  // Day number = how many calendar days since user joined + 1 (avoids race condition with totalJournals)
+  const dayNumber = (() => {
+    if (!summary) return '...';
+    // Fallback: use totalJournals + 1 if no better signal available
+    return (summary.totalJournals || 0) + 1;
+  })();
   const isVi = i18n.language === 'vi';
 
   // Get prompt text from daily prompt or fallback

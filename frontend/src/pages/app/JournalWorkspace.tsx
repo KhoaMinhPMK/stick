@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { createVocabItem } from '../../services/api/endpoints';
 import { trackSessionStart, trackSubmissionSent } from '../../services/analytics/coreLoop';
 
 const QUICK_PROMPTS = [
@@ -49,6 +50,20 @@ export const JournalWorkspacePage: React.FC = () => {
   const targetWords = 50;
   const progress = Math.min(wordCount / targetWords, 1);
   const canSubmit = wordCount >= 10;
+
+  const [vocabSaved, setVocabSaved] = useState(false);
+
+  const handleAddVocabToLibrary = async () => {
+    try {
+      for (const item of vocabulary) {
+        await createVocabItem({ word: item.word, meaning: item.meaning });
+      }
+      setVocabSaved(true);
+      setTimeout(() => setVocabSaved(false), 2500);
+    } catch (err) {
+      console.error('Failed to add vocab to library', err);
+    }
+  };
 
   const quickStarters = [
     t('journal_workspace.quick_start_1'),
@@ -291,8 +306,12 @@ export const JournalWorkspacePage: React.FC = () => {
                 </li>
               ))}
             </ul>
-            <button className="mt-4 md:mt-6 lg:mt-8 w-full py-1.5 md:py-2 border-2 border-dashed border-black rounded-lg font-bold text-xs md:text-sm hover:bg-white transition-colors active:scale-95">
-              + {t('journal_workspace.add_to_library')}
+            <button
+              onClick={handleAddVocabToLibrary}
+              disabled={vocabSaved}
+              className="mt-4 md:mt-6 lg:mt-8 w-full py-1.5 md:py-2 border-2 border-dashed border-black rounded-lg font-bold text-xs md:text-sm hover:bg-white transition-colors active:scale-95 disabled:opacity-50"
+            >
+              {vocabSaved ? '✓ Saved!' : `+ ${t('journal_workspace.add_to_library')}`}
             </button>
           </div>
 
