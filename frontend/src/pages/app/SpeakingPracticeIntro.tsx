@@ -35,8 +35,12 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
 
   const handleListen = () => {
     if (!sentence) return;
-    if (!window.speechSynthesis) {
-      return; // fallback: button just stays inactive
+    if (!window.speechSynthesis) return;
+    // Toggle: stop if already playing
+    if (isPlaying) {
+      window.speechSynthesis.cancel();
+      setIsPlaying(false);
+      return;
     }
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(sentence);
@@ -113,13 +117,13 @@ export const SpeakingPracticeIntroPage: React.FC = () => {
                 {/* Listen Button */}
                 <button 
                   onClick={handleListen}
-                  disabled={!sentence || isPlaying}
-                  className={`flex justify-center items-center gap-3 px-8 py-4 md:px-10 md:py-5 w-full md:w-auto border-[3px] border-black rounded-full font-headline font-bold text-lg md:text-xl transition-all active:scale-95 group shadow-[2px_2px_0_0_#000000] hover:shadow-[1px_1px_0_0_#000000] hover:translate-x-[1px] hover:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed ${isPlaying ? 'bg-secondary-container text-primary scale-105' : 'bg-surface hover:bg-secondary-container'}`}
+                  disabled={!sentence}
+                  className={`flex justify-center items-center gap-3 px-8 py-4 md:px-10 md:py-5 w-full md:w-auto border-[3px] border-black rounded-full font-headline font-bold text-lg md:text-xl transition-all active:scale-95 group shadow-[2px_2px_0_0_#000000] hover:shadow-[1px_1px_0_0_#000000] hover:translate-x-[1px] hover:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed ${isPlaying ? 'bg-error-container text-error scale-105' : 'bg-surface hover:bg-secondary-container'}`}
                 >
                   <span className={`material-symbols-outlined text-3xl transition-transform ${isPlaying ? 'animate-pulse' : 'group-hover:rotate-12'}`} style={{fontVariationSettings: isPlaying ? "'FILL' 1" : "'FILL' 0"}}>
-                    {isPlaying ? 'volume_up' : 'volume_up'}
+                    {isPlaying ? 'stop_circle' : 'volume_up'}
                   </span>
-                  {isPlaying ? t('speaking_intro.playing', { defaultValue: 'Playing...' }) : t('speaking_intro.listen_first', { defaultValue: 'Listen first' })}
+                  {isPlaying ? t('speaking_intro.stop', { defaultValue: 'Stop' }) : t('speaking_intro.listen_first', { defaultValue: 'Listen first' })}
                 </button>
                 
                 {/* Record Button */}

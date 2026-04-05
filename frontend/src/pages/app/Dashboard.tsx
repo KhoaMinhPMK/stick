@@ -47,13 +47,14 @@ export const DashboardPage: React.FC = () => {
   const chartBars = (() => {
     const now = new Date();
     const bars = [];
+    const getLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getLocalDate(d);
       const dayOfWeek = d.getDay(); // 0=Sun,1=Mon...
       const labelIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const found = dailyData.find(p => new Date(p.day).toISOString().split('T')[0] === dateStr);
+      const found = dailyData.find(p => getLocalDate(new Date(p.day)) === dateStr);
       const activity = found ? (found.journalsCount * 10 + found.minutesSpent + found.xpEarned) : 0;
       bars.push({
         label: dayLabels[labelIdx],

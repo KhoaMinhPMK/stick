@@ -27,10 +27,16 @@ export const JournalPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // Day number = how many calendar days since user joined + 1 (avoids race condition with totalJournals)
+  // Day number = calendar days since user joined + 1 (1-based)
   const dayNumber = (() => {
     if (!summary) return '...';
-    // Fallback: use totalJournals + 1 if no better signal available
+    if (summary.memberSince) {
+      const joined = new Date(summary.memberSince);
+      const now = new Date();
+      const diffMs = now.getTime() - joined.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      return Math.max(diffDays + 1, 1);
+    }
     return (summary.totalJournals || 0) + 1;
   })();
   const isVi = i18n.language === 'vi';

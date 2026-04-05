@@ -8,6 +8,7 @@ export const HistoryDetailPage: React.FC = () => {
   const { t } = useTranslation();
   const [journal, setJournal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
@@ -110,13 +111,24 @@ export const HistoryDetailPage: React.FC = () => {
                   <button
                     onClick={() => {
                       if (!enhancedText || !window.speechSynthesis) return;
+                      if (isPlayingAudio) {
+                        window.speechSynthesis.cancel();
+                        setIsPlayingAudio(false);
+                        return;
+                      }
                       window.speechSynthesis.cancel();
                       const utt = new SpeechSynthesisUtterance(enhancedText);
                       utt.lang = 'en-US';
+                      utt.onend = () => setIsPlayingAudio(false);
+                      utt.onerror = () => setIsPlayingAudio(false);
+                      setIsPlayingAudio(true);
                       window.speechSynthesis.speak(utt);
                     }}
-                    className="material-symbols-outlined text-black bg-white rounded-full p-1.5 md:p-2 border-2 border-black hover:scale-110 transition-transform text-lg md:text-2xl cursor-pointer"
-                  >volume_up</button>
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-black transition-all cursor-pointer ${isPlayingAudio ? 'bg-error-container text-error' : 'bg-white hover:bg-secondary-container hover:scale-105'}`}
+                  >
+                    <span className="material-symbols-outlined text-lg md:text-xl">{isPlayingAudio ? 'stop_circle' : 'volume_up'}</span>
+                    <span className="text-xs font-bold">{isPlayingAudio ? 'Stop' : 'Listen'}</span>
+                  </button>
                   <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest opacity-40">AI-Grammar Polish</span>
                 </div>
               </div>

@@ -278,7 +278,7 @@ export const JournalRecordPage: React.FC = () => {
                   </span>
                 </div>
                 <span className="text-[10px] md:text-sm font-bold text-outline group-hover:text-secondary">
-                  {recordState === 'playing' ? 'Pause' : t('journal_record.retry')}
+                  {recordState === 'playing' ? t('journal_record.pause', { defaultValue: 'Pause' }) : t('journal_record.playback', { defaultValue: 'Play back' })}
                 </span>
               </button>
             </div>
@@ -288,7 +288,7 @@ export const JournalRecordPage: React.FC = () => {
               onClick={handleFinish}
               className="text-xs text-on-surface-variant underline hover:text-black transition-colors mt-2"
             >
-              Skip this step
+              {t('journal_record.skip_step', { defaultValue: 'Skip this step' })}
             </button>
           </div>
 

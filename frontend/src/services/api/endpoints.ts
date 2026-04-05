@@ -248,6 +248,7 @@ export interface ProgressSummary {
   totalXp: number;
   onboardingCompleted: boolean;
   level: string;
+  memberSince: string | null;
 }
 
 export interface ProgressDailyItem {

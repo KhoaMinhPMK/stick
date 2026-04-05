@@ -111,8 +111,24 @@ export const LibraryPage: React.FC = () => {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center">
-            <span className="material-symbols-outlined text-5xl md:text-6xl text-stone-300 mb-4">search_off</span>
-            <p className="font-headline font-bold text-lg md:text-xl text-stone-400">{t('library.no_results')}</p>
+            <span className="material-symbols-outlined text-5xl md:text-6xl text-stone-300 mb-4">auto_stories</span>
+            <p className="font-headline font-bold text-lg md:text-xl text-stone-400 mb-2">
+              {search ? t('library.no_results') : t('library.coming_soon', { defaultValue: 'Lessons coming soon!' })}
+            </p>
+            {!search && (
+              <p className="text-on-surface-variant text-xs md:text-sm max-w-sm">
+                {t('library.coming_soon_desc', { defaultValue: 'We\'re preparing amazing lessons for you. In the meantime, keep writing your daily journal!' })}
+              </p>
+            )}
+            {!search && (
+              <button
+                onClick={() => (window.location.hash = '#journal')}
+                className="mt-6 px-6 py-3 sketch-border bg-primary text-white font-headline font-bold text-sm hover:bg-stone-800 transition-colors active:scale-95 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">edit_note</span>
+                {t('library.go_journal', { defaultValue: 'Write today\'s journal' })}
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">

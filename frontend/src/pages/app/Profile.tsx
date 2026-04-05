@@ -128,14 +128,14 @@ export const ProfilePage: React.FC = () => {
           </div>
 
           {/* Quick Stats */}
-          <div className="lg:col-span-4 space-y-4 md:space-y-6">
-            <div className="bg-surface-container border-2 border-black rounded-lg p-4 md:p-6 rotate-1">
+          <div className="lg:col-span-4 space-y-4 md:space-y-6 overflow-hidden">
+            <div className="bg-surface-container border-2 border-black rounded-lg p-4 md:p-6">
               <p className="text-on-surface-variant font-bold text-xs md:text-sm mb-3 md:mb-4">{t('profile.entries_month')}</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl md:text-5xl font-headline font-black text-primary">{summary?.totalJournals || 0}</span>
               </div>
             </div>
-            <div className="bg-surface-container-highest border-2 border-black rounded-lg p-4 md:p-6 -rotate-1">
+            <div className="bg-surface-container-highest border-2 border-black rounded-lg p-4 md:p-6">
               <p className="text-on-surface-variant font-bold text-xs md:text-sm mb-3 md:mb-4">{t('profile.total_points')}</p>
               <div className="flex items-center justify-between">
                 <span className="text-2xl md:text-4xl font-headline font-black text-primary">{summary?.totalXp || 0}</span>

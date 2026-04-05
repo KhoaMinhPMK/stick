@@ -180,6 +180,28 @@ export const FeedbackResultPage: React.FC = () => {
               <p className="text-on-surface-variant text-xs md:text-sm px-2 md:px-4">{encouragement}</p>
             </div>
 
+            {/* Score Explanation Card */}
+            <div className="sketch-card p-5 md:p-6 bg-surface-container">
+              <h4 className="font-headline font-bold text-sm md:text-base mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg">analytics</span>
+                {t('feedback_result.score_title', { defaultValue: 'Your Score' })}
+              </h4>
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className="text-3xl md:text-4xl font-headline font-black text-primary">{score}</span>
+                <span className="text-sm font-bold opacity-50">/100</span>
+              </div>
+              <div className="space-y-2 text-xs md:text-sm">
+                <p className="text-on-surface-variant leading-relaxed">{t('feedback_result.score_breakdown', { defaultValue: 'Score is based on:' })}</p>
+                <ul className="space-y-1.5 text-on-surface-variant">
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>{t('feedback_result.score_effort', { defaultValue: 'Effort & completeness (30%)' })}</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0"></span>{t('feedback_result.score_english', { defaultValue: 'English usage (30%)' })}</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-tertiary shrink-0"></span>{t('feedback_result.score_clarity', { defaultValue: 'Clarity of expression (20%)' })}</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>{t('feedback_result.score_grammar', { defaultValue: 'Grammar accuracy (20%)' })}</li>
+                </ul>
+                <p className="text-[10px] md:text-xs italic opacity-60 mt-2">{t('feedback_result.score_note', { defaultValue: 'Writing in Vietnamese still earns points for effort. The more English you use, the higher your score!' })}</p>
+              </div>
+            </div>
+
             {/* Actions */}
             <div className="flex flex-col gap-3 md:gap-4">
               <button

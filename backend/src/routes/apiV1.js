@@ -85,8 +85,10 @@ async function getOrCreateOnboardingState(userId) {
  * Call this whenever the user does something meaningful.
  */
 async function trackDailyProgress(userId, data = {}) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Use Vietnam timezone (UTC+7) for day boundary so users see progress on their local date
+  const vnNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  vnNow.setHours(0, 0, 0, 0);
+  const today = vnNow;
   try {
     try {
       await prisma.progressDaily.upsert({
@@ -542,10 +544,11 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
     });
   }
 
-  // Per-day submission limit: only one submitted journal per user per calendar day
-  const todayStart = new Date();
+  // Per-day submission limit: only one submitted journal per user per calendar day (Vietnam timezone)
+  const vnToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  const todayStart = new Date(vnToday);
   todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
+  const todayEnd = new Date(vnToday);
   todayEnd.setHours(23, 59, 59, 999);
   const existingToday = await prisma.journal.findFirst({
     where: {
@@ -1256,7 +1259,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
 
   let currentStreak = 0;
   let bestStreak = 0;
-  const today = new Date();
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
   today.setHours(0, 0, 0, 0);
 
   // Build a set of active date strings for fast lookup
@@ -1321,6 +1324,9 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   // Total XP
   const totalXp = dailyProgress.reduce((sum, p) => sum + p.xpEarned, 0);
 
+  // memberSince for day-number calculation
+  const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true } });
+
   res.status(200).json({
     totalJournals,
     totalWords,
@@ -1332,6 +1338,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     totalXp,
     onboardingCompleted: onboarding.completed,
     level: onboarding.level || 'beginner',
+    memberSince: user?.createdAt || null,
   });
 }));
 
