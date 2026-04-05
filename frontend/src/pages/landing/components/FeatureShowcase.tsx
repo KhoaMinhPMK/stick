@@ -26,7 +26,7 @@ export const FeatureShowcase: React.FC = () => {
         <div>
           <h3 className="text-2xl md:text-4xl font-black font-headline mb-4 md:mb-6">{t("features.journal_badge")}</h3>
           <p className="text-sm md:text-lg text-on-surface-variant mb-4 md:mb-8">
-            Low pressure. High output. Just tell STICK about your day. No prompts, no rules—just your life in English.
+            {t("features.journal_desc")}
           </p>
           <ul className="space-y-4">
             <li className="flex items-center gap-3 font-bold"><Icon name="check" className="text-tertiary" /> {t("features.journal_li1")}</li>
@@ -41,7 +41,7 @@ export const FeatureShowcase: React.FC = () => {
         <div className="order-2 lg:order-1">
           <h3 className="text-2xl md:text-4xl font-black font-headline mb-4 md:mb-6">{t("features.polish_title")}</h3>
           <p className="text-sm md:text-lg text-on-surface-variant mb-4 md:mb-8">
-            STICK doesn't just correct errors; it shows you how a native speaker would express the same thought naturally.
+            {t("features.polish_desc")}
           </p>
           <div className="p-6 bg-secondary-container rounded-2xl border-2 border-black">
             <p className="font-bold italic">"We focus on 'Nuance'—the difference between technically correct and sounding like yourself."</p>

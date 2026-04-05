@@ -73,6 +73,13 @@
     "cta": "Start your 5-minute habit",
     "trial": "7-day free trial. No credit card required."
   },
+  "demo": {
+    "scanning": "Scanning grammar & tone...",
+    "locating": "Locating awkward phrasing...",
+    "applying": "Applying native nuance...",
+    "polishing": "Finalizing sentence rhythm...",
+    "done": "Perfect native rhythm!"
+  },
   "target": {
     "headline": "Designed for the busy and ambitious.",
     "group1_title": "Students",
@@ -85,12 +92,17 @@
     "group4_desc": "Need quick, practical phrasing for daily life in an English-speaking environment."
   },
   "problem": {
+    "headline": "Why learners study for years and still can't use it.",
+    "description": "Traditional methods focus on passive consumption. You watch, you read, you listen. But you never produce. The gap between input and output is where fluency goes to die.",
+    "callout": "Knowledge ≠ Performance",
     "card1_title": "The Syllabus Trap",
     "card1_desc": "Traditional apps force you to study like \"The cat goes to school\". Zero relevance to your actual life.",
     "card2_title": "The Exam Mindset",
     "card2_desc": "You're trained to find the \"most grammatically correct\" answer, making you speak like a textbook, not a human.",
     "card3_title": "The Consistency Cliff",
-    "card3_desc": "Long sessions are hard to commit to. You binge on Sunday and forget everything by Tuesday."
+    "card3_desc": "Long sessions are hard to commit to. You binge on Sunday and forget everything by Tuesday.",
+    "card4_title": "Drill Fatigue",
+    "card4_desc": "Boring flashcards don't build emotional connections to the language."
   },
   "features": {
     "ai_badge": "Naturalness > Grammar",

@@ -28,12 +28,17 @@
     "s_desc": "Từ người học cá nhân đến toàn bộ hệ thống trường học, STICK phát triển cùng với cộng đồng người dùng."
   },
   "problem": {
+    "headline": "Tại sao học nhiều năm mà vẫn không dùng được?",
+    "description": "Các phương pháp truyền thống tập trung vào tiêu thụ thụ động. Bạn xem, đọc, nghe. Nhưng chưa bao giờ thực sự tạo ra câu. Khoảng cách giữa đầu vào và đầu ra là nơi sự lưu loát chết dần.",
+    "callout": "Kiến thức ≠ Kỹ năng",
     "card1_title": "Cái bẫy giáo trình",
     "card1_desc": "Các ứng dụng truyền thống ép bạn học theo các câu mẫu giả trân. Chúng không liên quan gì đến những thứ bạn thật sự muốn nói.",
     "card2_title": "Tư duy làm bài thi",
     "card2_desc": "Bạn bị huấn luyện để luôn đi tìm đáp án đúng ngữ pháp nhất, khiến việc giao tiếp giống bị hỏi bài thi thay vì đang trò chuyện.",
     "card3_title": "Rất dễ bỏ cuộc",
-    "card3_desc": "Thiếu kiên trì khiến bạn học bù đầu vào Chủ nhật rồi lại nhanh chóng quên sạch vào thứ Ba."
+    "card3_desc": "Thiếu kiên trì khiến bạn học bù đầu vào Chủ nhật rồi lại nhanh chóng quên sạch vào thứ Ba.",
+    "card4_title": "Mệt mỏi luyện đề",
+    "card4_desc": "Flashcard nhàm chán không tạo được kết nối cảm xúc với ngôn ngữ."
   },
   "core_loop": {
     "title": "Vòng lặp 5 phút mỗi ngày",
@@ -132,7 +137,13 @@
     "cta": "Bắt đầu thói quen 5 phút của bạn",
     "trial": "Dùng thử 7 ngày miễn phí. Không cần thẻ tín dụng."
   },
-  "footer": {
+  "demo": {
+    "scanning": "Đang quét ngữ pháp & giọng văn...",
+    "locating": "Đang tìm cách diễn đạt lúng túng...",
+    "applying": "Đang áp dụng sắc thái bản ngữ...",
+    "polishing": "Đang hoàn thiện nhịp câu...",
+    "done": "Nhịp câu chuẩn bản ngữ!"
+  },
     "product": "Sản Phẩm",
     "features": "Tính năng",
     "pricing": "Bảng giá",

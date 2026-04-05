@@ -8,10 +8,11 @@ export const Footer: React.FC = () => {
   const [subscribed, setSubscribed] = useState(false);
 
   const handleSubscribe = () => {
-    if (subEmail.includes('@')) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(subEmail)) {
       setSubscribed(true);
       setSubEmail('');
-      setTimeout(() => setSubscribed(false), 3000);
+      setTimeout(() => setSubscribed(false), 5000);
     }
   };
 

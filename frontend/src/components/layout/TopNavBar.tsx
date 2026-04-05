@@ -7,6 +7,7 @@ import logoUrl from '../../assets/logo.svg';
 export const TopNavBar: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -17,6 +18,13 @@ export const TopNavBar: React.FC = () => {
     i18n.changeLanguage(nextLang);
   };
 
+  const navLinks = [
+    { href: '#why-stick', label: t('nav.why_stick') },
+    { href: '#features', label: t('nav.features') },
+    { href: '#validation', label: t('nav.validation') },
+    { href: '#pricing', label: t('nav.pricing') },
+  ];
+
   return (
     <nav className="fixed top-0 left-0 right-0 w-full border-b-4 border-black dark:border-stone-100 bg-[#fdf9f0]/95 backdrop-blur-sm z-50">
       <div className="flex justify-between items-center w-full px-4 md:px-8 py-3 md:py-4 max-w-7xl mx-auto">
@@ -26,6 +34,7 @@ export const TopNavBar: React.FC = () => {
           onClick={(e) => {
             e.preventDefault();
             window.scrollTo(0, 0);
+            setMobileMenuOpen(false);
           }}
         >
           <img src={logoUrl} alt="STICK Logo" className="h-8 md:h-16 object-contain" />
@@ -35,21 +44,23 @@ export const TopNavBar: React.FC = () => {
         </a>
         
         <div className="hidden md:flex gap-8 items-center">
-          <a className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href="#why-stick">
-            {t('nav.why_stick')}
-          </a>
-          <a className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href="#features">
-            {t('nav.features')}
-          </a>
-          <a className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href="#validation">
-            {t('nav.validation')}
-          </a>
-          <a className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href="#pricing">
-            {t('nav.pricing')}
-          </a>
+          {navLinks.map(link => (
+            <a key={link.href} className="text-stone-600 font-medium hover:skew-x-1 hover:text-black transition-transform font-headline tracking-tight" href={link.href}>
+              {link.label}
+            </a>
+          ))}
         </div>
         
         <div className="flex items-center gap-2 md:gap-6">
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden p-2"
+            onClick={() => setMobileMenuOpen(prev => !prev)}
+            aria-label="Toggle menu"
+          >
+            <Icon name={mobileMenuOpen ? 'close' : 'menu'} className="text-[24px]" />
+          </button>
+
           {mounted && (
             <button 
               onClick={toggleLanguage}
@@ -63,11 +74,35 @@ export const TopNavBar: React.FC = () => {
           <Button 
             variant="sketch"
             onClick={() => window.location.hash = '#onboarding'}
+            className="hidden sm:inline-flex"
           >
             {t('nav.start_free')}
           </Button>
         </div>
       </div>
+
+      {/* Mobile menu dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t-2 border-black bg-[#fdf9f0] px-4 py-4 space-y-3">
+          {navLinks.map(link => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="block text-stone-700 font-medium font-headline py-2 hover:text-black transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {link.label}
+            </a>
+          ))}
+          <Button 
+            variant="sketch"
+            onClick={() => { window.location.hash = '#onboarding'; setMobileMenuOpen(false); }}
+            className="w-full sm:hidden"
+          >
+            {t('nav.start_free')}
+          </Button>
+        </div>
+      )}
     </nav>
   );
 };

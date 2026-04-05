@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const stepOrder = [
   'idle', 'typing', 'reading', 'scanning', 
@@ -8,6 +9,7 @@ const stepOrder = [
 ];
 
 export const InteractiveJournalDemo: React.FC = () => {
+  const { t } = useTranslation();
   const wrongText = "Today I very happy cus finish my project.";
   
   const [step, setStep] = useState<string>('idle');
@@ -134,7 +136,7 @@ export const InteractiveJournalDemo: React.FC = () => {
       return (
         <div className="flex items-center gap-2 text-secondary font-bold text-sm bg-secondary-container px-4 py-2 rounded-full sketch-border w-fit animate-pulse">
           <span className="material-symbols-outlined text-base animate-spin-slow">radar</span>
-          <span>Scanning grammar & tone...</span>
+          <span>{t('demo.scanning', { defaultValue: 'Scanning grammar & tone...' })}</span>
         </div>
       );
     }
@@ -143,7 +145,7 @@ export const InteractiveJournalDemo: React.FC = () => {
       return (
         <div className="flex items-center gap-2 text-error font-bold text-sm bg-error-container/20 px-4 py-2 rounded-full border-2 border-error w-fit transition-all shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
           <span className="material-symbols-outlined text-base">manage_search</span>
-          <span>Locating awkward phrasing...</span>
+          <span>{t('demo.locating', { defaultValue: 'Locating awkward phrasing...' })}</span>
         </div>
       );
     }
@@ -152,7 +154,7 @@ export const InteractiveJournalDemo: React.FC = () => {
       return (
         <div className="flex items-center gap-2 text-tertiary font-bold text-sm bg-tertiary-container/30 px-4 py-2 rounded-full border-2 border-tertiary w-fit transition-all shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
           <span className="material-symbols-outlined text-base animate-spin">sync</span>
-          <span>Applying native nuance...</span>
+          <span>{t('demo.applying', { defaultValue: 'Applying native nuance...' })}</span>
         </div>
       );
     }
@@ -161,7 +163,7 @@ export const InteractiveJournalDemo: React.FC = () => {
       return (
         <div className="flex items-center gap-2 text-primary font-bold text-sm bg-primary-container/40 px-4 py-2 rounded-full border-2 border-primary w-fit transition-all scale-105 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
           <span className="material-symbols-outlined text-base animate-bounce">auto_awesome</span>
-          <span>Finalizing sentence rhythm...</span>
+          <span>{t('demo.polishing', { defaultValue: 'Finalizing sentence rhythm...' })}</span>
         </div>
       );
     }
@@ -170,7 +172,7 @@ export const InteractiveJournalDemo: React.FC = () => {
       return (
         <div className="flex items-center gap-2 text-white font-bold text-sm bg-black px-5 py-2.5 rounded-full sketch-border w-fit" style={{ animation: 'pop 0.4s ease-out' }}>
           <span className="material-symbols-outlined text-base text-tertiary">verified</span>
-          <span>Perfect native rhythm!</span>
+          <span>{t('demo.done', { defaultValue: 'Perfect native rhythm!' })}</span>
         </div>
       );
     }
