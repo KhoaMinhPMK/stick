@@ -54,6 +54,12 @@ export const FeedbackResultPage: React.FC = () => {
   if (!journal) {
     return (
       <AppLayout activePath="#journal">
+        {loadError && (
+          <div className="bg-error/10 border border-error/30 rounded-xl p-4 mb-4 flex items-center gap-2 max-w-5xl mx-auto">
+            <span className="material-symbols-outlined text-error">error</span>
+            <span className="text-error font-medium text-sm">{loadError}</span>
+          </div>
+        )}
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
           <p className="font-headline font-bold text-xl">{t('feedback_result.not_found', { defaultValue: 'Result not found' })}</p>

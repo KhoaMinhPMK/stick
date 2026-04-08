@@ -48,6 +48,13 @@ export const AchievementsPage: React.FC = () => {
           </p>
         </div>
 
+        {error && (
+          <div className="bg-error/10 border border-error/30 rounded-xl p-4 mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-error">error</span>
+            <span className="text-error font-medium text-sm">{error}</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>

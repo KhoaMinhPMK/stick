@@ -98,6 +98,12 @@ export const SettingsPage: React.FC = () => {
     <>
     <AppLayout activePath="#settings">
       <div className="max-w-6xl mx-auto">
+        {loadError && (
+          <div className="bg-error/10 border border-error/30 rounded-xl p-4 mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-error">error</span>
+            <span className="text-error font-medium text-sm">{loadError}</span>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-6 md:mb-12">
           <button onClick={() => (window.location.hash = '#profile')} className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors mb-3 md:mb-4 group">

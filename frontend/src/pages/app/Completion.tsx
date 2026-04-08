@@ -62,6 +62,12 @@ export const CompletionPage: React.FC = () => {
 
   return (
     <AppLayout activePath="#journal">
+      {loadError && (
+        <div className="bg-error/10 border border-error/30 rounded-xl p-4 mb-4 flex items-center gap-2 max-w-5xl mx-auto">
+          <span className="material-symbols-outlined text-error">error</span>
+          <span className="text-error font-medium text-sm">{loadError}</span>
+        </div>
+      )}
       <div className="flex items-center justify-center py-8">
         <div className="max-w-5xl w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           
