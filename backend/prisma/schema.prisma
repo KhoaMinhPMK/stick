@@ -26,6 +26,12 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // Cached EXP / streak fields (updated via awardXp + streak logic)
+  totalXp          Int       @default(0)
+  currentStreak    Int       @default(0)
+  bestStreak        Int       @default(0)
+  lastActiveDate   DateTime? @db.Date
+
   sessions         Session[]
   onboarding       OnboardingState?
   journals         Journal[]
@@ -39,6 +45,7 @@ model User {
   progressDaily    ProgressDaily[]
   errorPatterns    LearnerErrorPattern[]
   lexiconItems     LearnerLexicon[]
+  xpLogs           UserXpLog[]
 }
 
 // ─── Auth ────────────────────────────────────────────
@@ -341,4 +348,19 @@ model AppConfig {
   value     String   @db.LongText
   updatedBy String?
   updatedAt DateTime @updatedAt
+}
+
+// ─── XP Log ──────────────────────────────────────────
+model UserXpLog {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int
+  source      String   // "journal", "feedback", "vocab", "phrase", "session", "achievement"
+  description String?
+  journalId   String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
 }

@@ -284,6 +284,21 @@ export const FeedbackResultPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                {/* CTA to view saved words in notebook */}
+                {savedCount > 0 && (
+                  <div className="mt-4 pt-4 border-t-2 border-dashed border-black/20 flex items-center justify-between gap-2">
+                    <p className="text-xs text-on-surface-variant font-body">
+                      {t('feedback_result.words_saved_notebook', { count: savedCount, defaultValue: '{{count}} word(s) saved to notebook' })}
+                    </p>
+                    <button
+                      onClick={() => { window.location.hash = '#vocab-notebook'; }}
+                      className="shrink-0 text-xs font-headline font-bold flex items-center gap-1 text-primary hover:text-stone-800 transition-colors"
+                    >
+                      {t('feedback_result.view_notebook', { defaultValue: 'View Notebook' })}
+                      <span className="material-symbols-outlined text-sm">auto_stories</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

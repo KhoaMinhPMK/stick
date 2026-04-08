@@ -569,6 +569,7 @@ async function checkAndUnlockAchievements(userId) {
         // Award XP
         if (def.xpReward > 0) {
           await trackDailyProgress(userId, { xp: def.xpReward });
+          awardXp(userId, def.xpReward, 'achievement', { description: `Achievement: ${def.title}` });
         }
 
         newlyUnlocked.push(def);
@@ -589,6 +590,71 @@ async function checkAndUnlockAchievements(userId) {
   } catch (err) {
     console.error('checkAndUnlockAchievements error:', err.message);
     return [];
+  }
+}
+
+// ─── Level / EXP System ──────────────────────────────
+const LEVEL_THRESHOLDS = [
+  { level: 1, minXp: 0,    name: 'Newbie',        badge: '🌱' },
+  { level: 2, minXp: 100,  name: 'Explorer',      badge: '🌿' },
+  { level: 3, minXp: 250,  name: 'Learner',       badge: '📖' },
+  { level: 4, minXp: 500,  name: 'Practitioner',  badge: '✏️' },
+  { level: 5, minXp: 1000, name: 'Communicator',  badge: '💬' },
+  { level: 6, minXp: 2000, name: 'Fluent',        badge: '🗣️' },
+  { level: 7, minXp: 4000, name: 'Advanced',      badge: '🎓' },
+  { level: 8, minXp: 8000, name: 'Master',        badge: '🏆' },
+];
+
+function getLevelInfo(totalXp) {
+  const xp = Math.max(0, totalXp || 0);
+  let tier = LEVEL_THRESHOLDS[0];
+  for (const t of LEVEL_THRESHOLDS) {
+    if (xp >= t.minXp) tier = t;
+    else break;
+  }
+  const isMax = tier.level === LEVEL_THRESHOLDS.length;
+  const nextTier = isMax ? null : LEVEL_THRESHOLDS[tier.level]; // tier.level is 1-based, so index = tier.level
+  const xpIntoLevel = xp - tier.minXp;
+  const xpForLevel = isMax ? tier.minXp : (nextTier.minXp - tier.minXp);
+  const progressPct = isMax ? 100 : Math.min(100, Math.round((xpIntoLevel / xpForLevel) * 100));
+  return {
+    level: tier.level,
+    name: tier.name,
+    badge: tier.badge,
+    totalXp: xp,
+    xpIntoLevel,
+    xpForLevel,
+    progressPct,
+    isMax,
+  };
+}
+
+/**
+ * Award XP to a user: logs to UserXpLog + increments User.totalXp cache.
+ * Non-blocking — errors are swallowed to never break the main request.
+ */
+async function awardXp(userId, amount, source, opts = {}) {
+  if (!amount || amount <= 0) return;
+  try {
+    const id = require('crypto').randomUUID();
+    await Promise.all([
+      prisma.userXpLog.create({
+        data: {
+          id,
+          userId,
+          amount,
+          source,
+          description: opts.description || null,
+          journalId: opts.journalId || null,
+        },
+      }),
+      prisma.user.update({
+        where: { id: userId },
+        data: { totalXp: { increment: amount } },
+      }),
+    ]);
+  } catch (err) {
+    console.error('awardXp error:', err.message);
   }
 }
 
@@ -927,6 +993,7 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
 
   // Track daily progress: +1 journal, +10 XP
   await trackDailyProgress(req.authUser.id, { journals: 1, xp: 10 });
+  awardXp(req.authUser.id, 10, 'journal', { description: 'New journal entry', journalId: journal.id });
 
   res.status(201).json({ journal });
 }));
@@ -1149,6 +1216,9 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
       // Track XP based on score
       const bonusXp = Math.round((feedback.overallScore || 0) / 5);
       await trackDailyProgress(req.authUser.id, { xp: bonusXp });
+      if (bonusXp > 0) {
+        awardXp(req.authUser.id, bonusXp, 'feedback', { description: `Score ${feedback.overallScore}/100`, journalId });
+      }
 
       // Create a LearningSession record for history
       await prisma.learningSession.create({
@@ -1235,11 +1305,12 @@ router.post('/journals/:id/import-vocab', requireAuth, asyncHandler(async (req, 
   for (const item of items.slice(0, 10)) {
     if (!item.word || typeof item.word !== 'string') continue;
 
-    // Case-insensitive dedup: skip if this word is already in the notebook
+    // Dedup: skip if this word is already in the notebook
+    // MySQL utf8mb4_unicode_ci collation is case-insensitive by default — no mode needed
     const existing = await prisma.vocabNotebookItem.findFirst({
       where: {
         userId: req.authUser.id,
-        word: { equals: item.word.trim(), mode: 'insensitive' },
+        word: item.word.trim(),
       },
       select: { id: true },
     });
@@ -1267,6 +1338,7 @@ router.post('/journals/:id/import-vocab', requireAuth, asyncHandler(async (req, 
 
   if (saved > 0) {
     await trackDailyProgress(req.authUser.id, { words: saved, xp: saved * 3 });
+    awardXp(req.authUser.id, saved * 3, 'vocab', { description: `Saved ${saved} word(s) from AI feedback`, journalId });
     checkAndUnlockAchievements(req.authUser.id).catch(() => {});
   }
 
@@ -1301,6 +1373,7 @@ router.post('/learning-sessions', requireAuth, asyncHandler(async (req, res) => 
   const xp = xpMap[type] || 0;
   if (xp > 0) {
     await trackDailyProgress(req.authUser.id, { xp });
+    awardXp(req.authUser.id, xp, 'session', { description: `Practice: ${type}` });
   }
 
   res.status(201).json({ session });
@@ -1515,6 +1588,7 @@ router.post('/phrases', requireAuth, asyncHandler(async (req, res) => {
 
   // Track daily progress: +2 XP
   await trackDailyProgress(req.authUser.id, { xp: 2 });
+  awardXp(req.authUser.id, 2, 'phrase', { description: 'Saved a phrase' });
 
   // Check achievements (phrase_collector)
   checkAndUnlockAchievements(req.authUser.id).catch(() => {});
@@ -1564,6 +1638,7 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
 
   // Track daily progress: +1 word, +3 XP
   await trackDailyProgress(req.authUser.id, { words: 1, xp: 3 });
+  awardXp(req.authUser.id, 3, 'vocab', { description: 'Added word to notebook' });
 
   // Check achievements (vocab milestones)
   checkAndUnlockAchievements(req.authUser.id).catch(() => {});
@@ -1825,15 +1900,9 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     ? Math.round(journals.reduce((s, j) => s + j.score, 0) / journals.length)
     : 0;
 
-  // Total XP — sum from ALL daily progress, not just last 60 days
-  const allXpProgress = await prisma.progressDaily.findMany({
-    where: { userId: req.authUser.id },
-    select: { xpEarned: true },
-  });
-  const totalXp = allXpProgress.reduce((sum, p) => sum + p.xpEarned, 0);
-
-  // memberSince for day-number calculation
-  const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true } });
+  // memberSince + cached totalXp — single user query instead of SUM(ProgressDaily)
+  const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true, totalXp: true } });
+  const totalXp = user?.totalXp ?? 0;
 
   // Today's journal check (Vietnam timezone) — unified day logic
   const vnToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -1860,12 +1929,32 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     bestStreak,
     avgScore,
     totalXp,
+    levelInfo: getLevelInfo(totalXp),
     onboardingCompleted: onboarding.completed,
     level: onboarding.level || 'beginner',
     memberSince: user?.createdAt || null,
     todayCompleted,
     todayJournalId,
     dayNumber,
+  });
+}));
+
+// ─── XP History ──────────────────────────────────────
+router.get('/xp/history', requireAuth, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const logs = await prisma.userXpLog.findMany({
+    where: { userId: req.authUser.id },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  const user = await prisma.user.findUnique({
+    where: { id: req.authUser.id },
+    select: { totalXp: true },
+  });
+  res.status(200).json({
+    totalXp: user?.totalXp ?? 0,
+    levelInfo: getLevelInfo(user?.totalXp ?? 0),
+    logs,
   });
 }));
 

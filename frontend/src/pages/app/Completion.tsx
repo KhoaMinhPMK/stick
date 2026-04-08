@@ -60,6 +60,7 @@ export const CompletionPage: React.FC = () => {
   const streak = summary?.currentStreak || 0;
   const totalWords = summary?.totalWords || 0;
   const dayNumber = summary?.dayNumber || 0;
+  const levelInfo = summary?.levelInfo;
 
   return (
     <AppLayout activePath="#journal">
@@ -123,6 +124,37 @@ export const CompletionPage: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Level / XP Card */}
+            {levelInfo && !loading && (
+              <div className="p-5 md:p-6 bg-surface-container sketch-border sketch-card cursor-default">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{levelInfo.badge}</span>
+                    <div>
+                      <p className="font-headline font-bold text-sm">{t('completion.level_label', { defaultValue: 'Level {{level}}', level: levelInfo.level })}</p>
+                      <p className="font-body text-xs text-on-surface-variant">{levelInfo.name}</p>
+                    </div>
+                  </div>
+                  <span className="font-headline font-black text-xl text-primary">{levelInfo.totalXp} <span className="text-sm font-bold text-on-surface-variant">XP</span></span>
+                </div>
+                {!levelInfo.isMax ? (
+                  <>
+                    <div className="w-full h-2.5 bg-surface-dim rounded-full overflow-hidden border border-black/10">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-700"
+                        style={{ width: `${levelInfo.progressPct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-on-surface-variant mt-1.5 text-right">
+                      {levelInfo.xpIntoLevel} / {levelInfo.xpForLevel} XP {t('completion.xp_to_next', { defaultValue: 'to next level' })}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-tertiary font-bold mt-1">{t('completion.xp_max', { defaultValue: 'Max level reached! 🏆' })}</p>
+                )}
+              </div>
+            )}
 
             {/* Mood Check Section */}
             <div className="space-y-4 pt-2 md:pt-4">

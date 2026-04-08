@@ -252,6 +252,17 @@ export async function createLearningSession(data: {
 }
 
 // ─── Progress ────────────────────────────────────────
+export interface LevelInfo {
+  level: number;
+  name: string;
+  badge: string;
+  totalXp: number;
+  xpIntoLevel: number;
+  xpForLevel: number;
+  progressPct: number;
+  isMax: boolean;
+}
+
 export interface ProgressSummary {
   totalJournals: number;
   totalWords: number;
@@ -261,12 +272,28 @@ export interface ProgressSummary {
   bestStreak: number;
   avgScore: number;
   totalXp: number;
+  levelInfo: LevelInfo;
   onboardingCompleted: boolean;
   level: string;
   memberSince: string | null;
   todayCompleted: boolean;
   todayJournalId: string | null;
   dayNumber: number;
+}
+
+export interface XpLogEntry {
+  id: string;
+  amount: number;
+  source: string;
+  description: string | null;
+  journalId: string | null;
+  createdAt: string;
+}
+
+export interface XpHistory {
+  totalXp: number;
+  levelInfo: LevelInfo;
+  logs: XpLogEntry[];
 }
 
 export interface ProgressDailyItem {
@@ -280,6 +307,10 @@ export interface ProgressDailyItem {
 
 export async function getProgressSummary() {
   return apiRequest<ProgressSummary>('/progress/summary');
+}
+
+export async function getXpHistory(limit = 20) {
+  return apiRequest<XpHistory>(`/xp/history?limit=${limit}`);
 }
 
 export async function getProgressDaily(days = 30) {

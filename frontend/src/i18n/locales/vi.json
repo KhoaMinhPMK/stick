@@ -500,7 +500,9 @@
                             "word_saved":  "Đã lưu ✓",
                             "save_all_words":  "Lưu tất cả vào sổ",
                             "vocab_saved_count":  "Đã lưu {{count}} từ",
-                            "vocab_already_saved":  "Đã có trong sổ"
+                            "vocab_already_saved":  "Đã có trong sổ",
+                            "words_saved_notebook":  "Đã lưu {{count}} từ vào sổ tay",
+                            "view_notebook":  "Xem Sổ Tay"
                         },
     "progress":  {
                      "title":  "Bảng Kiên Trì",
@@ -583,7 +585,10 @@
                        "mood_saved":  "✓ Đã lưu cảm xúc!",
                        "mood_error":  "Không lưu được cảm xúc. Nhấn để thử lại.",
                        "view_progress":  "Xem tiến trình",
-                       "error_load":  "Không thể tải tổng kết."
+                       "error_load":  "Không thể tải tổng kết.",
+                       "level_label":  "Cấp {{level}}",
+                       "xp_to_next":  "đến cấp tiếp theo",
+                       "xp_max":  "Đã đạt cấp tối đa! 🏆"
                    },
     "skeleton":  {
                      "title":  "Đang chuẩn bị bút chì...",

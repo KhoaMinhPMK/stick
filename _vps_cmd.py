@@ -24,5 +24,9 @@ def run_cmd(cmd, timeout=60):
     return code
 
 if __name__ == "__main__":
-    cmd = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "echo connected"
-    run_cmd(cmd)
+    args = sys.argv[1:]
+    t = 60
+    if len(args) >= 2 and args[-1].isdigit():
+        t = int(args.pop())
+    cmd = " ".join(args) if args else "echo connected"
+    run_cmd(cmd, timeout=t)

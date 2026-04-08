@@ -22,7 +22,17 @@ CREATE TABLE IF NOT EXISTS `LearnerErrorPattern` (
     FOREIGN KEY (`userId`) REFERENCES `User` (`id`) ON DELETE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- 2. New columns on VocabNotebookItem
-ALTER TABLE `VocabNotebookItem`
-  ADD COLUMN IF NOT EXISTS `sourceJournalId` VARCHAR(36) NULL AFTER `notes`,
-  ADD COLUMN IF NOT EXISTS `fromAI` TINYINT(1) NOT NULL DEFAULT 0 AFTER `sourceJournalId`;
+-- 2. New columns on VocabNotebookItem (MySQL 8.0 compat — no IF NOT EXISTS for ADD COLUMN)
+SET @col_exists_src = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'VocabNotebookItem' AND COLUMN_NAME = 'sourceJournalId');
+SET @sql_src = IF(@col_exists_src = 0,
+  'ALTER TABLE `VocabNotebookItem` ADD COLUMN `sourceJournalId` VARCHAR(36) NULL AFTER `notes`',
+  'SELECT 1');
+PREPARE stmt FROM @sql_src; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists_ai = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'VocabNotebookItem' AND COLUMN_NAME = 'fromAI');
+SET @sql_ai = IF(@col_exists_ai = 0,
+  'ALTER TABLE `VocabNotebookItem` ADD COLUMN `fromAI` TINYINT(1) NOT NULL DEFAULT 0 AFTER `sourceJournalId`',
+  'SELECT 1');
+PREPARE stmt FROM @sql_ai; EXECUTE stmt; DEALLOCATE PREPARE stmt;

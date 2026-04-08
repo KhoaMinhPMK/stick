@@ -500,7 +500,9 @@
                             "word_saved":  "Saved âœ“",
                             "save_all_words":  "Save all to notebook",
                             "vocab_saved_count":  "Saved {{count}} word(s)",
-                            "vocab_already_saved":  "Already in notebook"
+                            "vocab_already_saved":  "Already in notebook",
+                            "words_saved_notebook":  "{{count}} word(s) saved to your notebook",
+                            "view_notebook":  "View Notebook"
                         },
     "progress":  {
                      "title":  "Consistency Board",
@@ -583,7 +585,10 @@
                        "mood_saved":  "✓ Mood saved!",
                        "mood_error":  "Couldn\u0027t save mood. Tap to retry.",
                        "view_progress":  "View Progress",
-                       "error_load":  "Couldn\u0027t load your summary."
+                       "error_load":  "Couldn\u0027t load your summary.",
+                       "level_label":  "Level {{level}}",
+                       "xp_to_next":  "to next level",
+                       "xp_max":  "Max level reached! 🏆"
                    },
     "skeleton":  {
                      "title":  "Sharpening pencils...",
