@@ -15,6 +15,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
   const navItems = [
     { id: '#app', icon: 'home', label: t('navigation.home') },
     { id: '#journal', icon: 'edit_note', label: t('navigation.journal') },
+    { id: '#vocab-notebook', icon: 'book_5', label: t('navigation.vocab') },
     { id: '#progress', icon: 'trending_up', label: t('navigation.progress') },
     { id: '#history', icon: 'history', label: t('navigation.history') },
     { id: '#library', icon: 'menu_book', label: t('navigation.library') },
@@ -25,7 +26,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
   const mobileNavItems = [
     { id: '#app', icon: 'home', label: t('navigation.home') },
     { id: '#journal', icon: 'edit_note', label: t('navigation.journal') },
-    { id: '#library', icon: 'menu_book', label: t('navigation.library') },
+    { id: '#vocab-notebook', icon: 'book_5', label: t('navigation.vocab') },
     { id: '#history', icon: 'history', label: t('navigation.history') },
     { id: '#profile', icon: 'person', label: t('navigation.profile') },
   ];

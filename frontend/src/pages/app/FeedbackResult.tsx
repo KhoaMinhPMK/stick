@@ -342,15 +342,14 @@ export const FeedbackResultPage: React.FC = () => {
                 onClick={() => (window.location.hash = `#speaking-intro?journalId=${id}`)}
                 className="w-full py-4 md:py-6 sketch-border bg-primary text-white font-headline font-black text-base md:text-xl flex items-center justify-center gap-2 md:gap-3 hover:bg-stone-800 transition-colors active:scale-95"
               >
-                {t('feedback_result.practice_speaking')}
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
+                {t('feedback_result.continue')} <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
               </button>
               <div className="grid grid-cols-1 gap-2 md:gap-3">
                 <button
                   onClick={() => (window.location.hash = `#completion?journalId=${id}`)}
                   className="w-full py-3 md:py-4 sketch-border bg-surface-container-highest font-headline font-bold text-sm md:text-base hover:bg-secondary-container transition-colors flex items-center justify-center gap-2 active:scale-95"
                 >
-                  {t('feedback_result.continue')} <span className="material-symbols-outlined text-sm md:text-base">arrow_forward</span>
+                  {t('feedback_result.skip_speaking', { defaultValue: 'Skip to Done' })} <span className="material-symbols-outlined text-sm md:text-base">check_circle</span>
                 </button>
                 <button
                   onClick={() => (window.location.hash = '#journal-workspace')}

@@ -294,6 +294,7 @@
     "navigation":  {
                        "home":  "Home",
                        "journal":  "Journal",
+                       "vocab":  "Words",
                        "progress":  "Progress",
                        "history":  "History",
                        "library":  "Library",
@@ -490,7 +491,8 @@
                             "great_progress":  "Great progress!",
                             "encouragement":  "Your storytelling is getting much clearer. Try speaking this version out loud to lock in the rhythm.",
                             "practice_speaking":  "Practice speaking",
-                            "continue":  "Continue",
+                            "continue":  "Continue to Speaking",
+                            "skip_speaking":  "Skip to Done",
                             "try_another":  "Try another version",
                             "daily_goal":  "Daily Goal",
                             "streak_hint":  "One more entry to hit your 7-day streak!",

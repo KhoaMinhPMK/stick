@@ -49,6 +49,7 @@ export async function adminLogin(email: string, password: string): Promise<Admin
     method: 'POST',
     body: { email, password },
     token: null,
+    _noRetry: true,
   } as Parameters<typeof apiRequest>[1]);
   localStorage.setItem(ADMIN_TOKEN_KEY, res.accessToken);
   localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(res.user));

@@ -2310,6 +2310,9 @@ router.post('/admin/login', asyncHandler(async (req, res) => {
   if (user.role !== 'admin') {
     return res.status(403).json({ code: 'NOT_ADMIN', message: 'This account does not have admin access' });
   }
+  if (user.status && user.status !== 'active') {
+    return res.status(403).json({ code: 'ACCOUNT_INACTIVE', message: 'This account is inactive' });
+  }
 
   const accessToken = await createSession(user.id);
   res.status(200).json({ accessToken, user: sanitizeUser(user) });

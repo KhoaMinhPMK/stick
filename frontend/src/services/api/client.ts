@@ -89,7 +89,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   // 401 recovery: distinguish between guest and real users.
   // – If a real (non-guest) user gets 401, their session expired → redirect to login instead of silently replacing with a guest.
   // – If no user was stored or user was a guest, create a fresh guest session and retry once.
-  if (response.status === 401 && !_noRetry && path !== '/auth/firebase/login' && path !== '/auth/register' && path !== '/auth/login') {
+  if (response.status === 401 && !_noRetry && path !== '/auth/firebase/login' && path !== '/auth/register' && path !== '/auth/login' && path !== '/admin/login') {
     const storedUserJson = localStorage.getItem(USER_KEY);
     let wasRealUser = false;
     if (storedUserJson) {
