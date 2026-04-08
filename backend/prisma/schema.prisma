@@ -51,6 +51,7 @@ model User {
   errorPatterns    LearnerErrorPattern[]
   lexiconItems     LearnerLexicon[]
   xpLogs           UserXpLog[]
+  streakFreezes    StreakFreeze[]
 }
 
 // ─── Auth ────────────────────────────────────────────
@@ -353,6 +354,24 @@ model AppConfig {
   value     String   @db.LongText
   updatedBy String?
   updatedAt DateTime @updatedAt
+}
+
+// ─── Streak Freeze ──────────────────────────────────
+model StreakFreeze {
+  id          String    @id @default(uuid())
+  userId      String
+  source      String    @default("admin")  // "admin" | "achievement" | "reward"
+  note        String?   @db.Text
+  grantedBy   String?   // null = system/achievement; admin userId if manual
+  grantedAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  usedAt      DateTime?
+  usedForDate DateTime? @db.Date
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, usedAt])
 }
 
 // ─── XP Log ──────────────────────────────────────────

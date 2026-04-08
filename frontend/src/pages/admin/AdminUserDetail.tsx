@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { getUser, patchUser } from '../../services/api/admin.api';
+import { getUser, patchUser, getAdminUserStreakFreezes, grantStreakFreeze, revokeStreakFreeze } from '../../services/api/admin.api';
+import type { AdminStreakFreeze } from '../../services/api/admin.api';
 import type { AdminUserDetailDTO } from '../../types/dto/admin.dto';
 
 function getQueryParam(key: string): string | null {
@@ -18,6 +19,61 @@ export const AdminUserDetailPage: React.FC = () => {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+
+  // Streak freezes state
+  const [freezes, setFreezes] = useState<{ available: AdminStreakFreeze[]; used: AdminStreakFreeze[]; expired: AdminStreakFreeze[]; availableCount: number } | null>(null);
+  const [freezeLoading, setFreezeLoading] = useState(false);
+  const [grantCount, setGrantCount] = useState(1);
+  const [grantNote, setGrantNote] = useState('');
+  const [grantExpiry, setGrantExpiry] = useState('');
+  const [freezeMsg, setFreezeMsg] = useState('');
+  const [freezeError, setFreezeError] = useState('');
+
+  const loadFreezes = async () => {
+    if (!userId) return;
+    try {
+      const res = await getAdminUserStreakFreezes(userId);
+      setFreezes(res);
+    } catch {
+      // non-critical — fail silently
+    }
+  };
+
+  const handleGrantFreeze = async () => {
+    if (!userId) return;
+    setFreezeLoading(true);
+    setFreezeMsg('');
+    setFreezeError('');
+    try {
+      await grantFreeze(userId, grantCount, grantNote || undefined, grantExpiry || undefined);
+      setFreezeMsg(`Granted ${grantCount} freeze${grantCount > 1 ? 's' : ''}`);
+      setGrantNote('');
+      setGrantExpiry('');
+      await loadFreezes();
+      setTimeout(() => setFreezeMsg(''), 3000);
+    } catch (err: unknown) {
+      setFreezeError(err instanceof Error ? err.message : 'Grant failed');
+    } finally {
+      setFreezeLoading(false);
+    }
+  };
+
+  const handleRevokeFreeze = async (freezeId: string) => {
+    if (!userId || !confirm('Revoke this streak freeze?')) return;
+    setFreezeLoading(true);
+    try {
+      await revokeFreeze(userId, freezeId);
+      await loadFreezes();
+    } catch (err: unknown) {
+      setFreezeError(err instanceof Error ? err.message : 'Revoke failed');
+    } finally {
+      setFreezeLoading(false);
+    }
+  };
+
+  // Aliases to avoid name collision with imported functions
+  const grantFreeze = grantStreakFreeze;
+  const revokeFreeze = revokeStreakFreeze;
 
   const handlePatch = async (patch: { role?: string; status?: string; isPremium?: boolean }) => {
     if (!userId) return;
@@ -56,6 +112,7 @@ export const AdminUserDetailPage: React.FC = () => {
       .then(setData)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load user'))
       .finally(() => setLoading(false));
+    loadFreezes();
   }, [userId]);
 
   if (loading) {
@@ -268,6 +325,106 @@ export const AdminUserDetailPage: React.FC = () => {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </div>
+
+        {/* Streak Freeze Management */}
+        <div className="border-2 border-black rounded-2xl overflow-hidden bg-surface-container-lowest mt-6">
+          <div className="px-5 py-3 border-b-2 border-black flex items-center justify-between">
+            <h3 className="font-headline font-bold text-sm flex items-center gap-2">
+              <span>🛡️</span> Streak Freezes
+              {freezes !== null && (
+                <span className="text-xs font-normal text-on-surface-variant">
+                  ({freezes.availableCount} available)
+                </span>
+              )}
+            </h3>
+          </div>
+
+          {/* Grant Form */}
+          <div className="px-5 py-4 border-b border-outline-variant bg-surface-container">
+            <p className="text-xs font-headline font-bold text-outline uppercase mb-3">Grant Freezes</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="text-[10px] font-headline uppercase text-outline block mb-1">Count</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={grantCount}
+                  onChange={(e) => setGrantCount(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+                  className="w-16 border-2 border-outline-variant rounded-lg px-2 py-1.5 text-sm font-headline font-bold text-center focus:border-primary outline-none"
+                />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-[10px] font-headline uppercase text-outline block mb-1">Note (optional)</label>
+                <input
+                  type="text"
+                  value={grantNote}
+                  onChange={(e) => setGrantNote(e.target.value.slice(0, 200))}
+                  placeholder="e.g. Compensation for outage"
+                  className="w-full border-2 border-outline-variant rounded-lg px-3 py-1.5 text-sm focus:border-primary outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-headline uppercase text-outline block mb-1">Expires (optional)</label>
+                <input
+                  type="date"
+                  value={grantExpiry}
+                  onChange={(e) => setGrantExpiry(e.target.value)}
+                  className="border-2 border-outline-variant rounded-lg px-2 py-1.5 text-sm focus:border-primary outline-none"
+                />
+              </div>
+              <button
+                onClick={handleGrantFreeze}
+                disabled={freezeLoading}
+                className="flex items-center gap-1.5 px-4 py-2 border-2 border-primary text-primary font-headline font-bold text-xs rounded-xl hover:bg-primary-container disabled:opacity-50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                Grant
+              </button>
+            </div>
+            {freezeMsg && <p className="mt-2 text-xs font-bold text-tertiary">{freezeMsg}</p>}
+            {freezeError && <p className="mt-2 text-xs font-bold text-error">{freezeError}</p>}
+          </div>
+
+          {/* Available Freezes List */}
+          <div className="divide-y divide-outline-variant">
+            {freezes === null ? (
+              <div className="px-5 py-4 text-xs text-outline">Loading freezes...</div>
+            ) : freezes.available.length === 0 && freezes.used.length === 0 ? (
+              <div className="px-5 py-4 text-xs text-outline text-center">No streak freezes for this user</div>
+            ) : (
+              <>
+                {freezes.available.map((f) => (
+                  <div key={f.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-container transition-colors">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-headline font-bold uppercase px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container">Available</span>
+                        <span className="text-xs text-outline">Granted {f.grantedAt.slice(0, 10)}</span>
+                        {f.expiresAt && <span className="text-xs text-orange-600">Expires {f.expiresAt.slice(0, 10)}</span>}
+                      </div>
+                      {f.note && <p className="text-xs text-on-surface-variant mt-0.5">{f.note}</p>}
+                    </div>
+                    <button
+                      onClick={() => handleRevokeFreeze(f.id)}
+                      disabled={freezeLoading}
+                      className="text-[10px] font-headline font-bold text-error border border-error px-2 py-0.5 rounded-lg hover:bg-error-container disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+                {freezes.used.slice(0, 5).map((f) => (
+                  <div key={f.id} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors opacity-60">
+                    <span className="text-[10px] font-headline font-bold uppercase px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant shrink-0">Used</span>
+                    <span className="text-xs text-outline">
+                      Protected {f.usedForDate ? f.usedForDate.slice(0, 10) : '—'} · Used {f.usedAt ? f.usedAt.slice(0, 10) : '—'}
+                    </span>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>

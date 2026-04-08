@@ -438,6 +438,206 @@ async function createNotification(userId, { type, title, body, data }) {
 }
 
 /**
+ * Auto-consume a streak freeze if the user missed exactly yesterday and has an available freeze.
+ * Called fire-and-forget after any trackDailyProgress() for journal activity.
+ * Logic: today has activity, yesterday has NO activity, day-before-yesterday had activity
+ *        (or yesterday-minus-1 was already frozen) → consume oldest valid freeze.
+ */
+async function autoConsumeStreakFreeze(userId) {
+  try {
+    const now = new Date();
+    const toVnStr = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+    const todayVnStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const todayUtc   = new Date(todayVnStr + 'T00:00:00.000Z');
+    const yesterday  = new Date(todayUtc.getTime() - 86400000);
+    const dayBefore  = new Date(todayUtc.getTime() - 172800000);
+
+    // Check if yesterday already has activity (no gap to fill)
+    const ydProgress = await prisma.progressDaily.findUnique({
+      where: { userId_day: { userId, day: yesterday } },
+    });
+    const ydActive = ydProgress && (
+      ydProgress.journalsCount > 0 || ydProgress.minutesSpent > 0 ||
+      ydProgress.xpEarned > 0 || ydProgress.wordsLearned > 0
+    );
+    if (ydActive) return; // No gap — nothing to do
+
+    // Check if yesterday is already covered by an existing freeze
+    const alreadyFrozen = await prisma.streakFreeze.findFirst({
+      where: { userId, usedForDate: yesterday },
+    });
+    if (alreadyFrozen) return; // Already covered
+
+    // There must be a streak worth protecting: day-before-yesterday was active OR was itself frozen
+    const dbProgress = await prisma.progressDaily.findUnique({
+      where: { userId_day: { userId, day: dayBefore } },
+    });
+    const dbActive = dbProgress && (
+      dbProgress.journalsCount > 0 || dbProgress.minutesSpent > 0 ||
+      dbProgress.xpEarned > 0 || dbProgress.wordsLearned > 0
+    );
+    const dbFrozen = await prisma.streakFreeze.findFirst({
+      where: { userId, usedForDate: dayBefore },
+    });
+    if (!dbActive && !dbFrozen) return; // No streak behind the gap — freeze would be wasted
+
+    // Find oldest available freeze (not expired, not used)
+    const freeze = await prisma.streakFreeze.findFirst({
+      where: {
+        userId,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      orderBy: { grantedAt: 'asc' }, // FIFO — consume oldest first
+    });
+    if (!freeze) return; // No freezes available
+
+    // Consume the freeze
+    await prisma.streakFreeze.update({
+      where: { id: freeze.id },
+      data: { usedAt: now, usedForDate: yesterday },
+    });
+
+    // Count remaining available freezes for notification
+    const remaining = await prisma.streakFreeze.count({
+      where: {
+        userId,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+    });
+
+    createNotification(userId, {
+      type: 'streak',
+      title: '🛡️ Streak Freeze Used!',
+      body: `One Streak Freeze was automatically used to protect your streak for ${toVnStr(yesterday)}. You have ${remaining} freeze${remaining !== 1 ? 's' : ''} remaining.`,
+      data: { freezeId: freeze.id, usedForDate: toVnStr(yesterday), remaining },
+    }).catch(() => {});
+  } catch (err) {
+    console.error('autoConsumeStreakFreeze error:', err.message);
+  }
+}
+
+/**
+ * Build a Set of date strings (YYYY-MM-DD, Vietnam TZ) covered by consumed streak freezes.
+ * Used to extend streak calculation to count frozen days as active.
+ */
+async function getFrozenDateSet(userId) {
+  try {
+    const usedFreezes = await prisma.streakFreeze.findMany({
+      where: { userId, usedAt: { not: null }, usedForDate: { not: null } },
+      select: { usedForDate: true },
+    });
+    return new Set(
+      usedFreezes.map((f) => new Date(f.usedForDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }))
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Auto-consume a streak freeze if the user missed exactly yesterday and has an available freeze.
+ * Called fire-and-forget after any trackDailyProgress() for journal activity.
+ * Logic: today has activity, yesterday has NO activity, day-before-yesterday had activity
+ *        (or yesterday-minus-1 was already frozen) → consume oldest valid freeze.
+ */
+async function autoConsumeStreakFreeze(userId) {
+  try {
+    const now = new Date();
+    const toVnStr = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+    const todayVnStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const todayUtc   = new Date(todayVnStr + 'T00:00:00.000Z');
+    const yesterday  = new Date(todayUtc.getTime() - 86400000);
+    const dayBefore  = new Date(todayUtc.getTime() - 172800000);
+
+    // Check if yesterday already has activity (no gap to fill)
+    const ydProgress = await prisma.progressDaily.findUnique({
+      where: { userId_day: { userId, day: yesterday } },
+    });
+    const ydActive = ydProgress && (
+      ydProgress.journalsCount > 0 || ydProgress.minutesSpent > 0 ||
+      ydProgress.xpEarned > 0 || ydProgress.wordsLearned > 0
+    );
+    if (ydActive) return; // No gap — nothing to do
+
+    // Check if yesterday is already covered by an existing freeze
+    const alreadyFrozen = await prisma.streakFreeze.findFirst({
+      where: { userId, usedForDate: yesterday },
+    });
+    if (alreadyFrozen) return; // Already covered
+
+    // There must be a streak worth protecting: day-before-yesterday was active OR was itself frozen
+    const dbProgress = await prisma.progressDaily.findUnique({
+      where: { userId_day: { userId, day: dayBefore } },
+    });
+    const dbActive = dbProgress && (
+      dbProgress.journalsCount > 0 || dbProgress.minutesSpent > 0 ||
+      dbProgress.xpEarned > 0 || dbProgress.wordsLearned > 0
+    );
+    const dbFrozen = await prisma.streakFreeze.findFirst({
+      where: { userId, usedForDate: dayBefore },
+    });
+    if (!dbActive && !dbFrozen) return; // No streak behind the gap — freeze would be wasted
+
+    // Find oldest available freeze (not expired, not used)
+    const freeze = await prisma.streakFreeze.findFirst({
+      where: {
+        userId,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      orderBy: { grantedAt: 'asc' }, // FIFO — consume oldest first
+    });
+    if (!freeze) return; // No freezes available
+
+    // Consume the freeze
+    await prisma.streakFreeze.update({
+      where: { id: freeze.id },
+      data: { usedAt: now, usedForDate: yesterday },
+    });
+
+    // Count remaining available freezes for notification
+    const remaining = await prisma.streakFreeze.count({
+      where: {
+        userId,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+    });
+
+    createNotification(userId, {
+      type: 'streak',
+      title: '🛡️ Streak Freeze Used!',
+      body: `One Streak Freeze was automatically used to protect your streak for ${toVnStr(yesterday)}. You have ${remaining} freeze${remaining !== 1 ? 's' : ''} remaining.`,
+      data: { freezeId: freeze.id, usedForDate: toVnStr(yesterday), remaining },
+    }).catch(() => {});
+  } catch (err) {
+    console.error('autoConsumeStreakFreeze error:', err.message);
+  }
+}
+
+/**
+ * Build a Set of date strings (YYYY-MM-DD, Vietnam TZ) covered by consumed streak freezes.
+ * Used to extend streak calculation to count frozen days as active.
+ */
+async function getFrozenDateSet(userId) {
+  try {
+    const usedFreezes = await prisma.streakFreeze.findMany({
+      where: { userId, usedAt: { not: null }, usedForDate: { not: null } },
+      select: { usedForDate: true },
+    });
+    return new Set(
+      usedFreezes.map((f) => new Date(f.usedForDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }))
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * Check and unlock achievements for a user.
  * Call after journal submit, feedback, streak update, vocab/phrase save.
  */
@@ -473,12 +673,13 @@ async function checkAndUnlockAchievements(userId) {
         progressDays.filter(pd => pd.journalsCount > 0 || pd.minutesSpent > 0 || pd.xpEarned > 0 || pd.wordsLearned > 0)
           .map(pd => toVnStr(pd.day))
       );
+      const frozenDays = await getFrozenDateSet(userId);
       const todayUtc = new Date(todayVnStr + 'T00:00:00.000Z');
       for (let i = 0; i < 60; i++) {
         const checkDate = new Date(todayUtc);
         checkDate.setUTCDate(checkDate.getUTCDate() - i);
         const dateStr = checkDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
-        if (activeDays.has(dateStr)) {
+        if (activeDays.has(dateStr) || frozenDays.has(dateStr)) {
           currentStreak++;
         } else if (i === 0) {
           continue; // Today might not have activity yet
@@ -997,6 +1198,8 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
   // Track daily progress: +1 journal, +10 XP
   await trackDailyProgress(req.authUser.id, { journals: 1, xp: 10 });
   awardXp(req.authUser.id, 10, 'journal', { description: 'New journal entry', journalId: journal.id });
+  // Auto-consume a streak freeze if user missed yesterday and has one available
+  autoConsumeStreakFreeze(req.authUser.id).catch(() => {});
 
   res.status(201).json({ journal });
 }));
@@ -1860,12 +2063,15 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     }
   }
 
+  // Include dates covered by consumed streak freezes
+  const frozenDateSet = await getFrozenDateSet(req.authUser.id);
+
   // Calculate current streak
   for (let i = 0; i < 60; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
     const dateStr = toVnDateStr(checkDate);
-    if (activeDateSet.has(dateStr)) {
+    if (activeDateSet.has(dateStr) || frozenDateSet.has(dateStr)) {
       currentStreak++;
     } else if (i === 0) {
       continue; // Today might not have activity yet
@@ -1931,6 +2137,16 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   const todayJournalId = todayJournal?.id || null;
   const dayNumber = todayCompleted ? totalJournals : totalJournals + 1;
 
+  // Count available streak freezes for this user
+  const now = new Date();
+  const streakFreezeCount = await prisma.streakFreeze.count({
+    where: {
+      userId: req.authUser.id,
+      usedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+  });
+
   res.status(200).json({
     totalJournals,
     totalWords,
@@ -1947,6 +2163,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     todayCompleted,
     todayJournalId,
     dayNumber,
+    streakFreezeCount,
   });
 }));
 
@@ -2281,6 +2498,29 @@ router.get('/progress/daily/:date', requireAuth, asyncHandler(async (req, res) =
       journals,
     },
   });
+}));
+
+// ─── Streak Freezes (User) ───────────────────────────
+router.get('/streak/freezes', requireAuth, asyncHandler(async (req, res) => {
+  const now = new Date();
+  const [available, used] = await Promise.all([
+    prisma.streakFreeze.findMany({
+      where: {
+        userId: req.authUser.id,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      orderBy: { grantedAt: 'asc' },
+      select: { id: true, source: true, note: true, grantedAt: true, expiresAt: true },
+    }),
+    prisma.streakFreeze.findMany({
+      where: { userId: req.authUser.id, usedAt: { not: null } },
+      orderBy: { usedAt: 'desc' },
+      take: 10,
+      select: { id: true, source: true, usedAt: true, usedForDate: true },
+    }),
+  ]);
+  res.status(200).json({ available, used, availableCount: available.length });
 }));
 
 // ═══════════════════════════════════════════════════════
@@ -2809,6 +3049,83 @@ router.patch('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (
   });
 
   res.status(200).json({ user: updated });
+}));
+
+// ─── Admin: Streak Freezes ───────────────────────────
+// Grant one or more streak freezes to a user
+router.post('/admin/users/:id/streak-freezes', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { count = 1, note, expiresAt } = req.body || {};
+  const grantCount = Math.min(10, Math.max(1, parseInt(count) || 1));
+
+  const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!target) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
+
+  const expiry = expiresAt ? new Date(expiresAt) : null;
+  if (expiry && isNaN(expiry.getTime())) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid expiresAt date' });
+  }
+
+  const created = [];
+  for (let i = 0; i < grantCount; i++) {
+    const freeze = await prisma.streakFreeze.create({
+      data: {
+        userId: req.params.id,
+        source: 'admin',
+        note: note ? String(note).slice(0, 500) : null,
+        grantedBy: req.authUser.id,
+        expiresAt: expiry,
+      },
+    });
+    created.push(freeze);
+  }
+
+  // Notify user
+  createNotification(req.params.id, {
+    type: 'streak',
+    title: `🛡️ You received ${grantCount} Streak Freeze${grantCount > 1 ? 's' : ''}!`,
+    body: `An admin granted you ${grantCount} Streak Freeze${grantCount > 1 ? 's' : ''}. ${note ? `Note: ${note}` : 'Use them to protect your streak if you miss a day.'}`,
+    data: { count: grantCount },
+  }).catch(() => {});
+
+  res.status(201).json({ created, count: created.length });
+}));
+
+// Revoke an unused streak freeze
+router.delete('/admin/users/:id/streak-freezes/:freezeId', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const freeze = await prisma.streakFreeze.findFirst({
+    where: { id: req.params.freezeId, userId: req.params.id },
+  });
+  if (!freeze) return res.status(404).json({ code: 'NOT_FOUND', message: 'Freeze not found' });
+  if (freeze.usedAt) {
+    return res.status(400).json({ code: 'ALREADY_USED', message: 'Cannot revoke a freeze that has already been used' });
+  }
+
+  await prisma.streakFreeze.delete({ where: { id: req.params.freezeId } });
+  res.status(200).json({ message: 'Streak freeze revoked' });
+}));
+
+// List streak freezes for a user (admin view)
+router.get('/admin/users/:id/streak-freezes', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!target) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
+
+  const now = new Date();
+  const [available, usedList, expired] = await Promise.all([
+    prisma.streakFreeze.findMany({
+      where: { userId: req.params.id, usedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      orderBy: { grantedAt: 'asc' },
+    }),
+    prisma.streakFreeze.findMany({
+      where: { userId: req.params.id, usedAt: { not: null } },
+      orderBy: { usedAt: 'desc' },
+    }),
+    prisma.streakFreeze.findMany({
+      where: { userId: req.params.id, usedAt: null, expiresAt: { lte: now } },
+      orderBy: { expiresAt: 'asc' },
+    }),
+  ]);
+
+  res.status(200).json({ available, used: usedList, expired, availableCount: available.length });
 }));
 
 // ─── Admin: AI Logs ──────────────────────────────────

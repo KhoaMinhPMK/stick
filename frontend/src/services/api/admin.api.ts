@@ -141,6 +141,36 @@ export function patchUser(id: string, data: { role?: string; status?: string; is
   );
 }
 
+// ─── Streak Freezes ───────────────────
+export interface AdminStreakFreeze {
+  id: string;
+  source: string;
+  note: string | null;
+  grantedBy: string | null;
+  grantedAt: string;
+  expiresAt: string | null;
+  usedAt: string | null;
+  usedForDate: string | null;
+}
+
+export function getAdminUserStreakFreezes(userId: string) {
+  return adminRequest<{ available: AdminStreakFreeze[]; used: AdminStreakFreeze[]; expired: AdminStreakFreeze[]; availableCount: number }>(`/admin/users/${userId}/streak-freezes`);
+}
+
+export function grantStreakFreeze(userId: string, count: number, note?: string, expiresAt?: string) {
+  return adminRequest<{ created: AdminStreakFreeze[]; count: number }>(
+    `/admin/users/${userId}/streak-freezes`,
+    { method: 'POST', body: { count, note, expiresAt } },
+  );
+}
+
+export function revokeStreakFreeze(userId: string, freezeId: string) {
+  return adminRequest<{ message: string }>(
+    `/admin/users/${userId}/streak-freezes/${freezeId}`,
+    { method: 'DELETE' },
+  );
+}
+
 // ─── AI Logs ──────────────────────────
 export function getAILogs(params: AILogFilterParams = {}) {
   const qs = new URLSearchParams();

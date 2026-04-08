@@ -113,6 +113,12 @@ export const CompletionPage: React.FC = () => {
                     {streak > 0 ? t('completion.streak_day', { count: streak }) : t('completion.streak_start')}
                   </p>
                 )}
+                {!loading && (summary?.streakFreezeCount ?? 0) > 0 && (
+                  <p className="mt-2 text-xs text-on-surface-variant font-medium flex items-center gap-1">
+                    <span>🛡️</span>
+                    <span>{summary!.streakFreezeCount} streak freeze{summary!.streakFreezeCount !== 1 ? 's' : ''} available</span>
+                  </p>
+                )}
               </div>
               <div className="p-5 md:p-6 bg-tertiary-container text-white sketch-border sketch-card cursor-default flex flex-col justify-between">
                 <div className="flex items-center gap-3 mb-1">

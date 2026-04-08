@@ -279,6 +279,7 @@ export interface ProgressSummary {
   todayCompleted: boolean;
   todayJournalId: string | null;
   dayNumber: number;
+  streakFreezeCount: number;
 }
 
 export interface XpLogEntry {
@@ -340,6 +341,26 @@ export async function postJournalMood(journalId: string, mood: string) {
     method: 'POST',
     body: { mood },
   });
+}
+
+// ─── Streak Freezes ─────────────────────────────────
+export interface StreakFreeze {
+  id: string;
+  source: string;
+  note: string | null;
+  grantedAt: string;
+  expiresAt: string | null;
+}
+
+export interface StreakFreezeUsed {
+  id: string;
+  source: string;
+  usedAt: string;
+  usedForDate: string | null;
+}
+
+export async function getStreakFreezes() {
+  return apiRequest<{ available: StreakFreeze[]; used: StreakFreezeUsed[]; availableCount: number }>('/streak/freezes');
 }
 
 // ─── Library / Lessons ───────────────────────────────
