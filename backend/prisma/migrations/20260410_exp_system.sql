@@ -1,12 +1,12 @@
 -- Migration: EXP System
 -- Adds cached XP/streak fields to User and creates UserXpLog table
 
--- 1. Add cached fields to User
+-- 1. Add cached fields to User (MySQL 8.0 — no IF NOT EXISTS on ADD COLUMN)
 ALTER TABLE `User`
-  ADD COLUMN IF NOT EXISTS `totalXp`       INT NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS `currentStreak` INT NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS `bestStreak`    INT NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS `lastActiveDate` DATE NULL;
+  ADD COLUMN `totalXp`        INT NOT NULL DEFAULT 0,
+  ADD COLUMN `currentStreak`  INT NOT NULL DEFAULT 0,
+  ADD COLUMN `bestStreak`     INT NOT NULL DEFAULT 0,
+  ADD COLUMN `lastActiveDate` DATE NULL;
 
 -- 2. Create UserXpLog table
 CREATE TABLE IF NOT EXISTS `UserXpLog` (
