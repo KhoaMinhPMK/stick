@@ -22,10 +22,11 @@ const navCards = [
 ];
 
 export const ProfilePage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -38,6 +39,7 @@ export const ProfilePage: React.FC = () => {
         setSummary(summaryRes);
       } catch (err) {
         console.error('Profile load error:', err);
+        setError(t('profile.error_load'));
       } finally {
         setLoading(false);
       }
@@ -46,12 +48,18 @@ export const ProfilePage: React.FC = () => {
   }, []);
 
   const memberSince = profile?.createdAt
-    ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    ? new Date(profile.createdAt).toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' })
     : '';
 
   return (
     <AppLayout activePath="#profile">
       <div className="max-w-6xl mx-auto space-y-8 md:space-y-12">
+        {error && (
+          <div className="p-3 bg-error-container border-2 border-error rounded-xl flex items-center justify-between">
+            <span className="text-sm font-bold text-on-error-container">{error}</span>
+            <button onClick={() => window.location.reload()} className="text-sm font-headline font-bold text-error underline">{t('common.retry')}</button>
+          </div>
+        )}
         {/* Profile Hero */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-8 items-start">
           {/* Main Profile Card */}
@@ -94,31 +102,31 @@ export const ProfilePage: React.FC = () => {
                   <div className="flex flex-wrap gap-2 md:gap-3 justify-center sm:justify-start">
                     <span className="px-3 md:px-4 py-0.5 md:py-1 bg-secondary-container border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
                       <span className="material-symbols-outlined text-xs md:text-sm">military_tech</span>
-                      {summary?.level || profile?.level || 'Beginner'}
+                      {summary?.level || profile?.level || t('profile.default_level')}
                     </span>
                     <span className="px-3 md:px-4 py-0.5 md:py-1 bg-surface-container-highest border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
                       <span className="material-symbols-outlined text-xs md:text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
-                      {summary?.currentStreak || 0} day streak
+                      {t('profile.day_streak', { count: summary?.currentStreak || 0 })}
                     </span>
                   </div>
 
                   {/* Stats Row */}
                   <div className="pt-3 md:pt-4 border-t-2 border-dotted border-outline-variant/30">
                     <p className="text-[10px] md:text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-2">
-                      Member since {memberSince}
+                      {t('profile.member_since', { date: memberSince })}
                     </p>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="text-center">
                         <p className="font-headline font-black text-lg md:text-2xl text-primary">{summary?.totalJournals || 0}</p>
-                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">Journals</p>
+                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">{t('profile.stat_journals')}</p>
                       </div>
                       <div className="text-center">
                         <p className="font-headline font-black text-lg md:text-2xl text-primary">{summary?.totalWords || 0}</p>
-                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">Words</p>
+                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">{t('profile.stat_words')}</p>
                       </div>
                       <div className="text-center">
                         <p className="font-headline font-black text-lg md:text-2xl text-primary">{summary?.totalPhrases || 0}</p>
-                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">Phrases</p>
+                        <p className="text-[10px] md:text-xs font-bold text-on-surface-variant">{t('profile.stat_phrases')}</p>
                       </div>
                     </div>
                   </div>

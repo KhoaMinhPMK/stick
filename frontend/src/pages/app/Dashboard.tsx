@@ -12,6 +12,7 @@ export const DashboardPage: React.FC = () => {
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
   const [dueVocabCount, setDueVocabCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -21,24 +22,27 @@ export const DashboardPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const [summaryRes, dailyRes, dueRes] = await Promise.all([
-          getProgressSummary(),
-          getProgressDaily(14),
-          getDueVocab(1).catch(() => ({ items: [], total: 0 })),
-        ]);
-        setSummary(summaryRes);
-        setDailyData(dailyRes.items);
-        setDueVocabCount(dueRes.total);
-      } catch (err) {
-        console.error('Dashboard fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [summaryRes, dailyRes, dueRes] = await Promise.all([
+        getProgressSummary(),
+        getProgressDaily(14),
+        getDueVocab(1).catch(() => ({ items: [], total: 0 })),
+      ]);
+      setSummary(summaryRes);
+      setDailyData(dailyRes.items);
+      setDueVocabCount(dueRes.total);
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+      setError(t('dashboard.error_load'));
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -68,6 +72,12 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <AppLayout activePath="#app">
+      {error && (
+        <div className="mb-4 p-3 bg-error-container border-2 border-error rounded-xl flex items-center justify-between">
+          <span className="text-sm font-bold text-on-error-container">{error}</span>
+          <button onClick={() => { setError(null); fetchData(); }} className="text-sm font-headline font-bold text-error underline">{t('common.retry')}</button>
+        </div>
+      )}
       {/* Hero Section */}
       <section className="mb-8 md:mb-10">
         <div className="bg-surface-container-highest sketch-border-card p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-6 relative overflow-hidden">
@@ -115,19 +125,19 @@ export const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <div className="bg-surface-container-highest sketch-border p-3 md:p-4 text-center">
                 <span className="font-headline font-black text-2xl md:text-3xl">{summary?.totalJournals || 0}</span>
-                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">Journals</p>
+                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">{t('dashboard.stat_journals')}</p>
               </div>
               <div className="bg-surface-container-highest sketch-border p-3 md:p-4 text-center">
                 <span className="font-headline font-black text-2xl md:text-3xl">{summary?.totalWords || 0}</span>
-                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">Words</p>
+                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">{t('dashboard.stat_words')}</p>
               </div>
               <div className="bg-surface-container-highest sketch-border p-3 md:p-4 text-center">
                 <span className="font-headline font-black text-2xl md:text-3xl">{summary?.avgScore || 0}</span>
-                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">Avg Score</p>
+                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">{t('dashboard.stat_avg_score')}</p>
               </div>
               <div className="bg-surface-container-highest sketch-border p-3 md:p-4 text-center">
                 <span className="font-headline font-black text-2xl md:text-3xl">{summary?.totalXp || 0}</span>
-                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">XP</p>
+                <p className="text-[10px] md:text-xs font-bold text-on-surface-variant mt-1">{t('dashboard.stat_xp')}</p>
               </div>
             </div>
           )}
@@ -224,19 +234,19 @@ export const DashboardPage: React.FC = () => {
           <div onClick={() => (window.location.hash = '#library')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-2 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="auto_stories">auto_stories</span>
             <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.reading_story')}</h6>
-            <p className="text-xs md:text-sm text-on-surface-variant">Explore lessons in the Library.</p>
+            <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.explore_library')}</p>
           </div>
           
           <div onClick={() => (window.location.hash = '#saved-phrases')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-2 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="format_quote">format_quote</span>
-            <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">Saved Phrases</h6>
-            <p className="text-xs md:text-sm text-on-surface-variant">{summary?.totalPhrases || 0} phrases collected</p>
+            <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.saved_phrases')}</h6>
+            <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.phrases_collected', { count: summary?.totalPhrases || 0 })}</p>
           </div>
           
           <div onClick={() => (window.location.hash = '#achievements')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-2 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="emoji_events">emoji_events</span>
-            <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">Achievements</h6>
-            <p className="text-xs md:text-sm text-on-surface-variant">Check your milestones and rewards.</p>
+            <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.achievements_title')}</h6>
+            <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.achievements_desc')}</p>
           </div>
         </div>
       </section>

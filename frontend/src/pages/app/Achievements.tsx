@@ -4,10 +4,11 @@ import { AppLayout } from '../../layouts/AppLayout';
 import { getAchievements, getAchievementsSummary, type Achievement, type AchievementSummary } from '../../services/api/endpoints';
 
 export const AchievementsPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [summary, setSummary] = useState<AchievementSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -20,6 +21,7 @@ export const AchievementsPage: React.FC = () => {
         setSummary(sumRes);
       } catch (err) {
         console.error('Failed to load achievements:', err);
+        setError(t('achievements.error_load'));
       } finally {
         setLoading(false);
       }
@@ -69,7 +71,7 @@ export const AchievementsPage: React.FC = () => {
                 </div>
                 <div>
                   <span className="font-headline font-black text-2xl md:text-3xl">{summary?.xpEarned || 0}</span>
-                  <p className="text-xs font-bold text-on-surface-variant">Total XP Earned</p>
+                  <p className="text-xs font-bold text-on-surface-variant">{t('achievements.total_xp_earned')}</p>
                 </div>
               </div>
             </div>
@@ -102,7 +104,7 @@ export const AchievementsPage: React.FC = () => {
                         {a.unlocked && a.unlockedAt && (
                           <p className="text-[10px] md:text-xs text-tertiary font-bold flex items-center gap-1">
                             <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                            {new Date(a.unlockedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {new Date(a.unlockedAt).toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         )}
                         {!a.unlocked && a.progress > 0 && (

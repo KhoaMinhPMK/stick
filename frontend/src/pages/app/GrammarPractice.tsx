@@ -73,7 +73,7 @@ export const GrammarPracticePage: React.FC = () => {
       <AppLayout activePath="#library">
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined animate-spin text-4xl mb-4">progress_activity</span>
-          <p className="font-headline font-bold text-lg">Generating quiz...</p>
+          <p className="font-headline font-bold text-lg">{t('grammar_practice.generating')}</p>
         </div>
       </AppLayout>
     );
@@ -84,11 +84,11 @@ export const GrammarPracticePage: React.FC = () => {
       <AppLayout activePath="#library">
         <div className="max-w-2xl mx-auto py-8 text-center">
           <span className="material-symbols-outlined text-6xl text-primary mb-4">emoji_events</span>
-          <h2 className="font-headline font-black text-3xl mb-4">Quiz Complete!</h2>
-          <p className="text-xl mb-8">You scored <strong>{score}</strong> out of <strong>{questions.length}</strong></p>
+          <h2 className="font-headline font-black text-3xl mb-4">{t('grammar_practice.quiz_complete')}</h2>
+          <p className="text-xl mb-8">{t('grammar_practice.score_text', { score, total: questions.length })}</p>
           <div className="flex gap-4 justify-center">
-            <button onClick={() => window.location.hash = '#library'} className="px-6 py-3 sketch-border bg-surface-container font-headline font-bold">Back to Library</button>
-            <button onClick={() => { setCurrentIndex(0); setScore(0); setSelected(null); setChecked(false); setLoading(true); apiRequest<{ questions: QuizQuestion[] }>('/ai/grammar-quiz?count=5').then(res => setQuestions(res.questions || [])).catch(() => {}).finally(() => setLoading(false)); }} className="px-6 py-3 sketch-border bg-black text-white font-headline font-bold">Try Again</button>
+            <button onClick={() => window.location.hash = '#library'} className="px-6 py-3 sketch-border bg-surface-container font-headline font-bold">{t('grammar_practice.back_to_library')}</button>
+            <button onClick={() => { setCurrentIndex(0); setScore(0); setSelected(null); setChecked(false); setLoading(true); apiRequest<{ questions: QuizQuestion[] }>('/ai/grammar-quiz?count=5').then(res => setQuestions(res.questions || [])).catch(() => {}).finally(() => setLoading(false)); }} className="px-6 py-3 sketch-border bg-black text-white font-headline font-bold">{t('grammar_practice.try_again')}</button>
           </div>
         </div>
       </AppLayout>
@@ -99,8 +99,11 @@ export const GrammarPracticePage: React.FC = () => {
     return (
       <AppLayout activePath="#library">
         <div className="text-center py-20">
-          <p className="text-on-surface-variant">No questions available.</p>
-          <button onClick={() => window.location.hash = '#library'} className="mt-4 text-primary underline">Go back</button>
+          <p className="text-on-surface-variant">{t('grammar_practice.no_questions')}</p>
+          <button onClick={() => window.location.hash = '#library'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group mx-auto">
+            <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
+            <span className="font-headline font-bold text-sm">{t('common.go_back')}</span>
+          </button>
         </div>
       </AppLayout>
     );

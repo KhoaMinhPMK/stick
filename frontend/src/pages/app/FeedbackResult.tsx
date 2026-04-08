@@ -9,6 +9,7 @@ export const FeedbackResultPage: React.FC = () => {
   const { t } = useTranslation();
   const [journal, setJournal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isPlayingEnhanced, setIsPlayingEnhanced] = useState(false);
   const feedbackTrackedRef = useRef(false);
 
@@ -32,6 +33,7 @@ export const FeedbackResultPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to load journal result', err);
+        setLoadError(t('feedback_result.error_load'));
       } finally {
         setLoading(false);
       }
@@ -55,7 +57,10 @@ export const FeedbackResultPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
           <p className="font-headline font-bold text-xl">{t('feedback_result.not_found', { defaultValue: 'Result not found' })}</p>
-          <button onClick={() => window.location.hash = '#journal-workspace'} className="mt-4 text-blue-500 underline">Go back</button>
+          <button onClick={() => window.location.hash = '#journal-workspace'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group">
+            <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
+            <span className="font-headline font-bold text-sm">{t('common.go_back')}</span>
+          </button>
         </div>
       </AppLayout>
     );

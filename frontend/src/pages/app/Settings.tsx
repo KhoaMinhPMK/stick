@@ -23,6 +23,9 @@ export const SettingsPage: React.FC = () => {
   const [showSaved, setShowSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -35,6 +38,7 @@ export const SettingsPage: React.FC = () => {
         if (langIdx >= 0) setSelectedLang(langIdx);
       } catch (err) {
         console.error('Failed to load settings:', err);
+        setLoadError(t('settings.error_load'));
       } finally {
         setLoading(false);
       }
@@ -51,9 +55,11 @@ export const SettingsPage: React.FC = () => {
         language: languages[selectedLang].value,
       });
       setShowSaved(true);
+      setSaveError(null);
       setTimeout(() => setShowSaved(false), 2000);
     } catch (err) {
       console.error('Failed to save settings:', err);
+      setSaveError(t('settings.error_save'));
     } finally {
       setSaving(false);
     }
@@ -73,6 +79,7 @@ export const SettingsPage: React.FC = () => {
       window.location.reload();
     } catch {
       setDeleting(false);
+      setDeleteError(t('settings.delete_error'));
       setShowDeleteConfirm(false);
     }
   };
@@ -95,7 +102,7 @@ export const SettingsPage: React.FC = () => {
         <div className="mb-6 md:mb-12">
           <button onClick={() => (window.location.hash = '#profile')} className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors mb-3 md:mb-4 group">
             <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
-            <span className="font-headline font-bold text-xs md:text-sm">Profile</span>
+            <span className="font-headline font-bold text-xs md:text-sm">{t('settings.back')}</span>
           </button>
           <h1 className="font-headline font-extrabold text-3xl md:text-4xl lg:text-5xl tracking-tight -rotate-1 origin-left">{t('settings.title')}</h1>
           <p className="text-on-surface-variant font-body mt-1 md:mt-2 text-sm md:text-base">{t('settings.subtitle')}</p>
@@ -251,14 +258,30 @@ export const SettingsPage: React.FC = () => {
       ) : (
         <span className="material-symbols-outlined text-lg">save</span>
       )}
-      {saving ? 'Saving...' : 'Save'}
+      {saving ? t('settings.saving') : t('settings.save')}
     </button>
 
     {/* Saved Toast */}
     {showSaved && (
       <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-tertiary-container text-white px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
         <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-        Settings saved!
+        {t('settings.saved_toast')}
+      </div>
+    )}
+
+    {/* Save Error Toast */}
+    {saveError && (
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-error-container text-on-error-container px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
+        <span className="material-symbols-outlined text-lg">error</span>
+        {saveError}
+      </div>
+    )}
+
+    {/* Delete Error Toast */}
+    {deleteError && (
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-error-container text-on-error-container px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
+        <span className="material-symbols-outlined text-lg">error</span>
+        {deleteError}
       </div>
     )}
 
@@ -271,10 +294,10 @@ export const SettingsPage: React.FC = () => {
           <p className="text-on-surface-variant text-xs md:text-sm mb-6">{t('settings.reset_desc')}</p>
           <div className="flex gap-3">
             <button onClick={() => setShowResetConfirm(false)} className="flex-1 py-2.5 sketch-border bg-surface-container font-headline font-bold text-sm hover:bg-surface-container-high transition-colors active:scale-95">
-              Cancel
+              {t('common.cancel')}
             </button>
             <button onClick={handleReset} className="flex-1 py-2.5 sketch-border bg-error text-white font-headline font-bold text-sm hover:bg-red-700 transition-colors active:scale-95">
-              Reset
+              {t('settings.reset_button')}
             </button>
           </div>
         </div>
@@ -290,10 +313,10 @@ export const SettingsPage: React.FC = () => {
           <p className="text-on-surface-variant text-xs md:text-sm mb-6">{t('settings.delete_confirm_desc', { defaultValue: 'All your journals, progress, and data will be permanently removed. Are you sure?' })}</p>
           <div className="flex gap-3">
             <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 sketch-border bg-surface-container font-headline font-bold text-sm hover:bg-surface-container-high transition-colors active:scale-95">
-              Cancel
+              {t('common.cancel')}
             </button>
             <button onClick={handleDeleteAccount} disabled={deleting} className="flex-1 py-2.5 sketch-border bg-error text-white font-headline font-bold text-sm hover:bg-red-700 transition-colors active:scale-95 disabled:opacity-50">
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleting ? t('settings.deleting') : t('settings.delete_confirm')}
             </button>
           </div>
         </div>

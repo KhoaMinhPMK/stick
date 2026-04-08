@@ -304,7 +304,25 @@
     "suggested_for_you": "Suggested for you",
     "reading_story": "Reading: Short Story",
     "listen_repeat": "Listen & Repeat",
-    "grammar_quiz": "Grammar Quiz"
+    "grammar_quiz": "Grammar Quiz",
+    "stat_journals": "Journals",
+    "stat_words": "Words",
+    "stat_avg_score": "Avg Score",
+    "stat_xp": "XP",
+    "explore_library": "Explore lessons in the Library.",
+    "saved_phrases": "Saved Phrases",
+    "phrases_collected": "{{count}} phrases collected",
+    "achievements_title": "Achievements",
+    "achievements_desc": "Check your milestones and rewards.",
+    "error_load": "Couldn't load dashboard data. Tap to retry."
+  },
+  "common": {
+    "go_back": "Go back",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "retry": "Retry",
+    "error_load": "Something went wrong. Tap to retry.",
+    "error_save": "Failed to save. Please try again."
   },
   "journal": {
     "session_intro": "Session Intro",
@@ -388,6 +406,7 @@
     }
   },
   "journal_workspace": {
+    "daily_title": "Daily Journal",
     "prompt_title": "How was your day?",
     "topic_label": "Topic",
     "draft_saved": "Draft saved",
@@ -446,7 +465,9 @@
     "continue": "Continue",
     "try_another": "Try another version",
     "daily_goal": "Daily Goal",
-    "streak_hint": "One more entry to hit your 7-day streak!"
+    "streak_hint": "One more entry to hit your 7-day streak!",
+    "not_found": "Result not found",
+    "error_load": "Couldn't load feedback."
   },
   "progress": {
     "title": "Consistency Board",
@@ -462,7 +483,28 @@
     "milestone_desc": "Just 3 more days for your next milestone. You're doing amazing!",
     "day_current": "Day {{day}}",
     "day_milestone": "Day {{day}} Milestone",
-    "encouragement_quote": "Every step counts toward mastery!"
+    "encouragement_quote": "Every step counts toward mastery!",
+    "current_streak": "Current Streak",
+    "best_streak_label": "Best Streak",
+    "total_xp": "Total XP",
+    "no_activity": "No activity recorded for this day.",
+    "stat_journals": "Journals",
+    "stat_words": "Words",
+    "stat_xp": "XP",
+    "stat_minutes": "Minutes",
+    "journal_entries": "Journal entries:",
+    "day_detail": "Day Detail",
+    "leaderboard": "Leaderboard",
+    "leaderboard_desc": "See how you rank against others",
+    "backfill_error": "Couldn't sync your history. Tap to retry.",
+    "error_load": "Couldn't load progress data.",
+    "weekday_0": "Mon",
+    "weekday_1": "Tue",
+    "weekday_2": "Wed",
+    "weekday_3": "Thu",
+    "weekday_4": "Fri",
+    "weekday_5": "Sat",
+    "weekday_6": "Sun"
   },
   "history_detail": {
     "return": "Return to history",
@@ -482,7 +524,12 @@
     "accuracy": "ACCURACY",
     "personal_note": "Personal Note",
     "saved_to_favorites": "Saved to favorites",
-    "encouragement": "Keep it up! You're doing great."
+    "encouragement": "Keep it up! You're doing great.",
+    "not_found": "Journal not found",
+    "no_feedback": "Feedback not generated yet.",
+    "listen": "Listen",
+    "stop": "Stop",
+    "ai_polish": "AI-Grammar Polish"
   },
   "completion": {
     "title": "Done for today!",
@@ -496,7 +543,14 @@
     "mood_okay": "Okay",
     "mood_tired": "Tired",
     "come_back": "Come back tomorrow",
-    "return_home": "Return home"
+    "return_home": "Return home",
+    "streak_day": "🔥 Day {{count}}!",
+    "streak_start": "Start your streak!",
+    "total_words": "{{count}} words",
+    "mood_saved": "✓ Mood saved!",
+    "mood_error": "Couldn't save mood. Tap to retry.",
+    "view_progress": "View Progress",
+    "error_load": "Couldn't load your summary."
   },
   "skeleton": {
     "title": "Sharpening pencils...",
@@ -523,7 +577,14 @@
     "card_preferences_desc": "Dark mode, font size, and language focus.",
     "card_saved": "Saved Phrases",
     "card_saved_desc": "Review the 124 expressions you've bookmarked.",
-    "footer_quote": "\"The beautiful thing about learning is that no one can take it away from you.\""
+    "footer_quote": "\"The beautiful thing about learning is that no one can take it away from you.\"",
+    "default_level": "Beginner",
+    "day_streak": "{{count}} day streak",
+    "member_since": "Member since {{date}}",
+    "stat_journals": "Journals",
+    "stat_words": "Words",
+    "stat_phrases": "Phrases",
+    "error_load": "Couldn't load your profile."
   },
   "settings": {
     "title": "Preferences",
@@ -543,7 +604,21 @@
     "intense": "Intense",
     "reset_title": "Reset Learning Journey?",
     "reset_desc": "This will wipe your current progress and restart the onboarding experience from scratch.",
-    "reset_button": "Reset onboarding"
+    "reset_button": "Reset onboarding",
+    "back": "Profile",
+    "saving": "Saving...",
+    "save": "Save",
+    "saved_toast": "Settings saved!",
+    "delete_title": "Delete Account",
+    "delete_desc": "Permanently delete your account and all data. This action cannot be undone.",
+    "delete_button": "Delete Account",
+    "delete_confirm_desc": "All your journals, progress, and data will be permanently removed. Are you sure?",
+    "deleting": "Deleting...",
+    "delete_confirm": "Delete",
+    "delete_error": "Failed to delete account. Please try again.",
+    "logout": "Log Out",
+    "error_load": "Couldn't load settings.",
+    "error_save": "Failed to save settings."
   },
   "reminders": {
     "title": "Reminder Settings",
@@ -739,7 +814,23 @@
     "def_resilient": "Able to recover quickly from difficulties",
     "ex_resilient": "Children are remarkably resilient creatures.",
     "def_contemplate": "To look at thoughtfully; to consider",
-    "ex_contemplate": "She sat by the window, contemplating her next move."
+    "ex_contemplate": "She sat by the window, contemplating her next move.",
+    "tag_new": "New",
+    "tag_learning": "Learning",
+    "tag_mastered": "Mastered",
+    "empty_title": "No words yet",
+    "empty_desc": "Tap + to add your first word!",
+    "no_definition": "No definition",
+    "add_title": "Add New Word",
+    "word_placeholder": "Word...",
+    "meaning_placeholder": "Meaning (optional)",
+    "example_placeholder": "Example sentence (optional)",
+    "adding": "Adding...",
+    "add_word": "Add Word",
+    "error_load": "Couldn't load vocabulary.",
+    "error_add": "Failed to add word.",
+    "error_update": "Failed to update.",
+    "error_delete": "Failed to delete."
   },
   "forgot_password": {
     "title": "Reset Password",
@@ -771,7 +862,9 @@
     "a_streak_30": "Monthly Champion",
     "a_streak_30_desc": "Maintain a 30-day writing streak.",
     "a_100_words": "Word Collector",
-    "a_100_words_desc": "Learn and review 100 vocabulary words."
+    "a_100_words_desc": "Learn and review 100 vocabulary words.",
+    "total_xp_earned": "Total XP Earned",
+    "error_load": "Couldn't load achievements."
   },
   "notifications": {
     "back": "Back to Dashboard",
@@ -828,7 +921,13 @@
     "correct": "Excellent! That's correct.",
     "incorrect": "Not quite right. Try again.",
     "check": "Check Answer",
-    "continue": "Continue"
+    "continue": "Continue",
+    "generating": "Generating quiz...",
+    "quiz_complete": "Quiz Complete!",
+    "score_text": "You scored {{score}} out of {{total}}",
+    "back_to_library": "Back to Library",
+    "try_again": "Try Again",
+    "no_questions": "No questions available."
   },
   "listening": {
     "instruction": "Listen and fill in the missing words",

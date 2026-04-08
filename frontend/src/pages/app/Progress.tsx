@@ -9,7 +9,7 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 type DayStatus = 'completed' | 'missed' | 'today' | 'future';
 
 export const ProgressPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [dayDetail, setDayDetail] = useState<any>(null);
@@ -17,6 +17,7 @@ export const ProgressPage: React.FC = () => {
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -36,6 +37,7 @@ export const ProgressPage: React.FC = () => {
             setDailyData(refreshed.items);
           } catch (backfillErr) {
             console.error('Backfill failed:', backfillErr);
+            setError(t('progress.backfill_error'));
             setDailyData([]);
           }
         } else {
@@ -43,6 +45,7 @@ export const ProgressPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to load progress:', err);
+        setError(t('progress.error_load'));
       } finally {
         setLoading(false);
       }
@@ -52,7 +55,7 @@ export const ProgressPage: React.FC = () => {
 
   const now = new Date();
   const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-  const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthName = viewDate.toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' });
   const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
 
   const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
@@ -152,9 +155,9 @@ export const ProgressPage: React.FC = () => {
 
                 {/* Weekday Labels */}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3 lg:gap-4 xl:gap-6 mb-2 md:mb-4">
-                  {WEEKDAYS.map(d => (
-                    <div key={d} className="text-center font-bold text-stone-400 text-[10px] md:text-sm uppercase tracking-widest">
-                      {d}
+                  {WEEKDAYS.map((_, idx) => (
+                    <div key={idx} className="text-center font-bold text-stone-400 text-[10px] md:text-sm uppercase tracking-widest">
+                      {t(`progress.weekday_${idx}`)}
                     </div>
                   ))}
                 </div>
@@ -220,7 +223,7 @@ export const ProgressPage: React.FC = () => {
                 <div className="mt-4 bg-surface-container-lowest sketch-border p-4 md:p-6 animate-fade-in">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-headline font-bold text-base md:text-lg">
-                      📋 {viewDate.toLocaleDateString('en-US', { month: 'short' })} {selectedDay} — Day Detail
+                      📋 {viewDate.toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { month: 'short' })} {selectedDay} — {t('progress.day_detail')}
                     </h4>
                     <button onClick={() => { setSelectedDay(null); setDayDetail(null); }} className="text-stone-400 hover:text-black">
                       <span className="material-symbols-outlined">close</span>
@@ -235,24 +238,24 @@ export const ProgressPage: React.FC = () => {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div className="bg-surface-container p-3 rounded-lg text-center">
                           <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.journalsCount}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">Journals</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_journals')}</p>
                         </div>
                         <div className="bg-surface-container p-3 rounded-lg text-center">
                           <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.wordsLearned}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">Words</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_words')}</p>
                         </div>
                         <div className="bg-surface-container p-3 rounded-lg text-center">
                           <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.xpEarned}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">XP</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_xp')}</p>
                         </div>
                         <div className="bg-surface-container p-3 rounded-lg text-center">
                           <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.minutesSpent}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">Minutes</p>
+                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_minutes')}</p>
                         </div>
                       </div>
                       {dayDetail.journals && dayDetail.journals.length > 0 && (
                         <div>
-                          <p className="font-bold text-xs uppercase text-stone-500 mb-2">Journal entries:</p>
+                          <p className="font-bold text-xs uppercase text-stone-500 mb-2">{t('progress.journal_entries')}:</p>
                           <div className="space-y-2">
                             {dayDetail.journals.map((j: any) => (
                               <div
@@ -271,7 +274,7 @@ export const ProgressPage: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                    <p className="text-stone-400 text-sm italic">No activity recorded for this day.</p>
+                    <p className="text-stone-400 text-sm italic">{t('progress.no_activity')}</p>
                   )}
                 </div>
               )}
@@ -286,14 +289,14 @@ export const ProgressPage: React.FC = () => {
                   <div className="flex items-center gap-3 md:gap-4 bg-surface/50 p-3 md:p-4 border-2 border-black rounded-lg">
                     <div className="text-2xl md:text-4xl">🔥</div>
                     <div>
-                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">Current Streak</p>
+                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">{t('progress.current_streak')}</p>
                       <p className="font-headline font-bold text-lg md:text-2xl">{streak} {t('progress.days')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 md:gap-4 bg-surface/50 p-3 md:p-4 border-2 border-black rounded-lg">
                     <div className="text-2xl md:text-4xl">🏆</div>
                     <div>
-                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">Best Streak</p>
+                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">{t('progress.best_streak_label')}</p>
                       <p className="font-headline font-bold text-lg md:text-2xl">{bestStreak} {t('progress.days')}</p>
                     </div>
                   </div>
@@ -307,7 +310,7 @@ export const ProgressPage: React.FC = () => {
                   <div className="flex items-center gap-3 md:gap-4 bg-surface/50 p-3 md:p-4 border-2 border-black rounded-lg">
                     <div className="text-2xl md:text-4xl">⚡</div>
                     <div>
-                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">Total XP</p>
+                      <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">{t('progress.total_xp')}</p>
                       <p className="font-headline font-bold text-lg md:text-2xl">{summary?.totalXp || 0}</p>
                     </div>
                   </div>
@@ -338,8 +341,8 @@ export const ProgressPage: React.FC = () => {
               >
                 <span className="material-symbols-outlined text-2xl md:text-3xl text-amber-500">emoji_events</span>
                 <div className="text-left flex-1">
-                  <p className="font-headline font-bold text-sm md:text-base">Leaderboard</p>
-                  <p className="text-xs text-stone-500">See how you rank against others</p>
+                  <p className="font-headline font-bold text-sm md:text-base">{t('progress.leaderboard')}</p>
+                  <p className="text-xs text-stone-500">{t('progress.leaderboard_desc')}</p>
                 </div>
                 <span className="material-symbols-outlined text-stone-400">chevron_right</span>
               </button>

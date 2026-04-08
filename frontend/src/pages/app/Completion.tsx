@@ -8,8 +8,10 @@ export const CompletionPage: React.FC = () => {
   const { t } = useTranslation();
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [moodSaved, setMoodSaved] = useState(false);
+  const [moodError, setMoodError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const completionTrackedRef = useRef(false);
 
   const journalId = useMemo(() => {
@@ -27,6 +29,7 @@ export const CompletionPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to load summary:', err);
+        setLoadError(t('completion.error_load'));
       } finally {
         setLoading(false);
       }
@@ -46,8 +49,10 @@ export const CompletionPage: React.FC = () => {
       try {
         await postJournalMood(journalId, moodId);
         setMoodSaved(true);
+        setMoodError(null);
       } catch (err) {
         console.error('Failed to save mood:', err);
+        setMoodError(t('completion.mood_error'));
       }
     }
   };
@@ -94,7 +99,7 @@ export const CompletionPage: React.FC = () => {
                   <span className="material-symbols-outlined animate-spin text-xl">progress_activity</span>
                 ) : (
                   <p className="font-headline font-black text-2xl md:text-3xl">
-                    {streak > 0 ? `🔥 Day ${streak}!` : 'Start your streak!'}
+                    {streak > 0 ? t('completion.streak_day', { count: streak }) : t('completion.streak_start')}
                   </p>
                 )}
               </div>
@@ -106,7 +111,7 @@ export const CompletionPage: React.FC = () => {
                 {loading ? (
                   <span className="material-symbols-outlined animate-spin text-xl">progress_activity</span>
                 ) : (
-                  <p className="font-headline font-black text-2xl md:text-3xl">{totalWords} words</p>
+                  <p className="font-headline font-black text-2xl md:text-3xl">{t('completion.total_words', { count: totalWords })}</p>
                 )}
               </div>
             </div>
@@ -134,7 +139,10 @@ export const CompletionPage: React.FC = () => {
                 })}
               </div>
               {moodSaved && (
-                <p className="text-xs text-tertiary font-bold animate-fade-in">✓ Mood saved!</p>
+                <p className="text-xs text-tertiary font-bold animate-fade-in">{t('completion.mood_saved')}</p>
+              )}
+              {moodError && (
+                <p className="text-xs text-error font-bold animate-fade-in">{moodError}</p>
               )}
             </div>
 
@@ -151,7 +159,7 @@ export const CompletionPage: React.FC = () => {
                 onClick={() => window.location.hash = '#progress'}
                 className="px-8 py-3 md:px-10 md:py-4 bg-transparent text-primary font-headline font-bold text-lg md:text-xl rounded-full border-[3px] border-black hover:bg-surface-container-highest transition-all active:scale-95 text-center w-full sm:w-auto"
               >
-                View Progress
+                {t('completion.view_progress')}
               </button>
             </div>
           </div>

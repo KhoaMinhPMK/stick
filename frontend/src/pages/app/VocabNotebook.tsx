@@ -14,6 +14,7 @@ export const VocabNotebookPage: React.FC = () => {
   const [newMeaning, setNewMeaning] = useState('');
   const [newExample, setNewExample] = useState('');
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadWords();
@@ -22,11 +23,13 @@ export const VocabNotebookPage: React.FC = () => {
   async function loadWords() {
     try {
       setLoading(true);
+      setError(null);
       const m = masteryFilter === 'all' ? undefined : masteryFilter;
       const res = await getVocabNotebook(m);
       setWords(res.items);
     } catch (err) {
       console.error('Failed to load vocab:', err);
+      setError(t('vocab_notebook.error_load'));
     } finally {
       setLoading(false);
     }
@@ -48,6 +51,7 @@ export const VocabNotebookPage: React.FC = () => {
       setShowAdd(false);
     } catch (err) {
       console.error('Failed to add word:', err);
+      setError(t('vocab_notebook.error_add'));
     } finally {
       setAdding(false);
     }
@@ -59,6 +63,7 @@ export const VocabNotebookPage: React.FC = () => {
       setWords(prev => prev.map(w => w.id === id ? { ...w, mastery: newMastery } : w));
     } catch (err) {
       console.error('Failed to update mastery:', err);
+      setError(t('vocab_notebook.error_update'));
     }
   };
 
@@ -68,6 +73,7 @@ export const VocabNotebookPage: React.FC = () => {
       setWords(prev => prev.filter(w => w.id !== id));
     } catch (err) {
       console.error('Failed to delete word:', err);
+      setError(t('vocab_notebook.error_delete'));
     }
   };
 
@@ -97,6 +103,13 @@ export const VocabNotebookPage: React.FC = () => {
           <p className="text-on-surface-variant font-medium text-xs md:text-sm mt-1">{t('vocab_notebook.subtitle')}</p>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-error-container border-2 border-error rounded-xl flex items-center justify-between">
+            <span className="text-sm font-bold text-on-error-container">{error}</span>
+            <button onClick={() => { setError(null); loadWords(); }} className="text-sm font-headline font-bold text-error underline">{t('common.retry')}</button>
+          </div>
+        )}
+
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
           <div className="sketch-card p-4 md:p-5 text-center">
@@ -125,7 +138,7 @@ export const VocabNotebookPage: React.FC = () => {
                 masteryFilter === tag ? 'bg-black text-white border-2 border-black' : 'bg-surface-container border-2 border-black/20 hover:border-black/50'
               }`}
             >
-              {tag === 'all' ? 'All' : tag.charAt(0).toUpperCase() + tag.slice(1)}
+              {tag === 'all' ? t('vocab_notebook.tag_all') : t(`vocab_notebook.tag_${tag}`)}
             </button>
           ))}
         </div>
@@ -138,8 +151,8 @@ export const VocabNotebookPage: React.FC = () => {
         ) : words.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <span className="material-symbols-outlined text-5xl text-stone-300 mb-4">dictionary</span>
-            <p className="font-headline font-bold text-lg text-stone-400">No words yet</p>
-            <p className="text-sm text-stone-400 mt-2">Tap + to add your first word!</p>
+            <p className="font-headline font-bold text-lg text-stone-400">{t('vocab_notebook.empty_title')}</p>
+            <p className="text-sm text-stone-400 mt-2">{t('vocab_notebook.empty_desc')}</p>
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
@@ -166,7 +179,7 @@ export const VocabNotebookPage: React.FC = () => {
                   {/* Word */}
                   <div className="flex-1 min-w-0">
                     <h4 className="font-headline font-bold text-base md:text-xl">{word.word}</h4>
-                    <p className="text-on-surface-variant text-xs md:text-sm line-clamp-1">{word.meaning || 'No definition'}</p>
+                    <p className="text-on-surface-variant text-xs md:text-sm line-clamp-1">{word.meaning || t('vocab_notebook.no_definition')}</p>
                   </div>
 
                   {/* Tag */}
@@ -203,14 +216,14 @@ export const VocabNotebookPage: React.FC = () => {
                               word.mastery === m ? 'bg-black text-white' : 'border-2 border-black/20 hover:border-black'
                             }`}
                           >
-                            {m.charAt(0).toUpperCase() + m.slice(1)}
+                            {t(`vocab_notebook.tag_${m}`)}
                           </button>
                         ))}
                         <button
                           onClick={() => handleDelete(word.id)}
                           className="px-3 py-1.5 rounded-full font-headline font-bold text-xs border-2 border-error/30 text-error hover:bg-error/10 transition-all active:scale-95 ml-auto"
                         >
-                          Delete
+                          {t('common.delete')}
                         </button>
                       </div>
                     </div>
@@ -234,16 +247,16 @@ export const VocabNotebookPage: React.FC = () => {
       {showAdd && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest sketch-card p-6 md:p-8 max-w-md w-full">
-            <h3 className="font-headline font-bold text-lg md:text-xl mb-4">Add New Word</h3>
+            <h3 className="font-headline font-bold text-lg md:text-xl mb-4">{t('vocab_notebook.add_title')}</h3>
             <div className="space-y-3">
-              <input type="text" value={newWord} onChange={e => setNewWord(e.target.value)} placeholder="Word..." className="w-full px-4 py-2.5 border-2 border-black rounded-xl font-body text-sm bg-white focus:outline-none" />
-              <input type="text" value={newMeaning} onChange={e => setNewMeaning(e.target.value)} placeholder="Meaning (optional)" className="w-full px-4 py-2.5 border-2 border-black/30 rounded-xl font-body text-sm bg-white focus:outline-none" />
-              <input type="text" value={newExample} onChange={e => setNewExample(e.target.value)} placeholder="Example sentence (optional)" className="w-full px-4 py-2.5 border-2 border-black/30 rounded-xl font-body text-sm bg-white focus:outline-none" />
+              <input type="text" value={newWord} onChange={e => setNewWord(e.target.value)} placeholder={t('vocab_notebook.word_placeholder')} className="w-full px-4 py-2.5 border-2 border-black rounded-xl font-body text-sm bg-white focus:outline-none" />
+              <input type="text" value={newMeaning} onChange={e => setNewMeaning(e.target.value)} placeholder={t('vocab_notebook.meaning_placeholder')} className="w-full px-4 py-2.5 border-2 border-black/30 rounded-xl font-body text-sm bg-white focus:outline-none" />
+              <input type="text" value={newExample} onChange={e => setNewExample(e.target.value)} placeholder={t('vocab_notebook.example_placeholder')} className="w-full px-4 py-2.5 border-2 border-black/30 rounded-xl font-body text-sm bg-white focus:outline-none" />
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 sketch-border bg-surface-container font-headline font-bold text-sm active:scale-95">Cancel</button>
+              <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 sketch-border bg-surface-container font-headline font-bold text-sm active:scale-95">{t('common.cancel')}</button>
               <button onClick={handleAdd} disabled={adding || !newWord.trim()} className="flex-1 py-2.5 sketch-border bg-black text-white font-headline font-bold text-sm active:scale-95 disabled:opacity-50">
-                {adding ? 'Adding...' : 'Add Word'}
+                {adding ? t('vocab_notebook.adding') : t('vocab_notebook.add_word')}
               </button>
             </div>
           </div>

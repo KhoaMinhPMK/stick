@@ -5,7 +5,7 @@ import { apiRequest } from '../../services/api/client';
 import { parseFeedback } from '../../types/dto/ai-feedback';
 
 export const HistoryDetailPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [journal, setJournal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -48,14 +48,17 @@ export const HistoryDetailPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
           <p className="font-headline font-bold text-xl">{t('history_detail.not_found', { defaultValue: 'Journal not found' })}</p>
-          <button onClick={() => window.location.hash = '#progress'} className="mt-4 text-blue-500 underline">Go back</button>
+          <button onClick={() => window.location.hash = '#progress'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group">
+            <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
+            <span className="font-headline font-bold text-sm">{t('common.go_back')}</span>
+          </button>
         </div>
       </AppLayout>
     );
   }
 
   const feedbackDto = parseFeedback(journal.feedback);
-  const enhancedText = feedbackDto.enhancedText || 'Feedback not generated yet.';
+  const enhancedText = feedbackDto.enhancedText || t('history_detail.no_feedback');
   const vocabBoosters = feedbackDto.vocabularyBoosters;
   const sentencePatterns = feedbackDto.sentencePatterns;
   const score = journal.score;
@@ -83,7 +86,7 @@ export const HistoryDetailPage: React.FC = () => {
             </div>
           </div>
           <h2 className="font-headline text-2xl md:text-3xl lg:text-5xl font-extrabold tracking-tight mb-3 md:mb-4 leading-tight">
-            {new Date(journal.createdAt).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — <span className="italic text-secondary">"{journal.title}"</span>
+            {new Date(journal.createdAt).toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — <span className="italic text-secondary">"{journal.title}"</span>
           </h2>
           <div className="w-20 md:w-32 h-1.5 md:h-2 bg-primary rounded-full" />
         </section>
@@ -127,9 +130,9 @@ export const HistoryDetailPage: React.FC = () => {
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-black transition-all cursor-pointer ${isPlayingAudio ? 'bg-error-container text-error' : 'bg-white hover:bg-secondary-container hover:scale-105'}`}
                   >
                     <span className="material-symbols-outlined text-lg md:text-xl">{isPlayingAudio ? 'stop_circle' : 'volume_up'}</span>
-                    <span className="text-xs font-bold">{isPlayingAudio ? 'Stop' : 'Listen'}</span>
+                    <span className="text-xs font-bold">{isPlayingAudio ? t('history_detail.stop') : t('history_detail.listen')}</span>
                   </button>
-                  <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest opacity-40">AI-Grammar Polish</span>
+                  <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest opacity-40">{t('history_detail.ai_polish')}</span>
                 </div>
               </div>
             </div>

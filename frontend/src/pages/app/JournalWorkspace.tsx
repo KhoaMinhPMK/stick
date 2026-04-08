@@ -42,7 +42,10 @@ export const JournalWorkspacePage: React.FC = () => {
     setJournalId(journalIdFromUrl);
     apiRequest<{ journal: { content: string } }>(`/journals/${journalIdFromUrl}`)
       .then(res => setText(res.journal.content || ''))
-      .catch(err => console.error('Failed to load draft', err))
+      .catch(err => {
+        console.error('Failed to load draft', err);
+        setSaveStatus('error');
+      })
       .finally(() => setIsLoadingDraft(false));
   }, [journalIdFromUrl]);
 
@@ -62,6 +65,7 @@ export const JournalWorkspacePage: React.FC = () => {
       setTimeout(() => setVocabSaved(false), 2500);
     } catch (err) {
       console.error('Failed to add vocab to library', err);
+      setSaveStatus('error');
     }
   };
 
@@ -85,7 +89,7 @@ export const JournalWorkspacePage: React.FC = () => {
       if (!id) {
         const res = await apiRequest<{ journal: { id: string } }>('/journals', {
           method: 'POST',
-          body: { title: 'Daily Journal', content: text, status: 'draft', language: 'en' },
+          body: { title: t('journal_workspace.daily_title', { defaultValue: 'Daily Journal' }), content: text, status: 'draft', language: 'en' },
         });
         id = res.journal.id;
       } else {
@@ -110,7 +114,7 @@ export const JournalWorkspacePage: React.FC = () => {
       if (!journalId) {
         const res = await apiRequest<{ journal: { id: string } }>('/journals', {
           method: 'POST',
-          body: { title: 'Daily Journal', content: text, status: 'draft', language: 'en' },
+          body: { title: t('journal_workspace.daily_title', { defaultValue: 'Daily Journal' }), content: text, status: 'draft', language: 'en' },
         });
         setJournalId(res.journal.id);
         window.history.replaceState(null, '', `#journal-workspace?journalId=${res.journal.id}`);

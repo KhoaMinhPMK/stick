@@ -304,7 +304,25 @@
     "suggested_for_you": "Gợi ý cho bạn",
     "reading_story": "Đọc: Truyện ngắn",
     "listen_repeat": "Nghe & Lặp lại",
-    "grammar_quiz": "Câu hỏi ngữ pháp"
+    "grammar_quiz": "Câu hỏi ngữ pháp",
+    "stat_journals": "Nhật ký",
+    "stat_words": "Từ vựng",
+    "stat_avg_score": "Điểm TB",
+    "stat_xp": "XP",
+    "explore_library": "Khám phá bài học trong Thư viện.",
+    "saved_phrases": "Cụm từ đã lưu",
+    "phrases_collected": "{{count}} cụm từ đã thu thập",
+    "achievements_title": "Thành tựu",
+    "achievements_desc": "Xem các cột mốc và phần thưởng.",
+    "error_load": "Không thể tải dữ liệu. Nhấn để thử lại."
+  },
+  "common": {
+    "go_back": "Quay lại",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "retry": "Thử lại",
+    "error_load": "Đã có lỗi xảy ra. Nhấn để thử lại.",
+    "error_save": "Lưu thất bại. Vui lòng thử lại."
   },
   "journal": {
     "session_intro": "Giới thiệu phiên học",
@@ -388,6 +406,7 @@
     }
   },
   "journal_workspace": {
+    "daily_title": "Nhật ký hàng ngày",
     "prompt_title": "Ngày hôm nay thế nào?",
     "topic_label": "Chủ đề",
     "draft_saved": "Đã lưu nháp",
@@ -446,7 +465,9 @@
     "continue": "Tiếp tục",
     "try_another": "Thử phiên bản khác",
     "daily_goal": "Mục tiêu hàng ngày",
-    "streak_hint": "Thêm một bài nữa để đạt chuỗi 7 ngày!"
+    "streak_hint": "Thêm một bài nữa để đạt chuỗi 7 ngày!",
+    "not_found": "Không tìm thấy kết quả",
+    "error_load": "Không thể tải phản hồi."
   },
   "progress": {
     "title": "Bảng Kiên Trì",
@@ -462,7 +483,28 @@
     "milestone_desc": "Chỉ còn 3 ngày nữa để đạt cột mốc tiếp theo. Bạn đang làm rất tốt!",
     "day_current": "Ngày {{day}}",
     "day_milestone": "Cột mốc ngày {{day}}",
-    "encouragement_quote": "Mỗi bước đều tiến gần đến sự thành thạo!"
+    "encouragement_quote": "Mỗi bước đều tiến gần đến sự thành thạo!",
+    "current_streak": "Chuỗi hiện tại",
+    "best_streak_label": "Chuỗi tốt nhất",
+    "total_xp": "Tổng XP",
+    "no_activity": "Chưa có hoạt động nào trong ngày này.",
+    "stat_journals": "Nhật ký",
+    "stat_words": "Từ vựng",
+    "stat_xp": "XP",
+    "stat_minutes": "Phút",
+    "journal_entries": "Bài nhật ký:",
+    "day_detail": "Chi tiết ngày",
+    "leaderboard": "Bảng xếp hạng",
+    "leaderboard_desc": "Xem thứ hạng của bạn so với người khác",
+    "backfill_error": "Không thể đồng bộ lịch sử. Nhấn để thử lại.",
+    "error_load": "Không thể tải dữ liệu tiến trình.",
+    "weekday_0": "T2",
+    "weekday_1": "T3",
+    "weekday_2": "T4",
+    "weekday_3": "T5",
+    "weekday_4": "T6",
+    "weekday_5": "T7",
+    "weekday_6": "CN"
   },
   "history_detail": {
     "return": "Quay lại lịch sử",
@@ -482,7 +524,12 @@
     "accuracy": "ĐỘ CHÍNH XÁC",
     "personal_note": "Ghi chú cá nhân",
     "saved_to_favorites": "Đã lưu vào yêu thích",
-    "encouragement": "Cố lên! Bạn đang làm rất tốt."
+    "encouragement": "Cố lên! Bạn đang làm rất tốt.",
+    "not_found": "Không tìm thấy nhật ký",
+    "no_feedback": "Phản hồi chưa được tạo.",
+    "listen": "Nghe",
+    "stop": "Dừng",
+    "ai_polish": "AI-Chỉnh sửa ngữ pháp"
   },
   "completion": {
     "title": "Hoàn thành hôm nay!",
@@ -496,7 +543,14 @@
     "mood_okay": "Bình thường",
     "mood_tired": "Mệt",
     "come_back": "Hẹn ngày mai",
-    "return_home": "Về trang chủ"
+    "return_home": "Về trang chủ",
+    "streak_day": "🔥 Ngày {{count}}!",
+    "streak_start": "Bắt đầu chuỗi ngày!",
+    "total_words": "{{count}} từ",
+    "mood_saved": "✓ Đã lưu cảm xúc!",
+    "mood_error": "Không lưu được cảm xúc. Nhấn để thử lại.",
+    "view_progress": "Xem tiến trình",
+    "error_load": "Không thể tải tổng kết."
   },
   "skeleton": {
     "title": "Đang chuẩn bị bút chì...",
@@ -523,7 +577,14 @@
     "card_preferences_desc": "Chế độ tối, cỡ chữ và ngôn ngữ.",
     "card_saved": "Câu đã lưu",
     "card_saved_desc": "Xem lại 124 cụm từ bạn đã đánh dấu.",
-    "footer_quote": "\"Điều tuyệt vời của việc học là không ai có thể lấy đi nó khỏi bạn.\""
+    "footer_quote": "\"Điều tuyệt vời của việc học là không ai có thể lấy đi nó khỏi bạn.\"",
+    "default_level": "Mới bắt đầu",
+    "day_streak": "chuỗi {{count}} ngày",
+    "member_since": "Thành viên từ {{date}}",
+    "stat_journals": "Nhật ký",
+    "stat_words": "Từ vựng",
+    "stat_phrases": "Cụm từ",
+    "error_load": "Không thể tải hồ sơ."
   },
   "settings": {
     "title": "Tùy chỉnh",
@@ -543,7 +604,21 @@
     "intense": "Cao độ",
     "reset_title": "Đặt lại hành trình học?",
     "reset_desc": "Điều này sẽ xóa tiến trình hiện tại và bắt đầu lại trải nghiệm giới thiệu từ đầu.",
-    "reset_button": "Đặt lại"
+    "reset_button": "Đặt lại",
+    "back": "Hồ sơ",
+    "saving": "Đang lưu...",
+    "save": "Lưu",
+    "saved_toast": "Đã lưu cài đặt!",
+    "delete_title": "Xóa tài khoản",
+    "delete_desc": "Xóa vĩnh viễn tài khoản và dữ liệu. Không thể hoàn tác.",
+    "delete_button": "Xóa tài khoản",
+    "delete_confirm_desc": "Tất cả nhật ký, tiến trình và dữ liệu sẽ bị xóa vĩnh viễn. Bạn chắc chứ?",
+    "deleting": "Đang xóa...",
+    "delete_confirm": "Xóa",
+    "delete_error": "Xóa tài khoản thất bại. Thử lại.",
+    "logout": "Đăng xuất",
+    "error_load": "Không thể tải cài đặt.",
+    "error_save": "Lưu cài đặt thất bại."
   },
   "reminders": {
     "title": "Cài đặt nhắc nhở",
@@ -739,7 +814,23 @@
     "def_resilient": "Có khả năng phục hồi nhanh chóng từ khó khăn",
     "ex_resilient": "Trẻ em là những sinh vật đáng kinh ngạc về khả năng phục hồi.",
     "def_contemplate": "Nhìn suy tư; cân nhắc",
-    "ex_contemplate": "Cô ấy ngồi bên cửa sổ, suy ngẫm về bước tiếp theo."
+    "ex_contemplate": "Cô ấy ngồi bên cửa sổ, suy ngẫm về bước tiếp theo.",
+    "tag_new": "Mới",
+    "tag_learning": "Đang học",
+    "tag_mastered": "Đã thạo",
+    "empty_title": "Chưa có từ nào",
+    "empty_desc": "Nhấn + để thêm từ đầu tiên!",
+    "no_definition": "Chưa có định nghĩa",
+    "add_title": "Thêm từ mới",
+    "word_placeholder": "Từ vựng...",
+    "meaning_placeholder": "Nghĩa (tùy chọn)",
+    "example_placeholder": "Câu ví dụ (tùy chọn)",
+    "adding": "Đang thêm...",
+    "add_word": "Thêm từ",
+    "error_load": "Không thể tải từ vựng.",
+    "error_add": "Thêm từ thất bại.",
+    "error_update": "Cập nhật thất bại.",
+    "error_delete": "Xóa thất bại."
   },
   "forgot_password": {
     "title": "Đặt lại mật khẩu",
@@ -771,7 +862,9 @@
     "a_streak_30": "Nhà vô địch tháng",
     "a_streak_30_desc": "Duy trì chuỗi viết 30 ngày.",
     "a_100_words": "Sưu tầm từ vựng",
-    "a_100_words_desc": "Học và ôn tập 100 từ vựng."
+    "a_100_words_desc": "Học và ôn tập 100 từ vựng.",
+    "total_xp_earned": "Tổng XP kiếm được",
+    "error_load": "Không thể tải thành tựu."
   },
   "notifications": {
     "back": "Quay lại Trang chủ",
@@ -828,7 +921,13 @@
     "correct": "Tuyệt vời! Chính xác.",
     "incorrect": "Chưa đúng lắm. Thử lại nhé.",
     "check": "Kiểm tra",
-    "continue": "Tiếp tục"
+    "continue": "Tiếp tục",
+    "generating": "Đang tạo câu hỏi...",
+    "quiz_complete": "Hoàn thành bài kiểm tra!",
+    "score_text": "Bạn đạt {{score}} trên {{total}}",
+    "back_to_library": "Quay lại Thư viện",
+    "try_again": "Thử lại",
+    "no_questions": "Không có câu hỏi nào."
   },
   "listening": {
     "instruction": "Nghe và điền từ còn thiếu",
