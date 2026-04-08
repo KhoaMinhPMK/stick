@@ -410,7 +410,7 @@
     "stick_feedback_typing": "Great work! You've written {{count}} words. Keep going to reach your {{target}}-word goal!",
     "daily_goal_progress": "Daily Goal Progress",
     "useful_vocab": "Useful Vocab",
-    "add_to_library": "Add to My Library",
+    "add_to_library": "Save to Vocab Notebook",
     "tip": "Tip: Try using \"because\" to join your sentences together and make them more complex!",
     "vocab_suggest": {
       "exhausted": "Instead of \"very tired\"",

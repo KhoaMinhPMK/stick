@@ -520,8 +520,21 @@ router.get('/profile', requireAuth, (req, res) => {
 });
 
 router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
-  const { name, bio, nativeLanguage } = req.body || {};
+  const { name, bio, nativeLanguage, avatarUrl } = req.body || {};
   const updateData = {};
+
+  if (typeof name === 'string' && name.trim()) updateData.name = name.trim();
+  if (typeof bio === 'string') updateData.bio = bio;
+  if (typeof nativeLanguage === 'string') updateData.nativeLanguage = nativeLanguage;
+  // Accept base64 data URL for avatar (limit ~200KB to prevent abuse)
+  if (typeof avatarUrl === 'string') {
+    if (avatarUrl === '') {
+      updateData.avatarUrl = null; // Allow clearing
+    } else if (avatarUrl.startsWith('data:image/') && avatarUrl.length <= 300000) {
+      updateData.avatarUrl = avatarUrl;
+    }
+    // Silently ignore invalid or oversized avatars
+  }
 
   if (typeof name === 'string' && name.trim()) updateData.name = name.trim();
   if (typeof bio === 'string') updateData.bio = bio;
@@ -975,17 +988,25 @@ router.get('/achievements/summary', requireAuth, asyncHandler(async (req, res) =
   const totalUnlocked = await prisma.userAchievement.count({
     where: { userId: req.authUser.id },
   });
-  const totalXp = await prisma.userAchievement.findMany({
+  const totalXpRecords = await prisma.userAchievement.findMany({
     where: { userId: req.authUser.id },
     include: { achievement: true },
   });
-  const xpEarned = totalXp.reduce((sum, ua) => sum + (ua.achievement?.xpReward || 0), 0);
+  const achievementXp = totalXpRecords.reduce((sum, ua) => sum + (ua.achievement?.xpReward || 0), 0);
+
+  // Also include totalXp from ProgressDaily for a unified view
+  const allXpProgress = await prisma.progressDaily.findMany({
+    where: { userId: req.authUser.id },
+    select: { xpEarned: true },
+  });
+  const totalXp = allXpProgress.reduce((sum, p) => sum + p.xpEarned, 0);
 
   res.status(200).json({
     totalAchievements: totalDefinitions,
     unlocked: totalUnlocked,
     locked: totalDefinitions - totalUnlocked,
-    xpEarned,
+    xpEarned: totalXp, // unified XP from daily progress (matches /progress/summary)
+    achievementXp, // XP from achievement rewards only
     completionPercent: totalDefinitions > 0 ? Math.round((totalUnlocked / totalDefinitions) * 100) : 0,
   });
 }));
@@ -1262,11 +1283,20 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
   today.setHours(0, 0, 0, 0);
 
+  // Helper: format a Date to YYYY-MM-DD in Vietnam timezone (consistent with trackDailyProgress)
+  const toVnDateStr = (d) => {
+    const vn = new Date(new Date(d).toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+    const y = vn.getFullYear();
+    const m = String(vn.getMonth() + 1).padStart(2, '0');
+    const dd = String(vn.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
   // Build a set of active date strings for fast lookup
   const activeDateSet = new Set();
   for (const p of dailyProgress) {
     if (p.journalsCount > 0 || p.minutesSpent > 0 || p.xpEarned > 0 || p.wordsLearned > 0) {
-      activeDateSet.add(new Date(p.day).toISOString().split('T')[0]);
+      activeDateSet.add(toVnDateStr(p.day));
     }
   }
 
@@ -1274,7 +1304,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   for (let i = 0; i < 60; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
-    const dateStr = checkDate.toISOString().split('T')[0];
+    const dateStr = toVnDateStr(checkDate);
     if (activeDateSet.has(dateStr)) {
       currentStreak++;
     } else if (i === 0) {
@@ -1291,7 +1321,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   });
   const allActiveDates = allProgress
     .filter(p => p.journalsCount > 0 || p.minutesSpent > 0 || p.xpEarned > 0 || p.wordsLearned > 0)
-    .map(p => new Date(p.day).toISOString().split('T')[0])
+    .map(p => toVnDateStr(p.day))
     .sort();
 
   let tempStreak = 0;
@@ -1321,8 +1351,12 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     ? Math.round(journals.reduce((s, j) => s + j.score, 0) / journals.length)
     : 0;
 
-  // Total XP
-  const totalXp = dailyProgress.reduce((sum, p) => sum + p.xpEarned, 0);
+  // Total XP — sum from ALL daily progress, not just last 60 days
+  const allXpProgress = await prisma.progressDaily.findMany({
+    where: { userId: req.authUser.id },
+    select: { xpEarned: true },
+  });
+  const totalXp = allXpProgress.reduce((sum, p) => sum + p.xpEarned, 0);
 
   // memberSince for day-number calculation
   const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true } });

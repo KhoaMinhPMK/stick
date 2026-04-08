@@ -33,6 +33,16 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+/** True when a non-guest user is signed-in. */
+export function isRealUserLoggedIn(): boolean {
+  const json = localStorage.getItem(USER_KEY);
+  if (!json) return false;
+  try {
+    const u = JSON.parse(json);
+    return u && u.isGuest === false;
+  } catch { return false; }
+}
+
 export function persistAuth(accessToken: string, user: unknown) {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -56,10 +66,28 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const payload = await response.json().catch(() => ({}));
 
-  // 401 recovery: clear stale token and create a fresh guest session, then retry once
+  // 401 recovery: distinguish between guest and real users.
+  // – If a real (non-guest) user gets 401, their session expired → redirect to login instead of silently replacing with a guest.
+  // – If no user was stored or user was a guest, create a fresh guest session and retry once.
   if (response.status === 401 && !_noRetry && path !== '/auth/firebase/login' && path !== '/auth/register' && path !== '/auth/login') {
+    const storedUserJson = localStorage.getItem(USER_KEY);
+    let wasRealUser = false;
+    if (storedUserJson) {
+      try {
+        const storedUser = JSON.parse(storedUserJson);
+        wasRealUser = storedUser && storedUser.isGuest === false;
+      } catch { /* ignore parse error */ }
+    }
+
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+
+    if (wasRealUser) {
+      // Real user session expired — redirect to login, don't silently degrade to guest
+      window.location.hash = '#login';
+      throw new ApiError(response.status, { code: 'SESSION_EXPIRED', message: 'Your session has expired. Please sign in again.' });
+    }
+
     try {
       // Lazily import to avoid circular deps at module level
       const { createGuestSession } = await import('./auth');

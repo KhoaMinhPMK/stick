@@ -32,6 +32,7 @@ function sanitizeUser(user) {
     role: user.role || 'user',
     bio: user.bio || '',
     nativeLanguage: user.nativeLanguage || '',
+    avatarUrl: user.avatarUrl || null,
     createdAt: user.createdAt,
   };
 }

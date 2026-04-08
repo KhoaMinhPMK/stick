@@ -8,7 +8,11 @@ export const TopNavBar: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isLoggedIn = !!localStorage.getItem('stick_access_token');
+  const isLoggedIn = (() => {
+    const userJson = localStorage.getItem('stick_user');
+    if (!userJson) return false;
+    try { const u = JSON.parse(userJson); return u && u.isGuest === false; } catch { return false; }
+  })();
 
   useEffect(() => {
     setMounted(true);

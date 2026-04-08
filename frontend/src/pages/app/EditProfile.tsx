@@ -18,12 +18,13 @@ export const EditProfilePage: React.FC = () => {
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const res = await apiRequest<{ user: { name: string; email: string; bio: string | null; nativeLanguage: string | null } }>('/profile');
+        const res = await apiRequest<{ user: { name: string; email: string; bio: string | null; nativeLanguage: string | null; avatarUrl: string | null } }>('/profile');
         if (res.user) {
           setName(res.user.name || '');
           setEmail(res.user.email || '');
           setBio(res.user.bio || '');
           setNativeLang(res.user.nativeLanguage || 'Vietnamese');
+          if (res.user.avatarUrl) setAvatarPreview(res.user.avatarUrl);
         }
       } catch (err) {
         console.error('Failed to fetch profile', err);
@@ -40,7 +41,7 @@ export const EditProfilePage: React.FC = () => {
     try {
       await apiRequest('/profile', {
         method: 'PUT',
-        body: { name, bio, nativeLanguage: nativeLang }
+        body: { name, bio, nativeLanguage: nativeLang, avatarUrl: avatarPreview || '' }
       });
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2500);

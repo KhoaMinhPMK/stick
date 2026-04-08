@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import LandingPage from './pages/landing';
 import { ensureSession } from './services/api/auth';
+import { isRealUserLoggedIn } from './services/api/client';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { OnboardingFlow } from './pages/app/onboarding/OnboardingFlow';
 import { LevelSelectionPage } from './pages/app/LevelSelection';
@@ -53,6 +54,11 @@ function App() {
   useEffect(() => {
     // Simple hash-based router
     const handleHashChange = () => {
+      // Cancel any ongoing speech synthesis when navigating away
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+
       // Strip query params before route matching so '#feedback?journalId=x' routes correctly
       const hash = window.location.hash.split('?')[0];
       // Admin routes: #admin/login, #admin/dashboard, etc.
@@ -187,11 +193,9 @@ function App() {
 
   // Bootstrap guest session silently — ensures protected API routes work
   // even before user goes through onboarding.
-  // If user already has a token, skip landing → go straight to dashboard.
+  // Only redirect to dashboard if a REAL (non-guest) user is stored.
   useEffect(() => {
-    const existingToken = localStorage.getItem('stick_access_token');
-    if (existingToken) {
-      // User already authenticated — if still on landing, redirect to dashboard
+    if (isRealUserLoggedIn()) {
       const hash = window.location.hash.split('?')[0];
       if (!hash || hash === '#' || hash === '#landing') {
         window.location.hash = '#dashboard';

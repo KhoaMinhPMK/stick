@@ -31,6 +31,29 @@ export const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Client-side validation
+    if (!name.trim()) {
+      setError(t('register.error_name_required', { defaultValue: 'Name is required' }));
+      return;
+    }
+    if (!email.trim()) {
+      setError(t('register.error_email_required', { defaultValue: 'Email is required' }));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(t('register.error_email_invalid', { defaultValue: 'Please enter a valid email' }));
+      return;
+    }
+    if (!password) {
+      setError(t('register.error_password_required', { defaultValue: 'Password is required' }));
+      return;
+    }
+    if (password.length < 6) {
+      setError(t('register.error_password_short', { defaultValue: 'Password must be at least 6 characters' }));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await registerWithEmail({ name, email, password });

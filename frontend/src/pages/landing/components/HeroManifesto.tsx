@@ -21,7 +21,12 @@ export const HeroManifesto: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
               variant="primary" 
-              onClick={() => window.location.hash = localStorage.getItem('stick_access_token') ? '#dashboard' : '#onboarding'}
+              onClick={() => {
+                const userJson = localStorage.getItem('stick_user');
+                let isReal = false;
+                try { const u = userJson && JSON.parse(userJson); isReal = u && u.isGuest === false; } catch { /* */ }
+                window.location.hash = isReal ? '#dashboard' : '#onboarding';
+              }}
             >
               {t('hero.cta_primary')} →
             </Button>
