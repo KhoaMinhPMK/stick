@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, getProgressDaily, getDueVocab, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 import { consumeGuestMergedFlag } from '../../services/api/auth';
+import { usePremium } from '../../hooks/usePremium';
 
 export const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
+  const isPremium = usePremium();
   const [periodOpen, setPeriodOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'this_week' | 'last_week'>('this_week');
   const periodRef = useRef<HTMLDivElement>(null);
@@ -75,10 +77,12 @@ export const DashboardPage: React.FC = () => {
       const labelIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       const found = dailyData.find(p => getLocalDate(new Date(p.day)) === dateStr);
       const activity = found ? (found.journalsCount * 10 + found.minutesSpent + found.xpEarned) : 0;
+      const hasActivity = activity > 0;
       bars.push({
         label: dayLabels[labelIdx],
         value: activity,
         isAlt: i % 2 === 0,
+        hasActivity,
       });
     }
     return bars;
@@ -111,6 +115,11 @@ export const DashboardPage: React.FC = () => {
               <span className="inline-block bg-secondary-container px-3 md:px-3 py-1 mt-2 transform -rotate-1 text-xl md:text-xl sketch-border">
                 {loading ? '...' : `${t('dashboard.day')} ${summary?.dayNumber ?? 1}`}
               </span>
+              {isPremium && (
+                <span className="inline-block ml-2 text-sm font-bold px-2 py-0.5 rounded-full premium-galaxy-badge text-amber-900 align-middle">
+                  ★ Premium
+                </span>
+              )}
             </h3>
             <p className="text-base md:text-lg text-on-surface-variant md:max-w-lg mx-auto md:mx-0">
               {summary?.todayCompleted ? t('dashboard.hero_subtitle_done') : t('dashboard.hero_subtitle')}
@@ -121,7 +130,7 @@ export const DashboardPage: React.FC = () => {
                 <span className="material-symbols-outlined group-hover:translate-x-2 transition-transform" data-icon="visibility">visibility</span>
               </button>
             ) : (
-              <button onClick={() => (window.location.hash = '#journal')} className="sketch-border w-full md:w-auto bg-black text-white px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 hover:bg-stone-800 transition-all active:scale-95 group">
+              <button onClick={() => (window.location.hash = '#journal')} className={`sketch-border w-full md:w-auto px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 transition-all active:scale-95 group ${isPremium ? 'premium-galaxy-btn' : 'bg-black text-white hover:bg-stone-800'}`}>
                 {t('dashboard.start_task')}
                 <span className="material-symbols-outlined group-hover:translate-x-2 transition-transform" data-icon="arrow_forward">arrow_forward</span>
               </button>
@@ -243,10 +252,13 @@ export const DashboardPage: React.FC = () => {
               return (
                 <div key={i} className="flex flex-col items-center gap-1 md:gap-1.5 group z-10 w-full">
                   <div
-                    className={`w-3 sm:w-5 md:w-8 ${bar.isAlt ? 'bg-secondary-container' : 'bg-black'} border-2 border-black rounded-t-lg transition-all group-hover:scale-y-110 origin-bottom sketch-border-subtle`}
+                    className={`w-3 sm:w-5 md:w-8 ${bar.hasActivity ? 'bg-gradient-to-t from-amber-500 to-yellow-300' : bar.isAlt ? 'bg-secondary-container' : 'bg-black/20'} border-2 border-black rounded-t-lg transition-all group-hover:scale-y-110 origin-bottom sketch-border-subtle`}
                     style={{ height: `${pct}%` }}
                   ></div>
-                  <span className="text-[10px] md:text-xs font-bold font-label">{t(bar.label)}</span>
+                  <span className={`text-[10px] md:text-xs font-bold font-label ${bar.hasActivity ? 'text-amber-700' : ''}`}>{t(bar.label)}</span>
+                  {bar.hasActivity && (
+                    <span className="material-symbols-outlined text-[12px] text-amber-500 -mt-0.5">local_fire_department</span>
+                  )}
                 </div>
               );
             })}
@@ -283,7 +295,7 @@ export const DashboardPage: React.FC = () => {
       </section>
 
       {/* FAB */}
-      <button onClick={() => (window.location.hash = '#journal-workspace')} className="fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 bg-black text-white rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 border-white hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle">
+      <button onClick={() => (window.location.hash = '#journal-workspace')} className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle ${isPremium ? 'premium-galaxy-btn border-purple-400' : 'bg-black text-white border-white'}`}>
         <span className="material-symbols-outlined text-2xl md:text-3xl" data-icon="add">add</span>
       </button>
     </AppLayout>

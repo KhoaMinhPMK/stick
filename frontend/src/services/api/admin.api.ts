@@ -133,8 +133,8 @@ export function getUser(id: string) {
   return adminRequest<AdminUserDetailDTO>(`/admin/users/${id}`);
 }
 
-export function patchUser(id: string, data: { role?: string; status?: string }) {
-  return adminRequest<{ user: { id: string; name: string; email: string | null; role: string; status: string } }>(
+export function patchUser(id: string, data: { role?: string; status?: string; isPremium?: boolean }) {
+  return adminRequest<{ user: { id: string; name: string; email: string | null; role: string; status: string; isPremium: boolean; premiumSince: string | null; premiumUntil: string | null } }>(
     `/admin/users/${id}`,
     { method: 'PATCH', body: data },
   );

@@ -82,6 +82,7 @@ export interface AdminUserDTO {
   isGuest: boolean;
   role: string;
   status: string;
+  isPremium: boolean;
   createdAt: string;
   stats: {
     totalDays: number;
@@ -95,6 +96,9 @@ export interface AdminUserDetailDTO {
   user: AdminUserDTO & {
     bio: string | null;
     nativeLanguage: string | null;
+    isPremium: boolean;
+    premiumSince: string | null;
+    premiumUntil: string | null;
     onboarding: {
       completed: boolean;
       level: string | null;

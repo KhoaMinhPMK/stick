@@ -129,7 +129,10 @@ export const AdminUsersPage: React.FC = () => {
                           {u.name?.charAt(0)?.toUpperCase() || '?'}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-sm truncate">{u.name}</p>
+                          <p className="font-bold text-sm truncate">
+                            {u.name}
+                            {u.isPremium && <span className="ml-1.5 text-[10px] font-bold font-headline uppercase px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-amber-900 align-middle">★</span>}
+                          </p>
                           <p className="text-[11px] text-outline truncate">{u.email || 'Guest'}</p>
                         </div>
                       </div>

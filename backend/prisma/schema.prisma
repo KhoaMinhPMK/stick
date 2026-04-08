@@ -32,6 +32,11 @@ model User {
   bestStreak        Int       @default(0)
   lastActiveDate   DateTime? @db.Date
 
+  // Premium subscription
+  isPremium        Boolean   @default(false)
+  premiumSince     DateTime?
+  premiumUntil     DateTime?  // null = lifetime while isPremium=true
+
   sessions         Session[]
   onboarding       OnboardingState?
   journals         Journal[]

@@ -9,6 +9,7 @@ export interface StoredUser {
   email?: string | null;
   isGuest?: boolean;
   avatarUrl?: string | null;
+  isPremium?: boolean;
 }
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

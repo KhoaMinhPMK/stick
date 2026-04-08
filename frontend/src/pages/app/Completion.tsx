@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, postJournalMood, type ProgressSummary } from '../../services/api/endpoints';
 import { trackCompletionView } from '../../services/analytics/coreLoop';
+import { usePremium } from '../../hooks/usePremium';
 
 export const CompletionPage: React.FC = () => {
   const { t } = useTranslation();
+  const isPremium = usePremium();
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [moodSaved, setMoodSaved] = useState(false);
   const [moodError, setMoodError] = useState<string | null>(null);
@@ -190,7 +192,7 @@ export const CompletionPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row flex-wrap gap-4 pt-4 md:pt-6">
               <button 
                 onClick={() => window.location.hash = '#app'}
-                className="px-8 py-3 md:px-10 md:py-4 bg-primary text-secondary-container font-headline font-bold md:font-extrabold text-lg md:text-xl rounded-full border-[3px] border-black hover:bg-stone-800 transition-all active:scale-95 flex items-center justify-center gap-3 w-full sm:w-auto"
+                className={`px-8 py-3 md:px-10 md:py-4 font-headline font-bold md:font-extrabold text-lg md:text-xl rounded-full border-[3px] border-black transition-all active:scale-95 flex items-center justify-center gap-3 w-full sm:w-auto ${isPremium ? 'premium-galaxy-btn' : 'bg-primary text-secondary-container hover:bg-stone-800'}`}
               >
                 {t('completion.come_back')}
                 <span className="material-symbols-outlined">arrow_forward</span>

@@ -7,6 +7,7 @@ export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -129,14 +130,24 @@ export const LoginPage: React.FC = () => {
                 <label className="font-headline font-bold text-[10px] sm:text-xs md:text-sm uppercase tracking-widest text-primary px-1" htmlFor="login-password">
                   {t('login.password_label')}
                 </label>
-                <input
-                  className="sketch-input py-3 md:py-4 px-1 text-base md:text-xl font-body placeholder:text-outline-variant focus:ring-0"
-                  id="login-password"
-                  placeholder="••••••••"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <input
+                    className="sketch-input py-3 md:py-4 px-1 pr-10 text-base md:text-xl font-body placeholder:text-outline-variant focus:ring-0 w-full"
+                    id="login-password"
+                    placeholder="••••••••"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-outline hover:text-on-surface transition-colors"
+                    tabIndex={-1}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                </div>
                 <div className="flex justify-end mt-1">
                   <button type="button" onClick={() => (window.location.hash = '#forgot-password')} className="text-xs md:text-sm text-primary font-bold hover:underline">
                     {t('login.forgot_password')}

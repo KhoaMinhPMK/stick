@@ -207,3 +207,58 @@ html.lang-vi .font-headline {
 .float-anim {
   animation: float 4s ease-in-out infinite;
 }
+
+/* ═══ Premium Galaxy Effects ═══ */
+@keyframes galaxyShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes galaxyPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(168, 85, 247, 0.3), 0 0 16px rgba(59, 130, 246, 0.1); }
+  50% { box-shadow: 0 0 16px rgba(168, 85, 247, 0.5), 0 0 32px rgba(59, 130, 246, 0.2); }
+}
+
+@keyframes galaxyStar {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.premium-galaxy-btn {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #a855f7, #3b82f6, #6366f1);
+  background-size: 300% 300%;
+  animation: galaxyShimmer 4s ease infinite, galaxyPulse 3s ease-in-out infinite;
+  color: white !important;
+  border-color: rgba(139, 92, 246, 0.5) !important;
+}
+
+.premium-galaxy-btn::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+  animation: galaxyStar 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.premium-galaxy-btn:active {
+  animation: galaxyShimmer 1s ease infinite;
+  transform: scale(0.97);
+}
+
+.premium-galaxy-badge {
+  background: linear-gradient(135deg, #f59e0b, #eab308, #f59e0b);
+  background-size: 200% 200%;
+  animation: galaxyShimmer 3s ease infinite;
+}
+
+.premium-galaxy-border {
+  border-image: linear-gradient(135deg, #6366f1, #a855f7, #3b82f6) 1;
+}

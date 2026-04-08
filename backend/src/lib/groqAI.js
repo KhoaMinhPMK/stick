@@ -9,7 +9,7 @@ const groq = new Groq({
  * Generate AI feedback for a journal entry.
  * Falls back to rule-based scoring if Groq API is unreachable.
  */
-async function generateJournalFeedback({ content, language = 'en', level = 'intermediate', goal = '', knownWords = [], errorPatterns = [], lexiconContext = null }) {
+async function generateJournalFeedback({ content, language = 'en', level = 'intermediate', goal = '', knownWords = [], errorPatterns = [], lexiconContext = null, isPremium = false }) {
   const learnerGoal = goal || 'build a daily English habit';
 
   // Build recurring error context so the AI coaches specifically on weak spots
@@ -44,8 +44,8 @@ CRITICAL RULES:
 1. The student may write in Vietnamese, English, or a mix of both (code-switching). This is NORMAL — never penalize it. Your job is to produce a FULLY ENGLISH version that preserves the student's original meaning and tone.
 2. The "enhancedText" must be natural, conversational English — not formal or academic. Write as a native speaker would casually express the same thought.
 3. For Vietnamese food names, cultural terms, or proper nouns (e.g. "bánh mì", "phở", "Tết"), keep them in the original Vietnamese form inside the English text — do NOT translate them.
-4. Keep corrections concise (max 4). Focus on the most impactful improvements.
-5. "learningCandidates" contains 0-3 expressions worth learning, tied to the learner's meaning gaps. Each must have a candidateType:
+4. Keep corrections concise (max ${isPremium ? 6 : 4}). Focus on the most impactful improvements.
+5. "learningCandidates" contains 0-${isPremium ? 5 : 3} expressions worth learning, tied to the learner's meaning gaps. Each must have a candidateType:
    - "new": expression the learner has never encountered — fills a clear meaning gap from this entry
    - "reinforce": expression the learner has seen/saved before but never used naturally — now there's a real context for it
    - "upgrade": expression the learner attempted but used awkwardly — a better/more natural form
@@ -122,7 +122,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown fences, no extra text.`;
         { role: 'user', content: `Journal entry (original language: ${language}):\n\n${content}` },
       ],
       temperature: 0.3,
-      max_tokens: 2000,
+      max_tokens: isPremium ? 3000 : 2000,
       response_format: { type: 'json_object' },
     });
 

@@ -4,6 +4,7 @@ import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { createVocabItem } from '../../services/api/endpoints';
 import { trackSessionStart, trackSubmissionSent } from '../../services/analytics/coreLoop';
+import { usePremium } from '../../hooks/usePremium';
 
 const QUICK_PROMPTS = [
   { icon: 'lightbulb', key: 'prompt_meal' },
@@ -13,6 +14,7 @@ const QUICK_PROMPTS = [
 
 export const JournalWorkspacePage: React.FC = () => {
   const { t } = useTranslation();
+  const isPremium = usePremium();
   const [text, setText] = useState('');
   const [showHelper, setShowHelper] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -214,7 +216,7 @@ export const JournalWorkspacePage: React.FC = () => {
                   disabled={!canSubmit || isSubmitting}
                   className={`flex-1 sm:flex-none px-5 md:px-8 lg:px-10 py-2 md:py-3 rounded-full font-bold text-sm md:text-base flex items-center justify-center gap-2 transition-all ${
                     canSubmit && !isSubmitting
-                      ? 'bg-black text-white hover:scale-105 active:scale-95'
+                      ? isPremium ? 'premium-galaxy-btn hover:scale-105 active:scale-95' : 'bg-black text-white hover:scale-105 active:scale-95'
                       : 'bg-surface-dim text-stone-400 cursor-not-allowed opacity-60'
                   }`}
                 >

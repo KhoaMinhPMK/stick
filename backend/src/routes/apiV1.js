@@ -966,20 +966,23 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
     });
   }
 
-  // Per-day submission limit: only one submitted journal per user per calendar day (Vietnam timezone)
+  // Per-day submission limit: premium=3, free=1
   const vnDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
   const todayStart = new Date(vnDateStr + 'T00:00:00+07:00');
   const todayEnd = new Date(vnDateStr + 'T23:59:59.999+07:00');
-  const existingToday = await prisma.journal.findFirst({
+  const isPremium = Boolean(req.authUser.isPremium);
+  const dailyLimit = isPremium ? 3 : 1;
+  const todayJournals = await prisma.journal.findMany({
     where: {
       userId: req.authUser.id,
       deletedAt: null,
       createdAt: { gte: todayStart, lte: todayEnd },
     },
+    orderBy: { createdAt: 'desc' },
   });
-  if (existingToday) {
-    // Return the existing journal instead of creating a duplicate
-    return res.status(200).json({ journal: existingToday, reused: true });
+  if (todayJournals.length >= dailyLimit) {
+    // Return the most recent journal instead of creating a duplicate
+    return res.status(200).json({ journal: todayJournals[0], reused: true, dailyLimitReached: true, dailyLimit });
   }
 
   const journal = await prisma.journal.create({
@@ -1186,6 +1189,7 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
       knownWords,
       errorPatterns: topErrors,
       lexiconContext,
+      isPremium: Boolean(req.authUser.isPremium),
     });
 
     // Log successful AI call
@@ -2677,6 +2681,7 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
       isGuest: u.isGuest,
       role: u.role,
       status: u.status || 'active',
+      isPremium: Boolean(u.isPremium),
       createdAt: u.createdAt,
       stats: {
         totalDays: progressDays,
@@ -2744,6 +2749,9 @@ router.get('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (re
       status: user.status || 'active',
       bio: user.bio,
       nativeLanguage: user.nativeLanguage,
+      isPremium: Boolean(user.isPremium),
+      premiumSince: user.premiumSince || null,
+      premiumUntil: user.premiumUntil || null,
       createdAt: user.createdAt,
       onboarding: user.onboarding ? {
         completed: user.onboarding.completed,
@@ -2764,7 +2772,7 @@ router.get('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (re
 }));
 
 router.patch('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const { role, status } = req.body || {};
+  const { role, status, isPremium } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id: req.params.id } });
   if (!user) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
@@ -2777,6 +2785,15 @@ router.patch('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (
   const data = {};
   if (role && ['user', 'admin'].includes(role)) data.role = role;
   if (status && ['active', 'banned'].includes(status)) data.status = status;
+  if (typeof isPremium === 'boolean') {
+    data.isPremium = isPremium;
+    if (isPremium && !user.isPremium) {
+      data.premiumSince = new Date();
+    }
+    if (!isPremium) {
+      data.premiumUntil = new Date(); // record when premium ended
+    }
+  }
 
   if (Object.keys(data).length === 0) {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'No valid fields to update' });
@@ -2785,7 +2802,7 @@ router.patch('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (
   const updated = await prisma.user.update({
     where: { id: req.params.id },
     data,
-    select: { id: true, name: true, email: true, role: true, status: true },
+    select: { id: true, name: true, email: true, role: true, status: true, isPremium: true, premiumSince: true, premiumUntil: true },
   });
 
   res.status(200).json({ user: updated });

@@ -33,6 +33,8 @@ function sanitizeUser(user) {
     bio: user.bio || '',
     nativeLanguage: user.nativeLanguage || '',
     avatarUrl: user.avatarUrl || null,
+    isPremium: Boolean(user.isPremium),
+    premiumUntil: user.premiumUntil || null,
     createdAt: user.createdAt,
   };
 }

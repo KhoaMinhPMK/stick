@@ -19,7 +19,7 @@ export const AdminUserDetailPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
 
-  const handlePatch = async (patch: { role?: string; status?: string }) => {
+  const handlePatch = async (patch: { role?: string; status?: string; isPremium?: boolean }) => {
     if (!userId) return;
     setActionLoading(true);
     setActionMsg('');
@@ -28,7 +28,14 @@ export const AdminUserDetailPage: React.FC = () => {
       // Update local state
       setData((prev) => prev ? {
         ...prev,
-        user: { ...prev.user, role: res.user.role, status: res.user.status },
+        user: {
+          ...prev.user,
+          role: res.user.role,
+          status: res.user.status,
+          isPremium: res.user.isPremium,
+          premiumSince: res.user.premiumSince,
+          premiumUntil: res.user.premiumUntil,
+        },
       } : prev);
       setActionMsg('Updated successfully');
       setTimeout(() => setActionMsg(''), 2000);
@@ -113,6 +120,11 @@ export const AdminUserDetailPage: React.FC = () => {
                     Banned
                   </span>
                 )}
+                {user.isPremium && (
+                  <span className="text-[10px] font-bold font-headline uppercase px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-amber-900">
+                    ★ Premium
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -180,6 +192,26 @@ export const AdminUserDetailPage: React.FC = () => {
             >
               <span className="material-symbols-outlined text-[16px]">person</span>
               Demote to User
+            </button>
+          )}
+          {/* Premium Toggle */}
+          {user.isPremium ? (
+            <button
+              onClick={() => { if (confirm('Remove premium access for this user?')) handlePatch({ isPremium: false }); }}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-4 py-2 border-2 border-amber-400 text-amber-700 font-headline font-bold text-xs rounded-xl hover:bg-amber-50 disabled:opacity-50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">star_off</span>
+              Remove Premium
+            </button>
+          ) : (
+            <button
+              onClick={() => { if (confirm('Grant premium access to this user?')) handlePatch({ isPremium: true }); }}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-4 py-2 border-2 border-amber-500 text-amber-600 font-headline font-bold text-xs rounded-xl hover:bg-amber-50 disabled:opacity-50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
+              Grant Premium
             </button>
           )}
           {actionMsg && (
