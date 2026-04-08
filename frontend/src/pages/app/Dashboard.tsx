@@ -48,15 +48,28 @@ export const DashboardPage: React.FC = () => {
     fetchData();
   }, []);
 
+  // Re-fetch when user navigates back to #app / #dashboard from another page
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.split('?')[0];
+      if (hash === '#app' || hash === '#dashboard') {
+        fetchData();
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   // Build chart data from daily progress (last 7 days)
   const dayLabels = ['dashboard.mon', 'dashboard.tue', 'dashboard.wed', 'dashboard.thu', 'dashboard.fri', 'dashboard.sat', 'dashboard.sun'];
   const chartBars = (() => {
     const now = new Date();
     const bars = [];
+    const offset = selectedPeriod === 'last_week' ? 7 : 0;
     const getLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
-      d.setDate(d.getDate() - i);
+      d.setDate(d.getDate() - i - offset);
       const dateStr = getLocalDate(d);
       const dayOfWeek = d.getDay(); // 0=Sun,1=Mon...
       const labelIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
