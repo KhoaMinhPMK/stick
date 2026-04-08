@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { parseFeedback } from '../../types/dto/ai-feedback';
+import { importFeedbackVocab } from '../../services/api/endpoints';
 
 export const HistoryDetailPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [journal, setJournal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [savedWordIndices, setSavedWordIndices] = useState<Set<number>>(new Set());
+  const [savingWordIndex, setSavingWordIndex] = useState<number | null>(null);
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
@@ -59,9 +62,25 @@ export const HistoryDetailPage: React.FC = () => {
 
   const feedbackDto = parseFeedback(journal.feedback);
   const enhancedText = feedbackDto.enhancedText || t('history_detail.no_feedback');
-  const vocabBoosters = feedbackDto.vocabularyBoosters;
+  const hasLexicon = feedbackDto.learningCandidates.length > 0;
+  const vocabWords: any[] = hasLexicon
+    ? feedbackDto.learningCandidates.map(c => ({ word: (c as any).expression, meaning: (c as any).meaning, example: (c as any).example }))
+    : feedbackDto.vocabularyBoosters.map((v: any) => ({ word: v.word, meaning: v.meaning || v.translation, example: v.context }));
   const sentencePatterns = feedbackDto.sentencePatterns;
   const score = journal.score;
+
+  const handleSaveWord = useCallback(async (index: number, word: any) => {
+    if (!id || savedWordIndices.has(index) || savingWordIndex !== null) return;
+    setSavingWordIndex(index);
+    try {
+      await importFeedbackVocab(id, [{ word: word.word, meaning: word.meaning, example: word.example }]);
+      setSavedWordIndices(prev => new Set(prev).add(index));
+    } catch {
+      // silently fail
+    } finally {
+      setSavingWordIndex(null);
+    }
+  }, [id, savedWordIndices, savingWordIndex]);
 
   return (
     <AppLayout activePath="#history">
@@ -145,18 +164,31 @@ export const HistoryDetailPage: React.FC = () => {
               </h3>
               <div className="space-y-6 md:space-y-12">
                 {/* Vocabulary Boosters */}
-                {vocabBoosters.length > 0 && (
+                {vocabWords.length > 0 && (
                   <div>
                     <p className="font-label uppercase tracking-widest text-[10px] md:text-xs font-black text-secondary mb-3 md:mb-4">{t('history_detail.vocab_boosters')}</p>
                     <div className="flex flex-wrap gap-3 md:gap-4">
-                      {vocabBoosters.map((v: any, i: number) => (
+                      {vocabWords.map((v: any, i: number) => (
                         <div
                           key={i}
-                          className="bg-surface-container p-3 md:p-4 rounded-xl border-2 border-black hover:-rotate-2 transition-transform cursor-help"
-                          title={v.context || v.meaning}
+                          className="bg-surface-container p-3 md:p-4 rounded-xl border-2 border-black flex items-start gap-2 hover:-rotate-1 transition-transform"
                         >
-                          <span className="font-bold block text-sm md:text-lg italic">{v.word}</span>
-                          <span className="text-[10px] md:text-sm opacity-70">{v.meaning || v.translation || t(v.meaning)}</span>
+                          <div className="min-w-0">
+                            <span className="font-bold block text-sm md:text-base italic">{v.word}</span>
+                            <span className="text-[10px] md:text-xs opacity-70">{v.meaning}</span>
+                          </div>
+                          <button
+                            onClick={() => handleSaveWord(i, v)}
+                            disabled={savedWordIndices.has(i) || savingWordIndex !== null}
+                            title={savedWordIndices.has(i) ? t('feedback_result.word_saved') : t('feedback_result.save_word')}
+                            className="shrink-0 p-1 rounded hover:bg-black/10 transition-colors disabled:opacity-40 disabled:cursor-default"
+                          >
+                            {savingWordIndex === i
+                              ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                              : savedWordIndices.has(i)
+                                ? <span className="material-symbols-outlined text-sm text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>bookmark_added</span>
+                                : <span className="material-symbols-outlined text-sm text-stone-400 hover:text-primary">bookmark_add</span>}
+                          </button>
                         </div>
                       ))}
                     </div>

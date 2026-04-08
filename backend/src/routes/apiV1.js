@@ -1128,6 +1128,13 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
     if (!journal) {
       return res.status(403).json({ code: 'FORBIDDEN', message: 'Journal not found or access denied' });
     }
+
+    // ── Idempotency guard: journal already has feedback → return cached, skip AI + XP ──
+    if (journal.status === 'submitted' && journal.feedback) {
+      const cached = typeof journal.feedback === 'string' ? JSON.parse(journal.feedback) : journal.feedback;
+      return res.status(200).json({ feedback: cached, cached: true });
+    }
+
     content = journal.content;
     language = journal.language;
   }
