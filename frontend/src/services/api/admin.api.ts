@@ -171,6 +171,24 @@ export function revokeStreakFreeze(userId: string, freezeId: string) {
   );
 }
 
+// ─── User Stats ───────────────────────
+export interface AdminUserStats {
+  id: string;
+  totalXp: number;
+  currentStreak: number;
+  bestStreak: number;
+}
+
+export function adjustUserStats(
+  userId: string,
+  payload: { xpAdjustment?: number; setCurrentStreak?: number; setBestStreak?: number },
+) {
+  return adminRequest<{ stats: AdminUserStats }>(
+    `/admin/users/${userId}/stats`,
+    { method: 'POST', body: payload },
+  );
+}
+
 // ─── AI Logs ──────────────────────────
 export function getAILogs(params: AILogFilterParams = {}) {
   const qs = new URLSearchParams();

@@ -1132,29 +1132,27 @@ router.get('/profile', requireAuth, (req, res) => {
 router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
   const { name, bio, nativeLanguage, avatarUrl } = req.body || {};
   const updateData = {};
+  let avatarTooLarge = false;
 
   if (typeof name === 'string' && name.trim()) updateData.name = name.trim();
-  if (typeof bio === 'string') updateData.bio = bio;
+  if (typeof bio === 'string') updateData.bio = bio.slice(0, 160);
   if (typeof nativeLanguage === 'string') updateData.nativeLanguage = nativeLanguage;
-  // Accept base64 data URL for avatar (limit ~200KB to prevent abuse)
+  // Accept base64 data URL for avatar (limit ~500KB to prevent abuse)
   if (typeof avatarUrl === 'string') {
     if (avatarUrl === '') {
-      updateData.avatarUrl = null; // Allow clearing
-    } else if (avatarUrl.startsWith('data:image/') && avatarUrl.length <= 300000) {
+      updateData.avatarUrl = null;
+    } else if (avatarUrl.startsWith('data:image/') && avatarUrl.length <= 700000) {
       updateData.avatarUrl = avatarUrl;
+    } else if (avatarUrl.startsWith('data:image/') && avatarUrl.length > 700000) {
+      avatarTooLarge = true;
     }
-    // Silently ignore invalid or oversized avatars
   }
-
-  if (typeof name === 'string' && name.trim()) updateData.name = name.trim();
-  if (typeof bio === 'string') updateData.bio = bio;
-  if (typeof nativeLanguage === 'string') updateData.nativeLanguage = nativeLanguage;
 
   const user = await prisma.user.update({
     where: { id: req.authUser.id },
     data: updateData,
   });
-  res.status(200).json({ user: sanitizeUser(user) });
+  res.status(200).json({ user: sanitizeUser(user), avatarTooLarge });
 }));
 
 // ─── Journals ────────────────────────────────────────
@@ -3126,6 +3124,66 @@ router.get('/admin/users/:id/streak-freezes', requireAuth, requireAdmin, asyncHa
   ]);
 
   res.status(200).json({ available, used: usedList, expired, availableCount: available.length });
+}));
+
+// ─── Admin: Adjust User Stats (XP, Streak) ──────────
+router.post('/admin/users/:id/stats', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { xpAdjustment, setCurrentStreak, setBestStreak } = req.body || {};
+
+  const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, totalXp: true, currentStreak: true, bestStreak: true } });
+  if (!target) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
+
+  const updateData = {};
+
+  // XP adjustment: create a log entry + update totalXp
+  if (typeof xpAdjustment === 'number' && xpAdjustment !== 0) {
+    const clampedXp = Math.max(-99999, Math.min(99999, Math.round(xpAdjustment)));
+    const newXp = Math.max(0, target.totalXp + clampedXp);
+    await prisma.userXpLog.create({
+      data: {
+        userId: req.params.id,
+        amount: clampedXp,
+        source: 'admin_adjustment',
+        description: `Admin XP adjustment by ${req.authUser.id} (${clampedXp > 0 ? '+' : ''}${clampedXp})`,
+      },
+    });
+    updateData.totalXp = newXp;
+  }
+
+  // Streak override: update stored value + backfill ProgressDaily
+  if (typeof setCurrentStreak === 'number' && setCurrentStreak >= 0) {
+    updateData.currentStreak = Math.round(setCurrentStreak);
+    if (setCurrentStreak > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      for (let i = 0; i < Math.min(setCurrentStreak, 365); i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        await prisma.progressDaily.upsert({
+          where: { userId_dateStr: { userId: req.params.id, dateStr } },
+          update: { completed: true },
+          create: { userId: req.params.id, dateStr, completed: true, dayNumber: 1 },
+        });
+      }
+    }
+  }
+
+  if (typeof setBestStreak === 'number' && setBestStreak >= 0) {
+    updateData.bestStreak = Math.round(setBestStreak);
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'No valid stat fields provided' });
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: req.params.id },
+    data: updateData,
+    select: { id: true, totalXp: true, currentStreak: true, bestStreak: true },
+  });
+
+  res.status(200).json({ stats: updated });
 }));
 
 // ─── Admin: AI Logs ──────────────────────────────────

@@ -6,8 +6,10 @@ const openai = new OpenAI({
   maxRetries: 2,
 });
 
-// o4-mini: best balance of thinking quality + speed for text tasks (April 2026)
-const CHAT_MODEL = 'o4-mini';
+// gpt-4.1: best language understanding + generation (outperforms o4-mini for text tasks)
+const CHAT_MODEL = 'gpt-4.1';
+// gpt-4.1-mini: cost-efficient for simpler generative tasks
+const FAST_MODEL = 'gpt-4.1-mini';
 
 /**
  * Generate AI feedback for a journal entry.
@@ -114,9 +116,8 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Journal entry (original language: ${language}):\n\n${content}` },
       ],
-      // o4-mini uses reasoning_effort instead of temperature
-      reasoning_effort: 'medium',
-      max_completion_tokens: isPremium ? 4000 : 2500,
+      temperature: 0.3,
+      max_tokens: isPremium ? 4000 : 2500,
       response_format: { type: 'json_object' },
     });
 
@@ -181,7 +182,7 @@ async function generateDailyChallenge(dateStr) {
   try {
     const seed = dateStr.replace(/-/g, '');
     const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+      model: FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -198,8 +199,8 @@ Return JSON:
         },
         { role: 'user', content: `Generate a daily English challenge for date: ${dateStr}` },
       ],
-      reasoning_effort: 'low',
-      max_completion_tokens: 500,
+      temperature: 0.9,
+      max_tokens: 500,
       response_format: { type: 'json_object' },
     });
     const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
@@ -227,7 +228,7 @@ async function generateGrammarQuiz(level = 'intermediate', count = 5) {
 
   try {
     const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+      model: FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -249,8 +250,8 @@ Generate exactly ${count} questions covering different grammar topics.`,
         },
         { role: 'user', content: `Generate ${count} grammar questions for ${level} level.` },
       ],
-      reasoning_effort: 'low',
-      max_completion_tokens: 2000,
+      temperature: 0.7,
+      max_tokens: 2000,
       response_format: { type: 'json_object' },
     });
     const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
@@ -277,7 +278,7 @@ async function generateReadingContent(topic, level = 'intermediate') {
 
   try {
     const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+      model: FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -297,8 +298,8 @@ Return JSON:
           content: `Write a short reading passage about: ${topic || 'daily life and personal growth'}`,
         },
       ],
-      reasoning_effort: 'low',
-      max_completion_tokens: 1000,
+      temperature: 0.8,
+      max_tokens: 1000,
       response_format: { type: 'json_object' },
     });
     const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');

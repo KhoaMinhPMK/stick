@@ -11,6 +11,7 @@ export const EditProfilePage: React.FC = () => {
   const [nativeLang, setNativeLang] = useState('Vietnamese');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,15 +39,21 @@ export const EditProfilePage: React.FC = () => {
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
+    setSaveError(null);
     try {
-      await apiRequest('/profile', {
+      const res = await apiRequest<{ user: unknown; avatarTooLarge?: boolean }>('/profile', {
         method: 'PUT',
         body: { name, bio, nativeLanguage: nativeLang, avatarUrl: avatarPreview || '' }
       });
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2500);
+      if (res.avatarTooLarge) {
+        setSaveError(t('edit_profile.avatar_too_large', { defaultValue: 'Avatar quá lớn (>500KB). Thông tin khác đã được lưu.' }));
+      } else {
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 2500);
+      }
     } catch (err) {
       console.error('Failed to save profile', err);
+      setSaveError(t('edit_profile.save_error', { defaultValue: 'Lưu thất bại. Vui lòng thử lại.' }));
     } finally {
       setSaving(false);
     }
@@ -192,6 +199,13 @@ export const EditProfilePage: React.FC = () => {
       <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-tertiary-container text-white px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold">
         <span className="material-symbols-outlined text-lg">check_circle</span>
         {t('edit_profile.saved')}
+      </div>
+    )}
+
+    {saveError && (
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-error text-white px-6 py-3 rounded-full sketch-border shadow-xl z-[60] flex items-center gap-2 animate-fade-in-up font-headline font-bold max-w-[90vw] text-center text-sm cursor-pointer" onClick={() => setSaveError(null)}>
+        <span className="material-symbols-outlined text-lg">error</span>
+        {saveError}
       </div>
     )}
     </>

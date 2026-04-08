@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { getUser, patchUser, getAdminUserStreakFreezes, grantStreakFreeze, revokeStreakFreeze } from '../../services/api/admin.api';
+import { getUser, patchUser, getAdminUserStreakFreezes, grantStreakFreeze, revokeStreakFreeze, adjustUserStats } from '../../services/api/admin.api';
 import type { AdminStreakFreeze } from '../../services/api/admin.api';
 import type { AdminUserDetailDTO } from '../../types/dto/admin.dto';
 
@@ -28,6 +28,14 @@ export const AdminUserDetailPage: React.FC = () => {
   const [grantExpiry, setGrantExpiry] = useState('');
   const [freezeMsg, setFreezeMsg] = useState('');
   const [freezeError, setFreezeError] = useState('');
+
+  // Stats editing state
+  const [xpInput, setXpInput] = useState('');
+  const [streakInput, setStreakInput] = useState('');
+  const [bestStreakInput, setBestStreakInput] = useState('');
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsMsg, setStatsMsg] = useState('');
+  const [statsError, setStatsError] = useState('');
 
   const loadFreezes = async () => {
     if (!userId) return;
@@ -74,6 +82,47 @@ export const AdminUserDetailPage: React.FC = () => {
   // Aliases to avoid name collision with imported functions
   const grantFreeze = grantStreakFreeze;
   const revokeFreeze = revokeStreakFreeze;
+
+  const handleAdjustStats = async () => {
+    if (!userId) return;
+    const payload: { xpAdjustment?: number; setCurrentStreak?: number; setBestStreak?: number } = {};
+    if (xpInput.trim() !== '') {
+      const xp = parseInt(xpInput.trim());
+      if (isNaN(xp)) { setStatsError('XP must be a number'); return; }
+      payload.xpAdjustment = xp;
+    }
+    if (streakInput.trim() !== '') {
+      const s = parseInt(streakInput.trim());
+      if (isNaN(s) || s < 0) { setStatsError('Streak must be a non-negative number'); return; }
+      payload.setCurrentStreak = s;
+    }
+    if (bestStreakInput.trim() !== '') {
+      const b = parseInt(bestStreakInput.trim());
+      if (isNaN(b) || b < 0) { setStatsError('Best streak must be a non-negative number'); return; }
+      payload.setBestStreak = b;
+    }
+    if (Object.keys(payload).length === 0) { setStatsError('Enter at least one value'); return; }
+
+    setStatsLoading(true);
+    setStatsMsg('');
+    setStatsError('');
+    try {
+      const res = await adjustUserStats(userId, payload);
+      const s = res.stats;
+      setStatsMsg(`Updated — XP: ${s.totalXp} | Streak: ${s.currentStreak} | Best: ${s.bestStreak}`);
+      setXpInput('');
+      setStreakInput('');
+      setBestStreakInput('');
+      // refresh user data
+      const fresh = await getUser(userId);
+      setData(fresh);
+      setTimeout(() => setStatsMsg(''), 4000);
+    } catch (err: unknown) {
+      setStatsError(err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handlePatch = async (patch: { role?: string; status?: string; isPremium?: boolean }) => {
     if (!userId) return;
@@ -428,6 +477,59 @@ export const AdminUserDetailPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* ── Stats Edit ── */}
+        <div className="bg-surface-container rounded-2xl p-5 mt-4">
+          <h3 className="font-headline font-bold text-base mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-base text-primary">edit_note</span>
+            Edit Stats (XP / Streak)
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="text-[10px] font-headline font-bold uppercase tracking-widest text-on-surface-variant block mb-1">XP Adjustment (+/-)</label>
+              <input
+                type="number"
+                value={xpInput}
+                onChange={(e) => setXpInput(e.target.value)}
+                placeholder="e.g. 100 or -50"
+                className="w-full border border-outline/30 rounded-lg px-3 py-2 text-sm bg-surface"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-headline font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Set Current Streak</label>
+              <input
+                type="number"
+                min="0"
+                value={streakInput}
+                onChange={(e) => setStreakInput(e.target.value)}
+                placeholder="e.g. 7"
+                className="w-full border border-outline/30 rounded-lg px-3 py-2 text-sm bg-surface"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-headline font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Set Best Streak</label>
+              <input
+                type="number"
+                min="0"
+                value={bestStreakInput}
+                onChange={(e) => setBestStreakInput(e.target.value)}
+                placeholder="e.g. 14"
+                className="w-full border border-outline/30 rounded-lg px-3 py-2 text-sm bg-surface"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-on-surface-variant mb-3">Setting current streak will backfill ProgressDaily records for the last N days.</p>
+          <button
+            onClick={handleAdjustStats}
+            disabled={statsLoading}
+            className="bg-primary text-white text-xs font-headline font-bold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          >
+            {statsLoading ? 'Saving...' : 'Apply Changes'}
+          </button>
+          {statsMsg && <p className="mt-2 text-xs font-bold text-tertiary">{statsMsg}</p>}
+          {statsError && <p className="mt-2 text-xs font-bold text-error">{statsError}</p>}
+        </div>
+
       </div>
     </AdminLayout>
   );
