@@ -1,0 +1,317 @@
+const OpenAI = require('openai');
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 30000,
+  maxRetries: 2,
+});
+
+// o4-mini: best balance of thinking quality + speed for text tasks (April 2026)
+const CHAT_MODEL = 'o4-mini';
+
+/**
+ * Generate AI feedback for a journal entry.
+ * Falls back to rule-based scoring if OpenAI API is unreachable.
+ */
+async function generateJournalFeedback({
+  content,
+  language = 'en',
+  level = 'intermediate',
+  goal = '',
+  knownWords = [],
+  errorPatterns = [],
+  lexiconContext = null,
+  isPremium = false,
+}) {
+  const learnerGoal = goal || 'build a daily English habit';
+
+  const patternHint =
+    Array.isArray(errorPatterns) && errorPatterns.length > 0
+      ? `\nThis student's known recurring problem areas (address these if relevant in this entry): ${errorPatterns.map((p) => p.errorType.replace(/_/g, ' ')).join(', ')}.`
+      : '';
+
+  let lexiconBlock = '';
+  if (lexiconContext && (lexiconContext.activeCount > 0 || lexiconContext.masteredCount > 0)) {
+    const parts = [];
+    if (lexiconContext.learningItems) {
+      parts.push(
+        `Expressions the learner is currently acquiring (suggest as REINFORCE if they fit a meaning gap):\n${lexiconContext.learningItems}`
+      );
+    }
+    if (lexiconContext.masteredList) {
+      parts.push(
+        `Expressions the learner already owns (do NOT suggest these): ${lexiconContext.masteredList}`
+      );
+    }
+    lexiconBlock = `\n\nLEARNER'S LANGUAGE MEMORY:\n${parts.join('\n\n')}`;
+  } else {
+    const knownWordsList =
+      Array.isArray(knownWords) && knownWords.length > 0
+        ? knownWords.slice(0, 12).join(', ')
+        : 'none yet';
+    lexiconBlock = `\nWords or phrases already saved in the learner's notebook: ${knownWordsList}.`;
+  }
+
+  const systemPrompt = `You are a warm, encouraging English tutor for the STICK app — a daily micro-learning tool that helps Vietnamese learners think in English.
+
+Student proficiency level: ${level}
+Student learning goal: ${learnerGoal}${lexiconBlock}${patternHint}
+
+CRITICAL RULES:
+1. The student may write in Vietnamese, English, or a mix. This is NORMAL — never penalize it. Produce a FULLY ENGLISH "enhancedText" that preserves the student's original meaning and tone.
+2. "enhancedText" must be natural, conversational English — not formal or academic.
+3. For Vietnamese food names, cultural terms, or proper nouns (e.g. "bánh mì", "phở", "Tết"), keep them as-is inside the English text.
+4. Keep corrections concise (max ${isPremium ? 6 : 4}). Focus on the most impactful improvements only.
+5. "learningCandidates" contains 0–${isPremium ? 5 : 3} expressions tied to the learner's MEANING GAPS in this entry.
+   Each must have a candidateType:
+   - "new": expression the learner has never encountered — fills a clear meaning gap
+   - "reinforce": learner has seen/saved it before but never used it naturally — now there's real context
+   - "upgrade": learner attempted a phrase but used it awkwardly — suggest a better/more natural form
+6. Each learningCandidate must fill a MEANING GAP — something the learner tried to express but couldn't say naturally. Describe the gap in "meaningGap".
+7. Prefer phrases/collocations over single words. Prefer "reinforce" over "new" when both fit equally.
+8. Do NOT suggest expressions the learner has already mastered (listed in LANGUAGE MEMORY as "do NOT suggest").
+9. "expressionUsage": scan the learner's text for any expressions from their LANGUAGE MEMORY. Report each with correct/incorrect usage and the relevant context quote.
+10. Still include "vocabularyBoosters" as a simplified mirror of learningCandidates for backward compatibility.
+11. The "meaning" field should be short and learner-facing: explain the meaning AND when to use it in this exact context.
+12. Include 0–2 "sentencePatterns" that are reusable and directly match the learner's message topic.
+13. "encouragement" must be warm and personal — reference something specific the student wrote.
+14. Score 0–100: effort (30%), English usage (30%), clarity (20%), grammar (20%). Full-Vietnamese entry still earns 20–40 for effort + clarity.
+
+Return ONLY a valid JSON object — no markdown fences, no extra text:
+{
+  "overallScore": <number 0-100>,
+  "enhancedText": "<natural English version>",
+  "corrections": [
+    { "original": "<original text>", "corrected": "<improved text>", "explanation": "<brief friendly explanation>" }
+  ],
+  "learningCandidates": [
+    {
+      "expression": "<word, phrase, collocation, or chunk>",
+      "expressionType": "<word|phrase|collocation|chunk>",
+      "candidateType": "<new|reinforce|upgrade>",
+      "meaning": "<short definition + when to use>",
+      "example": "<natural example sentence>",
+      "level": "<CEFR level A1-C2>",
+      "meaningGap": "<what the learner was trying to say but couldn't>"
+    }
+  ],
+  "expressionUsage": [
+    { "expression": "<expression from language memory>", "usedCorrectly": <true|false>, "context": "<quote from learner's text>" }
+  ],
+  "vocabularyBoosters": [
+    { "word": "<expression>", "meaning": "<short definition>", "level": "<CEFR level>" }
+  ],
+  "sentencePatterns": [
+    { "pattern": "<reusable sentence structure>", "example": "<example using this pattern>" }
+  ],
+  "encouragement": "<warm personal message>"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Journal entry (original language: ${language}):\n\n${content}` },
+      ],
+      // o4-mini uses reasoning_effort instead of temperature
+      reasoning_effort: 'medium',
+      max_completion_tokens: isPremium ? 4000 : 2500,
+      response_format: { type: 'json_object' },
+    });
+
+    const text = response.choices[0]?.message?.content || '{}';
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { overallScore: 0, summary: 'Unable to parse AI feedback', raw: text };
+    }
+  } catch (err) {
+    console.error('OpenAI API error, using fallback scoring:', err.message || err);
+    return generateFallbackFeedback(content);
+  }
+}
+
+/**
+ * Simple rule-based feedback when AI is unavailable.
+ */
+function generateFallbackFeedback(content) {
+  const words = content.split(/\s+/).filter(Boolean);
+  const sentences = content.split(/[.!?]+/).filter(Boolean);
+  const wordCount = words.length;
+  const sentenceCount = Math.max(sentences.length, 1);
+  const avgWordsPerSentence = wordCount / sentenceCount;
+
+  const lengthScore = Math.min(100, wordCount * 2);
+  const fluencyScore = avgWordsPerSentence >= 5 && avgWordsPerSentence <= 20 ? 75 : 50;
+  const overallScore = Math.round((lengthScore + fluencyScore) / 2);
+
+  const errors = [];
+  if (content.match(/\bi\b(?![''])/g)) {
+    errors.push({
+      original: 'i',
+      corrected: 'I',
+      explanation: "The pronoun 'I' should always be capitalized in English.",
+    });
+  }
+
+  return {
+    overallScore,
+    enhancedText: content,
+    vocabularyBoosters: [],
+    corrections: errors,
+    sentencePatterns: [],
+    encouragement: 'Great job writing today! Every journal entry helps you improve. Keep it up! 🌟',
+    _fallback: true,
+  };
+}
+
+/**
+ * Generate a daily challenge using OpenAI.
+ */
+async function generateDailyChallenge(dateStr) {
+  const fallback = {
+    phrase: 'Break the ice',
+    meaning: 'To initiate conversation in a social setting, especially with strangers.',
+    type: 'idiom',
+    task: 'Write a short journal entry (at least 3 sentences) about a time you had to "break the ice" with someone new.',
+    example: 'I had to break the ice with my new classmates on the first day of school.',
+  };
+
+  try {
+    const seed = dateStr.replace(/-/g, '');
+    const response = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You generate daily English challenges for a language learning app called STICK. Return ONLY valid JSON. Rotate between idioms, phrasal verbs, and useful expressions. Today's date seed: ${seed}.
+
+Return JSON:
+{
+  "phrase": "<the idiom or expression>",
+  "meaning": "<clear definition>",
+  "type": "<idiom|phrasal_verb|expression>",
+  "task": "<a writing prompt using this phrase>",
+  "example": "<example sentence using the phrase>"
+}`,
+        },
+        { role: 'user', content: `Generate a daily English challenge for date: ${dateStr}` },
+      ],
+      reasoning_effort: 'low',
+      max_completion_tokens: 500,
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return parsed.phrase ? parsed : fallback;
+  } catch (err) {
+    console.error('generateDailyChallenge error:', err.message);
+    return fallback;
+  }
+}
+
+/**
+ * Generate grammar quiz questions using OpenAI.
+ */
+async function generateGrammarQuiz(level = 'intermediate', count = 5) {
+  const fallback = {
+    questions: [
+      {
+        question: 'She _____ to the store yesterday.',
+        options: ['go', 'goes', 'went', 'gone'],
+        correct: 2,
+        explanation: "Use past simple 'went' for completed actions in the past.",
+      },
+    ],
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You generate English grammar quiz questions for level: ${level}. Return ONLY valid JSON.
+
+Return JSON:
+{
+  "questions": [
+    {
+      "question": "<sentence with _____ blank>",
+      "options": ["<option1>", "<option2>", "<option3>", "<option4>"],
+      "correct": <0-based index of correct answer>,
+      "explanation": "<brief explanation why>"
+    }
+  ]
+}
+
+Generate exactly ${count} questions covering different grammar topics.`,
+        },
+        { role: 'user', content: `Generate ${count} grammar questions for ${level} level.` },
+      ],
+      reasoning_effort: 'low',
+      max_completion_tokens: 2000,
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return Array.isArray(parsed.questions) && parsed.questions.length > 0 ? parsed : fallback;
+  } catch (err) {
+    console.error('generateGrammarQuiz error:', err.message);
+    return fallback;
+  }
+}
+
+/**
+ * Generate reading content + comprehension using OpenAI.
+ */
+async function generateReadingContent(topic, level = 'intermediate') {
+  const fallback = {
+    title: 'The Power of Daily Habits',
+    content:
+      'Building good habits is one of the most effective ways to improve your life. When you repeat a small action every day, it becomes automatic over time. The key is to start small and be consistent.',
+    vocabulary: [
+      { word: 'effective', meaning: 'successful in producing a desired result' },
+      { word: 'consistent', meaning: 'acting the same way over time' },
+    ],
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You generate short English reading passages for language learners at ${level} level. Return ONLY valid JSON.
+
+Return JSON:
+{
+  "title": "<article title>",
+  "content": "<150-250 word article paragraph>",
+  "vocabulary": [
+    { "word": "<key vocabulary word>", "meaning": "<simple definition>" }
+  ]
+}`,
+        },
+        {
+          role: 'user',
+          content: `Write a short reading passage about: ${topic || 'daily life and personal growth'}`,
+        },
+      ],
+      reasoning_effort: 'low',
+      max_completion_tokens: 1000,
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return parsed.title ? parsed : fallback;
+  } catch (err) {
+    console.error('generateReadingContent error:', err.message);
+    return fallback;
+  }
+}
+
+module.exports = {
+  generateJournalFeedback,
+  generateDailyChallenge,
+  generateGrammarQuiz,
+  generateReadingContent,
+};

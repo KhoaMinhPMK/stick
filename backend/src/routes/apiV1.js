@@ -8,7 +8,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent } = require('../lib/groqAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
