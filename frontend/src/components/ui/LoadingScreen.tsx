@@ -39,7 +39,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isLoading, minDela
   return (
     <div className={`fixed inset-0 z-[100] transition-opacity duration-500 ${fade ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
       <div className="bg-surface font-body text-on-surface overflow-hidden w-full h-[100dvh]">
-        <main className="relative h-full w-full flex flex-col items-center justify-center p-4 md:p-8 bg-notebook-pattern">
+          <main className="relative h-full w-full flex flex-col items-center justify-between p-4 md:p-8 pb-8 md:pb-12 bg-notebook-pattern">
           {/* Floating background elements */}
           <div className="absolute top-10 left-4 md:top-20 md:left-20 opacity-10 pointer-events-none animate-[float_6s_ease-in-out_infinite]">
             <span className="material-symbols-outlined text-5xl md:text-9xl text-primary">edit_note</span>
@@ -52,7 +52,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isLoading, minDela
           </div>
 
           {/* Center content */}
-          <div className="flex flex-col items-center gap-6 md:gap-10 relative z-10 w-full max-w-full px-2">
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 md:gap-10 relative z-10 w-full max-w-full px-2">
             <div className="text-center w-full">
               <h1 className="font-headline text-[16vw] sm:text-[6rem] md:text-[8rem] font-black tracking-tighter text-primary italic leading-none wobble-text">
                 STICK
@@ -81,7 +81,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isLoading, minDela
           </div>
 
           {/* Bottom quote */}
-          <div className="absolute bottom-6 w-full flex justify-center px-6">
+          <div className="relative z-10 w-full flex justify-center px-6 mt-4">
             <div className="max-w-[280px] md:max-w-md text-center opacity-60">
               <p className="text-secondary font-medium italic text-[10px] sm:text-xs md:text-base leading-tight">
                 "The secret of getting ahead is getting started."
