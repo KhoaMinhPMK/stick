@@ -92,8 +92,10 @@ export const ProgressPage: React.FC = () => {
   const streak = summary?.currentStreak || 0;
   const bestStreak = summary?.bestStreak || 0;
 
-  // Dynamic milestone: next multiple of 10
-  const nextMilestone = Math.max(Math.ceil((completedCount + 1) / 10) * 10, 10);
+  // Milestone uses all-time total journals for meaningful goal tracking
+  const totalJournals = summary?.totalJournals || 0;
+  const nextMilestone = Math.max(Math.ceil((totalJournals + 1) / 10) * 10, 10);
+  const daysToGoal = nextMilestone - totalJournals;
 
   // Load day detail when clicking a completed day
   const handleDayClick = async (day: number, status: DayStatus) => {
@@ -331,12 +333,12 @@ export const ProgressPage: React.FC = () => {
                   <div className="bg-tertiary-container px-2 md:px-3 py-0.5 md:py-1 border-2 border-black rounded-lg text-[10px] md:text-xs font-bold uppercase">{t('progress.goal_label')}</div>
                 </div>
                 <h4 className="font-headline font-bold text-base md:text-xl mb-1 md:mb-2">{t('progress.keep_it_up')}</h4>
-                <p className="text-on-tertiary/90 leading-relaxed text-xs md:text-sm mb-4 md:mb-6">{t('progress.milestone_desc')}</p>
+                <p className="text-on-tertiary/90 leading-relaxed text-xs md:text-sm mb-4 md:mb-6">{t('progress.milestone_desc', { count: daysToGoal })}</p>
                 <div className="w-full h-3 md:h-4 bg-black/20 rounded-full overflow-hidden mb-1 md:mb-2">
-                  <div className="h-full bg-on-tertiary rounded-full transition-all" style={{ width: `${Math.min((completedCount / nextMilestone) * 100, 100)}%` }} />
+                  <div className="h-full bg-on-tertiary rounded-full transition-all" style={{ width: `${Math.min((totalJournals / nextMilestone) * 100, 100)}%` }} />
                 </div>
                 <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase">
-                  <span>{t('progress.day_current', { day: completedCount })}</span>
+                  <span>{t('progress.day_current', { day: totalJournals })}</span>
                   <span>{t('progress.day_milestone', { day: nextMilestone })}</span>
                 </div>
               </div>

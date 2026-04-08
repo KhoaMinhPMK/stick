@@ -480,7 +480,7 @@
     "days": "days",
     "goal_label": "Goal",
     "keep_it_up": "Keep it up!",
-    "milestone_desc": "Just 3 more days for your next milestone. You're doing amazing!",
+    "milestone_desc": "{{count}} more days to your next milestone. Keep it up!",
     "day_current": "Day {{day}}",
     "day_milestone": "Day {{day}} Milestone",
     "encouragement_quote": "Every step counts toward mastery!",

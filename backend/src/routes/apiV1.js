@@ -85,10 +85,10 @@ async function getOrCreateOnboardingState(userId) {
  * Call this whenever the user does something meaningful.
  */
 async function trackDailyProgress(userId, data = {}) {
-  // Use Vietnam timezone (UTC+7) for day boundary so users see progress on their local date
-  const vnNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-  vnNow.setHours(0, 0, 0, 0);
-  const today = vnNow;
+  // Use Vietnam timezone (UTC+7) for day boundary so users see progress on their local date.
+  // Store as UTC midnight of the VN date string to ensure consistent cross-timezone parsing.
+  const vnDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const today = new Date(vnDateStr + 'T00:00:00.000Z');
   try {
     try {
       await prisma.progressDaily.upsert({
@@ -161,7 +161,8 @@ async function checkAndUnlockAchievements(userId) {
     const unlockedKeys = new Set();
     for (const ua of existing) {
       const def = definitions.find(d => d.id === ua.achievementId);
-      if (def) unlockedKeys.add(def.key);
+      // Only mark as unlocked if progress has reached the threshold
+      if (def && ua.progress >= def.threshold) unlockedKeys.add(def.key);
     }
 
     // Gather user stats
@@ -177,17 +178,21 @@ async function checkAndUnlockAchievements(userId) {
     });
     let currentStreak = 0;
     if (progressDays.length > 0) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      let checkDate = new Date(today);
-      for (const pd of progressDays) {
-        const pdDate = new Date(pd.day);
-        pdDate.setHours(0, 0, 0, 0);
-        const diff = Math.round((checkDate - pdDate) / 86400000);
-        if (diff <= 1) {
+      const todayVnStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const toVnStr = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const activeDays = new Set(
+        progressDays.filter(pd => pd.journalsCount > 0 || pd.minutesSpent > 0 || pd.xpEarned > 0 || pd.wordsLearned > 0)
+          .map(pd => toVnStr(pd.day))
+      );
+      const todayUtc = new Date(todayVnStr + 'T00:00:00.000Z');
+      for (let i = 0; i < 60; i++) {
+        const checkDate = new Date(todayUtc);
+        checkDate.setUTCDate(checkDate.getUTCDate() - i);
+        const dateStr = checkDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+        if (activeDays.has(dateStr)) {
           currentStreak++;
-          checkDate = pdDate;
-          checkDate.setDate(checkDate.getDate() - 1);
+        } else if (i === 0) {
+          continue; // Today might not have activity yet
         } else {
           break;
         }
@@ -269,7 +274,7 @@ async function checkAndUnlockAchievements(userId) {
         await prisma.userAchievement.upsert({
           where: { userId_achievementId: { userId, achievementId: def.id } },
           update: { progress: def.threshold, unlockedAt: new Date() },
-          create: { userId, achievementId: def.id, progress: def.threshold },
+          create: { userId, achievementId: def.id, progress: def.threshold, unlockedAt: new Date() },
         });
 
         // Award XP
@@ -558,11 +563,9 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
   }
 
   // Per-day submission limit: only one submitted journal per user per calendar day (Vietnam timezone)
-  const vnToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-  const todayStart = new Date(vnToday);
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(vnToday);
-  todayEnd.setHours(23, 59, 59, 999);
+  const vnDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const todayStart = new Date(vnDateStr + 'T00:00:00.000Z');
+  const todayEnd = new Date(vnDateStr + 'T23:59:59.999Z');
   const existingToday = await prisma.journal.findFirst({
     where: {
       userId: req.authUser.id,
@@ -1107,20 +1110,25 @@ router.get('/vocab/notebook/due', requireAuth, asyncHandler(async (req, res) => 
   const limit = Math.min(parseInt(req.query.limit) || 20, 50);
   const now = new Date();
 
+  const whereClause = {
+    userId: req.authUser.id,
+    mastery: { not: 'mastered' },
+    OR: [
+      { nextReviewAt: null },
+      { nextReviewAt: { lte: now } },
+    ],
+  };
+
   // Items due: nextReviewAt <= now OR nextReviewAt is null (never reviewed)
-  const items = await prisma.vocabNotebookItem.findMany({
-    where: {
-      userId: req.authUser.id,
-      mastery: { not: 'mastered' },
-      OR: [
-        { nextReviewAt: null },
-        { nextReviewAt: { lte: now } },
-      ],
-    },
-    orderBy: { nextReviewAt: 'asc' },
-    take: limit,
-  });
-  res.status(200).json({ items, total: items.length });
+  const [items, total] = await Promise.all([
+    prisma.vocabNotebookItem.findMany({
+      where: whereClause,
+      orderBy: { nextReviewAt: 'asc' },
+      take: limit,
+    }),
+    prisma.vocabNotebookItem.count({ where: whereClause }),
+  ]);
+  res.status(200).json({ items, total });
 }));
 
 // ─── Vocab: Review with SM-2 algorithm ───────────────
@@ -1280,17 +1288,11 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
 
   let currentStreak = 0;
   let bestStreak = 0;
-  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-  today.setHours(0, 0, 0, 0);
+  const todayVnStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const today = new Date(todayVnStr + 'T00:00:00.000Z');
 
-  // Helper: format a Date to YYYY-MM-DD in Vietnam timezone (consistent with trackDailyProgress)
-  const toVnDateStr = (d) => {
-    const vn = new Date(new Date(d).toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-    const y = vn.getFullYear();
-    const m = String(vn.getMonth() + 1).padStart(2, '0');
-    const dd = String(vn.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dd}`;
-  };
+  // Helper: get YYYY-MM-DD date string in Vietnam timezone from any Date
+  const toVnDateStr = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
 
   // Build a set of active date strings for fast lookup
   const activeDateSet = new Set();

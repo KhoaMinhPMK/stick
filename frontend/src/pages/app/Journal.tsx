@@ -27,18 +27,8 @@ export const JournalPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // Day number = calendar days since user joined + 1 (1-based)
-  const dayNumber = (() => {
-    if (!summary) return '...';
-    if (summary.memberSince) {
-      const joined = new Date(summary.memberSince);
-      const now = new Date();
-      const diffMs = now.getTime() - joined.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      return Math.max(diffDays + 1, 1);
-    }
-    return (summary.totalJournals || 0) + 1;
-  })();
+  // Day number = which journal session this is (totalJournals + 1 since this is the next one)
+  const dayNumber = summary ? (summary.totalJournals || 0) + 1 : '...';
   const isVi = i18n.language === 'vi';
 
   // Get prompt text from daily prompt or fallback

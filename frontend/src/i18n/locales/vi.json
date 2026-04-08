@@ -480,7 +480,7 @@
     "days": "ngày",
     "goal_label": "Mục tiêu",
     "keep_it_up": "Cố lên!",
-    "milestone_desc": "Chỉ còn 3 ngày nữa để đạt cột mốc tiếp theo. Bạn đang làm rất tốt!",
+    "milestone_desc": "Còn {{count}} ngày nữa để đạt cột mốc tiếp theo. Cố lên!",
     "day_current": "Ngày {{day}}",
     "day_milestone": "Cột mốc ngày {{day}}",
     "encouragement_quote": "Mỗi bước đều tiến gần đến sự thành thạo!",
