@@ -27,8 +27,10 @@ export const JournalPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // Day number = which journal session this is (totalJournals + 1 since this is the next one)
-  const dayNumber = summary ? (summary.totalJournals || 0) + 1 : '...';
+  // Day number from backend (unified logic)
+  const dayNumber = summary?.dayNumber ?? '...';
+  const todayCompleted = summary?.todayCompleted ?? false;
+  const todayJournalId = summary?.todayJournalId ?? null;
   const isVi = i18n.language === 'vi';
 
   // Get prompt text from daily prompt or fallback
@@ -53,7 +55,7 @@ export const JournalPage: React.FC = () => {
             <div className="space-y-6 md:space-y-8">
               <div className="space-y-1 md:space-y-2 text-center md:text-left">
                 <span className="font-headline font-bold text-tertiary uppercase tracking-widest text-xs md:text-sm">
-                  {t('journal.session_intro')}
+                  {todayCompleted ? t('journal.session_intro_done') : t('journal.session_intro')}
                 </span>
                 <h2 className="font-headline font-extrabold text-3xl md:text-4xl text-black wobble-heading leading-tight mx-auto md:mx-0 max-w-[90%] md:max-w-none">
                   {t('journal.day_title', { day: dayNumber })}
@@ -109,16 +111,34 @@ export const JournalPage: React.FC = () => {
               </div>
 
               <div className="pt-2 md:pt-4">
-                <button 
-                  onClick={() => {
-                    const params = promptId ? `?promptId=${promptId}` : '';
-                    window.location.hash = `#journal-workspace${params}`;
-                  }}
-                  className="w-full md:w-auto px-8 md:px-12 py-3 md:py-4 bg-secondary-container hover:bg-on-secondary-fixed-variant hover:text-white transition-all duration-300 font-headline font-black text-lg md:text-xl sketch-border flex items-center justify-center gap-3 md:gap-4 group active:scale-95 mx-auto md:mx-0"
-                >
-                  {t('journal.begin_activity')}
-                  <span className="material-symbols-outlined transition-transform group-hover:translate-x-2">arrow_forward</span>
-                </button>
+                {todayCompleted && todayJournalId ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-tertiary/10 border-2 border-tertiary/30 rounded-xl flex items-center gap-3">
+                      <span className="material-symbols-outlined text-tertiary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      <span className="text-sm md:text-base font-medium text-on-surface">{t('journal.already_done')}</span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        window.location.hash = `#feedback?journalId=${todayJournalId}`;
+                      }}
+                      className="w-full md:w-auto px-8 md:px-12 py-3 md:py-4 bg-tertiary text-white hover:bg-tertiary/80 transition-all duration-300 font-headline font-black text-lg md:text-xl sketch-border flex items-center justify-center gap-3 md:gap-4 group active:scale-95 mx-auto md:mx-0"
+                    >
+                      {t('journal.view_feedback')}
+                      <span className="material-symbols-outlined transition-transform group-hover:translate-x-2">visibility</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      const params = promptId ? `?promptId=${promptId}` : '';
+                      window.location.hash = `#journal-workspace${params}`;
+                    }}
+                    className="w-full md:w-auto px-8 md:px-12 py-3 md:py-4 bg-secondary-container hover:bg-on-secondary-fixed-variant hover:text-white transition-all duration-300 font-headline font-black text-lg md:text-xl sketch-border flex items-center justify-center gap-3 md:gap-4 group active:scale-95 mx-auto md:mx-0"
+                  >
+                    {t('journal.begin_activity')}
+                    <span className="material-symbols-outlined transition-transform group-hover:translate-x-2">arrow_forward</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

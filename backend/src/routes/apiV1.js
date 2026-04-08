@@ -4,6 +4,7 @@ const {
   hashPassword,
   createSession,
   sanitizeUser,
+  getUserFromBearer,
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken } = require('../lib/firebase');
@@ -78,6 +79,294 @@ async function getOrCreateOnboardingState(userId) {
     });
   }
   return state;
+}
+
+/**
+ * Categorize an AI correction into a structured error type.
+ * Used for learner memory: we upsert `LearnerErrorPattern` after each feedback.
+ */
+function categorizeError(correction) {
+  const text = ((correction.explanation || '') + ' ' + (correction.corrected || '')).toLowerCase();
+  if (/past tense|past simple|simple past|past perfect|used to|would/.test(text)) return 'past_tense';
+  if (/article|use "a"|use "an"|use "the"|indefinite|definite/.test(text)) return 'article_usage';
+  if (/preposition|\"in\"|\"on\"|\"at\"|\"for\"|\"to\"|\"with\"|\"by\"|\"about\"/.test(text)) return 'preposition';
+  if (/capitalize|capital|uppercase|pronoun.i/.test(text)) return 'capitalization';
+  if (/plural|singular|countable|uncountable|doesn't take|doesn.t take/.test(text)) return 'noun_number';
+  if (/subject.verb|agreement|subj agreement|third person|he\/she/.test(text)) return 'subject_verb_agreement';
+  if (/collocation|goes with|paired with|often used with/.test(text)) return 'collocation';
+  if (/tense|present perfect|future|progressive|continuous|present simple/.test(text)) return 'tense_usage';
+  if (/word choice|word order|phrasing|expression|natural|idiomatic|instead of/.test(text)) return 'word_choice';
+  return 'other';
+}
+
+/**
+ * Upsert a LearnerErrorPattern row (count + 1 on conflict).
+ * Always non-blocking — errors are swallowed.
+ */
+async function upsertErrorPattern(userId, errorType, exampleError) {
+  try {
+    const id = require('crypto').randomUUID();
+    const example = String(exampleError || '').slice(0, 500);
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`LearnerErrorPattern\` (id, userId, errorType, count, lastSeenAt, exampleError, updatedAt)
+       VALUES (?, ?, ?, 1, NOW(3), ?, NOW(3))
+       ON DUPLICATE KEY UPDATE
+         count      = count + 1,
+         lastSeenAt = NOW(3),
+         exampleError = VALUES(exampleError),
+         updatedAt  = NOW(3)`,
+      id, userId, errorType, example
+    );
+  } catch { /* non-blocking */ }
+}
+
+// ─── Learner Lexicon helpers ─────────────────────────────────────────────────
+
+/**
+ * Compute the knowledge state from evidence counters.
+ * Pure function — no DB calls.
+ */
+function computeKnowledgeState(entry) {
+  if (entry.correctUseCount >= 4 && entry.correctUseSessions >= 4) return 'mastered';
+  if (entry.correctUseCount >= 2 && entry.correctUseSessions >= 2) return 'stable';
+  if (entry.userUsedCount >= 1) return 'activating';
+  if ((entry.userSavedCount >= 1 && entry.reviewSuccessCount >= 1)
+    || (entry.aiSuggestedCount >= 2 && entry.userSavedCount >= 1)) return 'learning';
+  if (entry.aiSuggestedCount >= 1 || entry.userSavedCount >= 1) return 'noticed';
+  return 'unseen';
+}
+
+/**
+ * Upsert a LearnerLexicon entry when AI suggests an expression.
+ * Increments aiSuggestedCount & recomputes state.
+ */
+async function lexiconOnAiSuggested(userId, expression, expressionType, journalId) {
+  try {
+    const canonical = String(expression).toLowerCase().trim();
+    if (!canonical) return;
+    const id = require('crypto').randomUUID();
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`LearnerLexicon\`
+         (id, userId, expression, expressionType, aiSuggestedCount, lastSuggestedAt, lastJournalId, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, 1, NOW(3), ?, NOW(3), NOW(3))
+       ON DUPLICATE KEY UPDATE
+         aiSuggestedCount = aiSuggestedCount + 1,
+         lastSuggestedAt  = NOW(3),
+         lastJournalId    = VALUES(lastJournalId),
+         expressionType   = VALUES(expressionType),
+         updatedAt        = NOW(3)`,
+      id, userId, canonical, expressionType || 'word', journalId || null
+    );
+    await recomputeLexiconState(userId, canonical);
+  } catch { /* non-blocking */ }
+}
+
+/**
+ * Update LearnerLexicon when AI reports the user used a known expression.
+ * @param {boolean} correct - whether usage was correct and natural
+ */
+async function lexiconOnUserUsed(userId, expression, correct, journalId) {
+  try {
+    const canonical = String(expression).toLowerCase().trim();
+    if (!canonical) return;
+    // Find existing entry
+    const rows = await safeFindManyRaw('LearnerLexicon', `userId = '${userId.replace(/'/g, '')}' AND expression = '${canonical.replace(/'/g, '')}'`);
+    if (!rows.length) return; // only track usage for known expressions
+    const entry = rows[0];
+    const isNewSession = entry.lastJournalId !== journalId;
+    const correctSessionInc = (correct && isNewSession) ? 1 : 0;
+    await prisma.$queryRawUnsafe(
+      `UPDATE \`LearnerLexicon\` SET
+         userUsedCount       = userUsedCount + 1,
+         correctUseCount     = correctUseCount + ?,
+         incorrectUseCount   = incorrectUseCount + ?,
+         correctUseSessions  = correctUseSessions + ?,
+         lastUsedAt          = NOW(3),
+         lastJournalId       = ?,
+         updatedAt           = NOW(3)
+       WHERE userId = ? AND expression = ?`,
+      correct ? 1 : 0,
+      correct ? 0 : 1,
+      correctSessionInc,
+      journalId || null,
+      userId,
+      canonical
+    );
+    await recomputeLexiconState(userId, canonical);
+  } catch { /* non-blocking */ }
+}
+
+/**
+ * Update LearnerLexicon when user saves an expression to notebook.
+ */
+async function lexiconOnUserSaved(userId, expression, notebookItemId) {
+  try {
+    const canonical = String(expression).toLowerCase().trim();
+    if (!canonical) return;
+    const id = require('crypto').randomUUID();
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`LearnerLexicon\`
+         (id, userId, expression, expressionType, userSavedCount, relatedNotebookItemId, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'word', 1, ?, NOW(3), NOW(3))
+       ON DUPLICATE KEY UPDATE
+         userSavedCount        = userSavedCount + 1,
+         relatedNotebookItemId = COALESCE(VALUES(relatedNotebookItemId), relatedNotebookItemId),
+         updatedAt             = NOW(3)`,
+      id, userId, canonical, notebookItemId || null
+    );
+    await recomputeLexiconState(userId, canonical);
+  } catch { /* non-blocking */ }
+}
+
+/**
+ * Update LearnerLexicon when user reviews (SRS) a vocab item.
+ */
+async function lexiconOnReview(userId, expression, success) {
+  try {
+    const canonical = String(expression).toLowerCase().trim();
+    if (!canonical) return;
+    const field = success ? 'reviewSuccessCount' : 'reviewFailCount';
+    await prisma.$queryRawUnsafe(
+      `UPDATE \`LearnerLexicon\` SET
+         ${field}       = ${field} + 1,
+         lastReviewedAt = NOW(3),
+         updatedAt      = NOW(3)
+       WHERE userId = ? AND expression = ?`,
+      userId, canonical
+    );
+    await recomputeLexiconState(userId, canonical);
+  } catch { /* non-blocking */ }
+}
+
+/**
+ * Recompute knowledgeState for a single lexicon entry.
+ */
+async function recomputeLexiconState(userId, canonical) {
+  try {
+    const rows = await safeFindManyRaw('LearnerLexicon', `userId = '${userId.replace(/'/g, '')}' AND expression = '${canonical.replace(/'/g, '')}'`);
+    if (!rows.length) return;
+    const entry = rows[0];
+    const newState = computeKnowledgeState(entry);
+    if (newState !== entry.knowledgeState) {
+      await prisma.$queryRawUnsafe(
+        `UPDATE \`LearnerLexicon\` SET knowledgeState = ?, updatedAt = NOW(3) WHERE id = ?`,
+        newState, entry.id
+      );
+    }
+  } catch { /* non-blocking */ }
+}
+
+/**
+ * Build lexicon context string for AI prompt.
+ * Returns object { learningItems: string, masteredItems: string }
+ */
+async function getLexiconContextForAI(userId) {
+  try {
+    // Items user is still learning — AI may suggest as reinforce/upgrade
+    const active = await safeFindManyRaw(
+      'LearnerLexicon',
+      `userId = '${userId.replace(/'/g, '')}' AND knowledgeState IN ('noticed','learning','activating')`,
+      'ORDER BY updatedAt DESC LIMIT 20'
+    );
+    // Items user has mastered — AI should NOT suggest these
+    const mastered = await safeFindManyRaw(
+      'LearnerLexicon',
+      `userId = '${userId.replace(/'/g, '')}' AND knowledgeState IN ('stable','mastered')`,
+      'ORDER BY correctUseCount DESC LIMIT 30'
+    );
+
+    const learningItems = active.map(e => {
+      const stateLabel = e.knowledgeState;
+      const detail = e.userUsedCount > 0
+        ? `used ${e.userUsedCount}x, correct ${e.correctUseCount}x`
+        : `seen ${e.aiSuggestedCount}x, saved ${e.userSavedCount}x, never used`;
+      return `- "${e.expression}" (${e.expressionType}, ${stateLabel}: ${detail})`;
+    }).join('\n');
+
+    const masteredList = mastered.map(e => `"${e.expression}"`).join(', ');
+
+    return { learningItems, masteredList, activeCount: active.length, masteredCount: mastered.length };
+  } catch {
+    return { learningItems: '', masteredList: '', activeCount: 0, masteredCount: 0 };
+  }
+}
+
+/**
+ * Merge a guest user's data into an existing real account.
+ * Called when a guest user logs into (or signs up with) an account
+ * that already exists so their journals/vocab/progress are preserved.
+ */
+async function mergeGuestIntoUser(guestUserId, targetUserId) {
+  // Step 1: Merge ProgressDaily with SUM on conflict (unique constraint)
+  try {
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`ProgressDaily\` (id, userId, day, journalsCount, wordsLearned, minutesSpent, xpEarned)
+       SELECT UUID(), ?, day, journalsCount, wordsLearned, minutesSpent, xpEarned
+       FROM \`ProgressDaily\` WHERE userId = ?
+       ON DUPLICATE KEY UPDATE
+         journalsCount = \`ProgressDaily\`.journalsCount + VALUES(journalsCount),
+         wordsLearned  = \`ProgressDaily\`.wordsLearned  + VALUES(wordsLearned),
+         minutesSpent  = \`ProgressDaily\`.minutesSpent  + VALUES(minutesSpent),
+         xpEarned      = \`ProgressDaily\`.xpEarned      + VALUES(xpEarned)`,
+      targetUserId, guestUserId
+    );
+  } catch (e) {
+    console.error('mergeGuestIntoUser: progress merge error', e.message);
+  }
+
+  // Step 2: Merge LearnerErrorPattern counts on conflict
+  try {
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`LearnerErrorPattern\` (id, userId, errorType, count, lastSeenAt, exampleError, updatedAt)
+       SELECT UUID(), ?, errorType, count, lastSeenAt, exampleError, NOW(3)
+       FROM \`LearnerErrorPattern\` WHERE userId = ?
+       ON DUPLICATE KEY UPDATE
+         count      = \`LearnerErrorPattern\`.count + VALUES(count),
+         lastSeenAt = GREATEST(\`LearnerErrorPattern\`.lastSeenAt, VALUES(lastSeenAt)),
+         updatedAt  = NOW(3)`,
+      targetUserId, guestUserId
+    );
+  } catch (e) {
+    console.error('mergeGuestIntoUser: error pattern merge error', e.message);
+  }
+
+  // Step 2b: Merge LearnerLexicon (sum counters on conflict)
+  try {
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`LearnerLexicon\` (id, userId, expression, expressionType,
+         aiSuggestedCount, userSavedCount, userUsedCount, correctUseCount, incorrectUseCount,
+         correctUseSessions, reviewSuccessCount, reviewFailCount, knowledgeState,
+         firstSeenAt, lastSuggestedAt, lastUsedAt, lastReviewedAt, createdAt, updatedAt)
+       SELECT UUID(), ?, expression, expressionType,
+         aiSuggestedCount, userSavedCount, userUsedCount, correctUseCount, incorrectUseCount,
+         correctUseSessions, reviewSuccessCount, reviewFailCount, knowledgeState,
+         firstSeenAt, lastSuggestedAt, lastUsedAt, lastReviewedAt, NOW(3), NOW(3)
+       FROM \`LearnerLexicon\` WHERE userId = ?
+       ON DUPLICATE KEY UPDATE
+         aiSuggestedCount   = \`LearnerLexicon\`.aiSuggestedCount   + VALUES(aiSuggestedCount),
+         userSavedCount     = \`LearnerLexicon\`.userSavedCount     + VALUES(userSavedCount),
+         userUsedCount      = \`LearnerLexicon\`.userUsedCount      + VALUES(userUsedCount),
+         correctUseCount    = \`LearnerLexicon\`.correctUseCount    + VALUES(correctUseCount),
+         incorrectUseCount  = \`LearnerLexicon\`.incorrectUseCount  + VALUES(incorrectUseCount),
+         correctUseSessions = \`LearnerLexicon\`.correctUseSessions + VALUES(correctUseSessions),
+         reviewSuccessCount = \`LearnerLexicon\`.reviewSuccessCount + VALUES(reviewSuccessCount),
+         reviewFailCount    = \`LearnerLexicon\`.reviewFailCount    + VALUES(reviewFailCount),
+         updatedAt          = NOW(3)`,
+      targetUserId, guestUserId
+    );
+  } catch (e) {
+    console.error('mergeGuestIntoUser: lexicon merge error', e.message);
+  }
+
+  // Step 3: Atomically re-parent all other guest data and delete the guest user
+  await prisma.$transaction([
+    prisma.journal.updateMany({ where: { userId: guestUserId }, data: { userId: targetUserId } }),
+    prisma.vocabNotebookItem.updateMany({ where: { userId: guestUserId }, data: { userId: targetUserId } }),
+    prisma.learningSession.updateMany({ where: { userId: guestUserId }, data: { userId: targetUserId } }),
+    prisma.progressDaily.deleteMany({ where: { userId: guestUserId } }),
+    prisma.session.deleteMany({ where: { userId: guestUserId } }),
+    prisma.user.delete({ where: { id: guestUserId } }),
+  ]);
 }
 
 /**
@@ -420,6 +709,15 @@ router.post('/auth/firebase/login', asyncHandler(async (req, res) => {
   const firebaseEmail = decoded.email || null;
   const firebaseName = decoded.name || decoded.email?.split('@')[0] || `User`;
   const isAnonymous = provider === 'anonymous';
+  const normalizedFirebaseEmail = firebaseEmail ? firebaseEmail.toLowerCase() : null;
+
+  let currentSession = null;
+  try {
+    currentSession = await getUserFromBearer(req.headers.authorization);
+  } catch (err) {
+    console.error('Current session lookup failed during Firebase login:', err.message);
+  }
+  const currentGuestUser = currentSession?.user?.isGuest ? currentSession.user : null;
 
   // Check if this Firebase UID already exists
   let user = await prisma.user.findFirst({
@@ -428,17 +726,35 @@ router.post('/auth/firebase/login', asyncHandler(async (req, res) => {
 
   if (user) {
     // Existing user — update name/email if changed
-    if (firebaseEmail && firebaseEmail !== user.email) {
+    const updateData = {};
+    if (normalizedFirebaseEmail && normalizedFirebaseEmail !== user.email) {
+      updateData.email = normalizedFirebaseEmail;
+    }
+    if ((!user.name || user.name.startsWith('Guest ')) && firebaseName) {
+      updateData.name = firebaseName;
+    }
+    if (!user.firebaseProvider || user.firebaseProvider !== provider) {
+      updateData.firebaseProvider = provider;
+    }
+    if (Object.keys(updateData).length > 0) {
       user = await prisma.user.update({
         where: { id: user.id },
-        data: { email: firebaseEmail },
+        data: updateData,
       });
+    }
+
+    // ── MERGE: guest session is active but we found an existing account by UID ──
+    // Preserve the guest's work by re-parenting all their data to this account.
+    if (currentGuestUser && currentGuestUser.id !== user.id) {
+      mergeGuestIntoUser(currentGuestUser.id, user.id).catch(e =>
+        console.error('Guest merge (uid-case) failed:', e.message)
+      );
     }
   } else {
     // Check if email already has an account (link Firebase to existing account)
-    if (firebaseEmail) {
+    if (normalizedFirebaseEmail) {
       user = await prisma.user.findFirst({
-        where: { email: firebaseEmail.toLowerCase(), isGuest: false },
+        where: { email: normalizedFirebaseEmail, isGuest: false },
       });
     }
 
@@ -448,12 +764,33 @@ router.post('/auth/firebase/login', asyncHandler(async (req, res) => {
         where: { id: user.id },
         data: { firebaseUid, firebaseProvider: provider },
       });
+
+      // ── MERGE: guest session active while logging into an existing email account ──
+      if (currentGuestUser && currentGuestUser.id !== user.id) {
+        mergeGuestIntoUser(currentGuestUser.id, user.id).catch(e =>
+          console.error('Guest merge (email-case) failed:', e.message)
+        );
+      }
+    } else if (currentGuestUser && !isAnonymous) {
+      // Upgrade the guest row in-place — same user ID, all history preserved
+      user = await prisma.user.update({
+        where: { id: currentGuestUser.id },
+        data: {
+          name: currentGuestUser.name && !currentGuestUser.name.startsWith('Guest ')
+            ? currentGuestUser.name
+            : firebaseName,
+          email: normalizedFirebaseEmail,
+          firebaseUid,
+          firebaseProvider: provider,
+          isGuest: false,
+        },
+      });
     } else {
       // Create new user
       user = await prisma.user.create({
         data: {
           name: firebaseName,
-          email: firebaseEmail ? firebaseEmail.toLowerCase() : null,
+          email: normalizedFirebaseEmail,
           firebaseUid,
           firebaseProvider: provider,
           isGuest: isAnonymous,
@@ -465,8 +802,9 @@ router.post('/auth/firebase/login', asyncHandler(async (req, res) => {
     }
   }
 
+  const guestMerged = !!(currentGuestUser && currentGuestUser.id !== user.id && !user.isGuest);
   const accessToken = await createSession(user.id);
-  res.status(200).json({ accessToken, user: sanitizeUser(user) });
+  res.status(200).json({ accessToken, user: sanitizeUser(user), guestMerged });
 }));
 
 // ─── Auth: Logout ────────────────────────────────────
@@ -564,8 +902,8 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
 
   // Per-day submission limit: only one submitted journal per user per calendar day (Vietnam timezone)
   const vnDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
-  const todayStart = new Date(vnDateStr + 'T00:00:00.000Z');
-  const todayEnd = new Date(vnDateStr + 'T23:59:59.999Z');
+  const todayStart = new Date(vnDateStr + 'T00:00:00+07:00');
+  const todayEnd = new Date(vnDateStr + 'T23:59:59.999+07:00');
   const existingToday = await prisma.journal.findFirst({
     where: {
       userId: req.authUser.id,
@@ -739,6 +1077,29 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
     where: { userId: req.authUser.id },
   });
   const level = onboarding?.level || 'intermediate';
+  let goal = typeof onboarding?.goal === 'string' ? onboarding.goal : '';
+  if (goal.startsWith('[')) {
+    try {
+      const parsedGoal = JSON.parse(goal);
+      if (Array.isArray(parsedGoal)) goal = parsedGoal.join(', ');
+    } catch {}
+  }
+  const knownWords = (await prisma.vocabNotebookItem.findMany({
+    where: { userId: req.authUser.id },
+    orderBy: { updatedAt: 'desc' },
+    take: 12,
+    select: { word: true },
+  })).map((item) => item.word).filter(Boolean);
+
+  // ── Learner Lexicon: build rich context for AI ──
+  const lexiconContext = await getLexiconContextForAI(req.authUser.id);
+
+  // ── Learner memory: fetch top recurring error patterns for AI context ──
+  const topErrors = await safeFindManyRaw(
+    'LearnerErrorPattern',
+    `userId = '${req.authUser.id.replace(/'/g, '')}'`,
+    'ORDER BY `count` DESC LIMIT 4'
+  );
 
   const startTime = Date.now();
   let feedback;
@@ -747,6 +1108,10 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
       content,
       language: language || 'en',
       level,
+      goal,
+      knownWords,
+      errorPatterns: topErrors,
+      lexiconContext,
     });
 
     // Log successful AI call
@@ -804,7 +1169,108 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
     }
   }
 
+  // ── Learner memory: extract error types from corrections and upsert patterns ──
+  if (feedback.corrections && Array.isArray(feedback.corrections) && !feedback._fallback) {
+    for (const correction of feedback.corrections) {
+      const errorType = categorizeError(correction);
+      upsertErrorPattern(req.authUser.id, errorType, correction.explanation || '');
+    }
+  }
+
+  // ── Learner Lexicon: process learningCandidates from AI ──
+  if (feedback.learningCandidates && Array.isArray(feedback.learningCandidates) && !feedback._fallback) {
+    for (const candidate of feedback.learningCandidates.slice(0, 3)) {
+      if (candidate.expression) {
+        lexiconOnAiSuggested(
+          req.authUser.id,
+          candidate.expression,
+          candidate.expressionType || 'word',
+          journalId || null
+        );
+      }
+    }
+  }
+
+  // ── Learner Lexicon: process expressionUsage from AI ──
+  if (feedback.expressionUsage && Array.isArray(feedback.expressionUsage) && !feedback._fallback) {
+    for (const usage of feedback.expressionUsage) {
+      if (usage.expression) {
+        lexiconOnUserUsed(
+          req.authUser.id,
+          usage.expression,
+          !!usage.usedCorrectly,
+          journalId || null
+        );
+      }
+    }
+  }
+
   res.status(200).json({ feedback });
+}));
+
+// ─── Feedback Vocab Import ────────────────────────────
+// Saves selected AI vocab boosters from a specific journal into the user's
+// vocab notebook. Deduplicates, schedules first review for tomorrow,
+// and marks items with fromAI + sourceJournalId for traceability.
+router.post('/journals/:id/import-vocab', requireAuth, asyncHandler(async (req, res) => {
+  const journalId = req.params.id;
+  const { items } = req.body || {};
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'items[] is required' });
+  }
+
+  const journal = await prisma.journal.findFirst({
+    where: { id: journalId, userId: req.authUser.id, deletedAt: null },
+  });
+  if (!journal) {
+    return res.status(403).json({ code: 'FORBIDDEN', message: 'Journal not found' });
+  }
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+
+  let saved = 0;
+  for (const item of items.slice(0, 10)) {
+    if (!item.word || typeof item.word !== 'string') continue;
+
+    // Case-insensitive dedup: skip if this word is already in the notebook
+    const existing = await prisma.vocabNotebookItem.findFirst({
+      where: {
+        userId: req.authUser.id,
+        word: { equals: item.word.trim(), mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    // Use raw INSERT so the new fromAI + sourceJournalId columns are always populated
+    const newId = require('crypto').randomUUID();
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO \`VocabNotebookItem\`
+         (id, userId, word, meaning, example, sourceJournalId, fromAI,
+          mastery, nextReviewAt, reviewInterval, easeFactor, reviewCount, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 'new', ?, 1, 2.5, 0, NOW(3), NOW(3))`,
+      newId,
+      req.authUser.id,
+      item.word.trim(),
+      item.meaning ? String(item.meaning).slice(0, 500) : null,
+      item.example ? String(item.example).slice(0, 1000) : null,
+      journalId,
+      tomorrow
+    );
+    // Sync: update lexicon when user saves a word
+    lexiconOnUserSaved(req.authUser.id, item.word.trim(), newId);
+    saved++;
+  }
+
+  if (saved > 0) {
+    await trackDailyProgress(req.authUser.id, { words: saved, xp: saved * 3 });
+    checkAndUnlockAchievements(req.authUser.id).catch(() => {});
+  }
+
+  res.status(200).json({ saved });
 }));
 
 // ─── Learning Sessions (create from practice modes) ─────────────────────
@@ -1182,6 +1648,12 @@ router.post('/vocab/notebook/:id/review', requireAuth, asyncHandler(async (req, 
     where: { id: req.params.id },
     data: { easeFactor, reviewInterval, reviewCount, nextReviewAt, mastery },
   });
+
+  // Sync: update lexicon when user reviews a vocab item
+  if (existing.word) {
+    lexiconOnReview(req.authUser.id, existing.word, quality >= 3);
+  }
+
   res.status(200).json({ item: updated });
 }));
 
@@ -1363,6 +1835,22 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   // memberSince for day-number calculation
   const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true } });
 
+  // Today's journal check (Vietnam timezone) — unified day logic
+  const vnToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const vnTodayStart = new Date(vnToday + 'T00:00:00+07:00');
+  const vnTodayEnd = new Date(vnToday + 'T23:59:59.999+07:00');
+  const todayJournal = await prisma.journal.findFirst({
+    where: {
+      userId: req.authUser.id,
+      deletedAt: null,
+      createdAt: { gte: vnTodayStart, lte: vnTodayEnd },
+    },
+    select: { id: true },
+  });
+  const todayCompleted = !!todayJournal;
+  const todayJournalId = todayJournal?.id || null;
+  const dayNumber = todayCompleted ? totalJournals : totalJournals + 1;
+
   res.status(200).json({
     totalJournals,
     totalWords,
@@ -1375,6 +1863,9 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     onboardingCompleted: onboarding.completed,
     level: onboarding.level || 'beginner',
     memberSince: user?.createdAt || null,
+    todayCompleted,
+    todayJournalId,
+    dayNumber,
   });
 }));
 

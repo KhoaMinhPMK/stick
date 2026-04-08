@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, type ProgressSummary } from '../../services/api/endpoints';
-import { apiRequest } from '../../services/api/client';
+import { apiRequest, getStoredUser } from '../../services/api/client';
 import { logout } from '../../services/api/auth';
 
 interface UserProfile {
@@ -23,6 +23,8 @@ const navCards = [
 
 export const ProfilePage: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const storedUser = getStoredUser();
+  const isGuest = storedUser?.isGuest === true;
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,34 @@ export const ProfilePage: React.FC = () => {
             <button onClick={() => window.location.reload()} className="text-sm font-headline font-bold text-error underline">{t('common.retry')}</button>
           </div>
         )}
+        {isGuest && (
+          <section className="bg-secondary-container sketch-border p-5 md:p-6 lg:p-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 md:gap-5">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border-2 border-black bg-white text-xs font-headline font-bold uppercase tracking-wide">
+                  <span className="material-symbols-outlined text-sm">bolt</span>
+                  {t('profile.guest_mode_badge')}
+                </div>
+                <h3 className="font-headline text-xl md:text-2xl font-black text-primary">{t('profile.guest_cta_title')}</h3>
+                <p className="text-sm md:text-base text-on-surface-variant max-w-2xl">{t('profile.guest_cta_desc')}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => (window.location.hash = '#register')}
+                  className="px-5 py-3 sketch-border bg-black text-white font-headline font-bold hover:bg-stone-800 transition-colors active:scale-95"
+                >
+                  {t('profile.guest_cta_primary')}
+                </button>
+                <button
+                  onClick={() => (window.location.hash = '#login')}
+                  className="px-5 py-3 sketch-border bg-white font-headline font-bold hover:bg-surface-container-highest transition-colors active:scale-95"
+                >
+                  {t('profile.guest_cta_secondary')}
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
         {/* Profile Hero */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-8 items-start">
           {/* Main Profile Card */}
@@ -94,12 +124,18 @@ export const ProfilePage: React.FC = () => {
                       {profile?.name || 'User'}
                     </h3>
                     <p className="text-secondary font-medium text-xs md:text-sm mt-1">
-                      {profile?.email || t('profile.subtitle')}
+                      {profile?.email || (isGuest ? t('profile.guest_email') : t('profile.subtitle'))}
                     </p>
                   </div>
 
                   {/* Badges */}
                   <div className="flex flex-wrap gap-2 md:gap-3 justify-center sm:justify-start">
+                    {isGuest && (
+                      <span className="px-3 md:px-4 py-0.5 md:py-1 bg-white border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
+                        <span className="material-symbols-outlined text-xs md:text-sm">person</span>
+                        {t('profile.guest_mode_badge')}
+                      </span>
+                    )}
                     <span className="px-3 md:px-4 py-0.5 md:py-1 bg-secondary-container border-2 border-black rounded-lg text-[10px] md:text-sm font-bold flex items-center gap-1 md:gap-2">
                       <span className="material-symbols-outlined text-xs md:text-sm">military_tech</span>
                       {summary?.level || profile?.level || t('profile.default_level')}

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { parseFeedback } from '../../types/dto/ai-feedback';
 import { trackFeedbackView } from '../../services/analytics/coreLoop';
+import { importFeedbackVocab } from '../../services/api/endpoints';
 
 export const FeedbackResultPage: React.FC = () => {
   const { t } = useTranslation();
@@ -11,6 +12,10 @@ export const FeedbackResultPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isPlayingEnhanced, setIsPlayingEnhanced] = useState(false);
+  const [savedWordIndices, setSavedWordIndices] = useState<Set<number>>(new Set());
+  const [savingWordIndex, setSavingWordIndex] = useState<number | null>(null);
+  const [saveAllStatus, setSaveAllStatus] = useState<'idle' | 'saving' | 'done'>('idle');
+  const [savedCount, setSavedCount] = useState(0);
   const feedbackTrackedRef = useRef(false);
 
   const id = useMemo(() => {
@@ -40,6 +45,36 @@ export const FeedbackResultPage: React.FC = () => {
     }
     load();
   }, [id]);
+
+  // ── Hooks must be unconditional — defined before any early returns ──────
+  const handleSaveWord = useCallback(async (index: number, word: any) => {
+    if (!id || savedWordIndices.has(index) || savingWordIndex !== null) return;
+    setSavingWordIndex(index);
+    try {
+      await importFeedbackVocab(id, [{ word: word.word, meaning: word.meaning, example: word.example }]);
+      setSavedWordIndices(prev => new Set(prev).add(index));
+      setSavedCount(prev => prev + 1);
+    } catch {
+      // silently fail — user can retry
+    } finally {
+      setSavingWordIndex(null);
+    }
+  }, [id, savedWordIndices, savingWordIndex]);
+
+  const handleSaveAllWords = useCallback(async (words: any[]) => {
+    if (!id || saveAllStatus !== 'idle') return;
+    setSaveAllStatus('saving');
+    try {
+      const items = words.map((w: any) => ({ word: w.word, meaning: w.meaning, example: w.example }));
+      const result = await importFeedbackVocab(id, items);
+      setSavedWordIndices(new Set(words.map((_: any, i: number) => i)));
+      setSavedCount(result.saved);
+      setSaveAllStatus('done');
+    } catch {
+      setSaveAllStatus('idle');
+    }
+  }, [id, saveAllStatus]);
+  // ────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -74,7 +109,10 @@ export const FeedbackResultPage: React.FC = () => {
 
   const feedbackDto = parseFeedback(journal.feedback);
   const corrections = feedbackDto.corrections;
+  const learningCandidates = feedbackDto.learningCandidates;
   const usefulWords = feedbackDto.vocabularyBoosters;
+  // Use learningCandidates if available, else fallback to vocabularyBoosters
+  const hasLexicon = learningCandidates.length > 0;
   const enhancedText = feedbackDto.enhancedText || journal.content;
   const encouragement = feedbackDto.encouragement || t('feedback_result.encouragement', { defaultValue: 'Keep up the great work!' });
   const score = journal.score || 0;
@@ -162,17 +200,87 @@ export const FeedbackResultPage: React.FC = () => {
                 </ul>
               </div>
 
-              {/* Useful Words */}
+              {/* Useful Words / Learning Candidates */}
               <div className="sketch-card p-5 md:p-8 bg-secondary-container/30">
-                <h3 className="font-headline font-bold text-base md:text-xl mb-4 md:mb-6 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-lg md:text-2xl">stylus_note</span> {t('feedback_result.useful_words')}
-                </h3>
+                <div className="flex items-center justify-between gap-2 mb-4 md:mb-6">
+                  <h3 className="font-headline font-bold text-base md:text-xl flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg md:text-2xl">stylus_note</span> {t('feedback_result.useful_words')}
+                  </h3>
+                  {(hasLexicon ? learningCandidates.length : usefulWords.length) > 0 && (
+                    <button
+                      onClick={() => handleSaveAllWords(hasLexicon
+                        ? learningCandidates.map(c => ({ word: c.expression, meaning: c.meaning, example: c.example }))
+                        : usefulWords)}
+                      disabled={saveAllStatus !== 'idle'}
+                      className="text-[10px] md:text-xs font-bold px-2 py-1 sketch-border bg-white hover:bg-primary hover:text-white transition-colors disabled:opacity-50 disabled:cursor-default flex items-center gap-1"
+                    >
+                      {saveAllStatus === 'saving' && <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>}
+                      {saveAllStatus === 'done'
+                        ? t('feedback_result.vocab_saved_count', { count: savedCount })
+                        : t('feedback_result.save_all_words')}
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-4 md:space-y-6">
-                  {usefulWords.map((w: any, i: number) => (
-                    <div key={i}>
-                      <span className="font-headline font-black text-base md:text-lg block">{w.word}</span>
-                      <p className="text-xs md:text-sm text-on-surface-variant italic">{w.meaning}</p>
-                      {w.level && <span className="text-[10px] md:text-xs bg-black text-white px-2 py-0.5 mt-1 inline-block">{w.level} Level</span>}
+                  {hasLexicon ? learningCandidates.map((c, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-headline font-black text-base md:text-lg">{c.expression}</span>
+                          <span className={`text-[9px] md:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm tracking-wider ${
+                            c.candidateType === 'new' ? 'bg-tertiary/20 text-tertiary' :
+                            c.candidateType === 'reinforce' ? 'bg-secondary/30 text-secondary' :
+                            'bg-primary/15 text-primary'
+                          }`}>
+                            {c.candidateType}
+                          </span>
+                          {c.expressionType !== 'word' && (
+                            <span className="text-[9px] md:text-[10px] text-stone-400 italic">{c.expressionType}</span>
+                          )}
+                        </div>
+                        <p className="text-xs md:text-sm text-on-surface-variant italic mt-0.5">{c.meaning}</p>
+                        {c.meaningGap && (
+                          <p className="text-[10px] md:text-xs text-stone-400 mt-1">
+                            <span className="font-bold">Gap:</span> {c.meaningGap}
+                          </p>
+                        )}
+                        {c.example && (
+                          <p className="text-[10px] md:text-xs text-stone-500 mt-1 italic">"{c.example}"</p>
+                        )}
+                        {c.level && <span className="text-[10px] md:text-xs bg-black text-white px-2 py-0.5 mt-1 inline-block">{c.level}</span>}
+                      </div>
+                      <button
+                        onClick={() => handleSaveWord(i, { word: c.expression, meaning: c.meaning, example: c.example })}
+                        disabled={savedWordIndices.has(i) || savingWordIndex !== null}
+                        title={savedWordIndices.has(i) ? t('feedback_result.word_saved') : t('feedback_result.save_word')}
+                        className="shrink-0 mt-0.5 p-1.5 rounded hover:bg-black/10 transition-colors disabled:opacity-40 disabled:cursor-default"
+                      >
+                        {savingWordIndex === i
+                          ? <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                          : savedWordIndices.has(i)
+                            ? <span className="material-symbols-outlined text-base text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>bookmark_added</span>
+                            : <span className="material-symbols-outlined text-base text-stone-400 hover:text-primary">bookmark_add</span>}
+                      </button>
+                    </div>
+                  )) : usefulWords.map((w: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-headline font-black text-base md:text-lg block">{w.word}</span>
+                        <p className="text-xs md:text-sm text-on-surface-variant italic">{w.meaning}</p>
+                        {w.level && <span className="text-[10px] md:text-xs bg-black text-white px-2 py-0.5 mt-1 inline-block">{w.level} Level</span>}
+                      </div>
+                      <button
+                        onClick={() => handleSaveWord(i, w)}
+                        disabled={savedWordIndices.has(i) || savingWordIndex !== null}
+                        title={savedWordIndices.has(i) ? t('feedback_result.word_saved') : t('feedback_result.save_word')}
+                        className="shrink-0 mt-0.5 p-1.5 rounded hover:bg-black/10 transition-colors disabled:opacity-40 disabled:cursor-default"
+                      >
+                        {savingWordIndex === i
+                          ? <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                          : savedWordIndices.has(i)
+                            ? <span className="material-symbols-outlined text-base text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>bookmark_added</span>
+                            : <span className="material-symbols-outlined text-base text-stone-400 hover:text-primary">bookmark_add</span>}
+                      </button>
                     </div>
                   ))}
                 </div>

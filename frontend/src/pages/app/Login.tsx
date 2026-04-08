@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../services/api/client';
-import { loginWithEmail, loginWithGoogle } from '../../services/api/auth';
+import { createGuestSession, loginWithEmail, loginWithGoogle } from '../../services/api/auth';
 
 export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
@@ -63,6 +63,23 @@ export const LoginPage: React.FC = () => {
         setError(t('login.popup_blocked', { defaultValue: 'Browser blocked the popup. Please check your popup blocker settings.' }));
       } else {
         setError(`Google sign-in failed: ${errorDetails}`);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGuest = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await createGuestSession();
+      window.location.hash = '#app';
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(t('login.guest_error', { defaultValue: 'Unable to start guest mode right now.' }));
       }
     } finally {
       setIsSubmitting(false);
@@ -162,7 +179,16 @@ export const LoginPage: React.FC = () => {
                 )}
                 <span className="font-bold text-xs md:text-sm">Google</span>
               </button>
+              <button onClick={handleGuest} disabled={isSubmitting} className="sketch-border border-2 bg-secondary-container/30 hover:bg-secondary-container py-3 md:py-4 flex items-center justify-center gap-2 md:gap-3 transition-all active:scale-95" type="button">
+                {isSubmitting ? (
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl animate-spin">sync</span>
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl">bolt</span>
+                )}
+                <span className="font-bold text-xs md:text-sm">{t('login.continue_as_guest', { defaultValue: 'Continue as guest' })}</span>
+              </button>
             </div>
+            <p className="text-center text-[11px] md:text-xs text-on-surface-variant">{t('login.guest_hint', { defaultValue: 'Try STICK first, then sign up later from your account.' })}</p>
           </form>
         </div>
 

@@ -10,12 +10,25 @@ import { apiRequest, persistAuth, getStoredToken } from './client';
 
 interface AuthResponse {
   accessToken: string;
+  guestMerged?: boolean;
   user: {
     id: string;
     name: string;
     email: string | null;
     isGuest: boolean;
   };
+}
+
+const GUEST_MERGED_KEY = 'stick_guest_merged';
+
+/** Returns true (and clears the flag) if a guest data merge just happened. */
+export function consumeGuestMergedFlag(): boolean {
+  const val = sessionStorage.getItem(GUEST_MERGED_KEY);
+  if (val) {
+    sessionStorage.removeItem(GUEST_MERGED_KEY);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -25,9 +38,12 @@ async function exchangeFirebaseToken(idToken: string): Promise<AuthResponse> {
   const response = await apiRequest<AuthResponse>('/auth/firebase/login', {
     method: 'POST',
     body: { idToken },
-    token: null, // No auth header needed for this call
+    token: getStoredToken(),
   });
   persistAuth(response.accessToken, response.user);
+  if (response.guestMerged) {
+    sessionStorage.setItem(GUEST_MERGED_KEY, '1');
+  }
   return response;
 }
 

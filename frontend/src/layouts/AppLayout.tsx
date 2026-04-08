@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { getStoredUser } from '../services/api/client';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,8 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#app' }) => {
   const { t, i18n } = useTranslation();
+  const storedUser = getStoredUser();
+  const isGuest = storedUser?.isGuest === true;
 
   const navItems = [
     { id: '#app', icon: 'home', label: t('navigation.home') },
@@ -100,6 +103,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
             <span className="material-symbols-outlined text-orange-600 text-sm md:text-base animate-pulse" data-icon="local_fire_department" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
             <span className="font-headline font-bold text-black text-xs md:text-sm">{t('dashboard.days_streak', { defaultValue: '12 Days' })}</span>
           </div>
+
+          {isGuest && (
+            <button
+              onClick={() => (window.location.hash = '#register')}
+              className="flex items-center justify-center gap-1.5 border-2 border-black rounded-full px-2.5 md:px-3 py-1.5 bg-white hover:bg-secondary-container transition-colors hover:scale-105 active:scale-95"
+              title={t('common.sign_up', { defaultValue: 'Sign up' })}
+            >
+              <span className="material-symbols-outlined text-sm md:text-base">person_add</span>
+              <span className="hidden sm:inline font-headline font-bold text-xs md:text-sm">{t('common.sign_up', { defaultValue: 'Sign up' })}</span>
+            </button>
+          )}
 
           {/* User Avatar */}
           <div onClick={() => (window.location.hash = '#profile')} className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-black overflow-hidden hover:scale-105 transition-transform cursor-pointer bg-white">

@@ -100,5 +100,6 @@ module.exports = {
   generateId,
   createSession,
   sanitizeUser,
+  getUserFromBearer,
   requireAuth,
 };

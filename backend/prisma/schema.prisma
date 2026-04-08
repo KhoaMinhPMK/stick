@@ -37,6 +37,8 @@ model User {
   vocabItems       VocabNotebookItem[]
   learningSessions LearningSession[]
   progressDaily    ProgressDaily[]
+  errorPatterns    LearnerErrorPattern[]
+  lexiconItems     LearnerLexicon[]
 }
 
 // ─── Auth ────────────────────────────────────────────
@@ -184,6 +186,8 @@ model VocabNotebookItem {
   mastery        String    @default("new") // "new", "learning", "mastered"
   tags           String?   // comma-separated
   notes          String?   @db.Text
+  sourceJournalId String?  // which journal produced this item
+  fromAI         Boolean   @default(false) // imported from AI feedback
   nextReviewAt   DateTime?
   easeFactor     Float     @default(2.5)
   reviewInterval Int       @default(0)   // days until next review
@@ -263,6 +267,53 @@ model DailyPrompt {
 
   @@unique([publishDate])
   @@index([status, publishDate])
+}
+
+// ─── Learner Error Patterns ─────────────────────────
+model LearnerErrorPattern {
+  id           String   @id @default(uuid())
+  userId       String
+  errorType    String   // "past_tense" | "article_usage" | "preposition" | "word_choice" | "capitalization" | "noun_number" | "subject_verb_agreement" | "collocation" | "tense_usage" | "other"
+  count        Int      @default(1)
+  lastSeenAt   DateTime @default(now())
+  exampleError String?  @db.Text
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, errorType])
+  @@index([userId, count(sort: Desc)])
+}
+
+// ─── Learner Lexicon (per-user expression knowledge memory) ──────────
+model LearnerLexicon {
+  id                    String    @id @default(uuid())
+  userId                String
+  expression            String    @db.VarChar(255) // canonical lowercase form
+  expressionType        String    @default("word") // word | phrase | collocation | chunk
+  aiSuggestedCount      Int       @default(0)
+  userSavedCount        Int       @default(0)
+  userUsedCount         Int       @default(0)
+  correctUseCount       Int       @default(0)
+  incorrectUseCount     Int       @default(0)
+  correctUseSessions    Int       @default(0) // distinct sessions with correct use
+  reviewSuccessCount    Int       @default(0)
+  reviewFailCount       Int       @default(0)
+  knowledgeState        String    @default("unseen") // unseen | noticed | learning | activating | stable | mastered
+  relatedNotebookItemId String?
+  lastJournalId         String?
+  firstSeenAt           DateTime  @default(now())
+  lastSuggestedAt       DateTime?
+  lastUsedAt            DateTime?
+  lastReviewedAt        DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, expression])
+  @@index([userId, knowledgeState])
+  @@index([userId, correctUseCount(sort: Desc)])
 }
 
 // ─── AI Logs ─────────────────────────────────────────

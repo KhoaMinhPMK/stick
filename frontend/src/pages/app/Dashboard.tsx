@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, getProgressDaily, getDueVocab, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
+import { consumeGuestMergedFlag } from '../../services/api/auth';
 
 export const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -13,6 +14,7 @@ export const DashboardPage: React.FC = () => {
   const [dueVocabCount, setDueVocabCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMergedBanner, setShowMergedBanner] = useState(() => consumeGuestMergedFlag());
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -72,6 +74,15 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <AppLayout activePath="#app">
+      {showMergedBanner && (
+        <div className="mb-4 p-3 bg-secondary-container border-2 border-secondary sketch-border rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-secondary text-xl">check_circle</span>
+            <span className="text-sm font-body text-on-secondary-container">{t('login.merged_guest_note')}</span>
+          </div>
+          <button onClick={() => setShowMergedBanner(false)} className="material-symbols-outlined text-secondary text-xl shrink-0" aria-label="Dismiss">close</button>
+        </div>
+      )}
       {error && (
         <div className="mb-4 p-3 bg-error-container border-2 border-error rounded-xl flex items-center justify-between">
           <span className="text-sm font-bold text-on-error-container">{error}</span>
@@ -85,16 +96,23 @@ export const DashboardPage: React.FC = () => {
             <h3 className="font-headline text-3xl md:text-4xl font-black text-black leading-tight">
               {t('dashboard.hero_title')}<br />
               <span className="inline-block bg-secondary-container px-3 md:px-3 py-1 mt-2 transform -rotate-1 text-xl md:text-xl sketch-border">
-                {loading ? '...' : `${t('dashboard.day')} ${summary?.currentStreak || 0}`}
+                {loading ? '...' : `${t('dashboard.day')} ${summary?.dayNumber ?? 1}`}
               </span>
             </h3>
             <p className="text-base md:text-lg text-on-surface-variant md:max-w-lg mx-auto md:mx-0">
-              {t('dashboard.hero_subtitle')}
+              {summary?.todayCompleted ? t('dashboard.hero_subtitle_done') : t('dashboard.hero_subtitle')}
             </p>
-            <button onClick={() => (window.location.hash = '#journal')} className="sketch-border w-full md:w-auto bg-black text-white px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 hover:bg-stone-800 transition-all active:scale-95 group">
-              {t('dashboard.start_task')}
-              <span className="material-symbols-outlined group-hover:translate-x-2 transition-transform" data-icon="arrow_forward">arrow_forward</span>
-            </button>
+            {summary?.todayCompleted && summary?.todayJournalId ? (
+              <button onClick={() => (window.location.hash = `#feedback?journalId=${summary.todayJournalId}`)} className="sketch-border w-full md:w-auto bg-tertiary text-white px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 hover:bg-tertiary/80 transition-all active:scale-95 group">
+                {t('dashboard.view_today_result')}
+                <span className="material-symbols-outlined group-hover:translate-x-2 transition-transform" data-icon="visibility">visibility</span>
+              </button>
+            ) : (
+              <button onClick={() => (window.location.hash = '#journal')} className="sketch-border w-full md:w-auto bg-black text-white px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 hover:bg-stone-800 transition-all active:scale-95 group">
+                {t('dashboard.start_task')}
+                <span className="material-symbols-outlined group-hover:translate-x-2 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+              </button>
+            )}
           </div>
           <div className="w-full md:w-1/3 flex justify-center items-center z-10 mt-6 md:mt-0">
             <div className="relative w-48 h-48 md:w-56 md:h-56 border-[3px] md:border-[4px] border-black rounded-full bg-white overflow-hidden flex items-center justify-center sketch-card">

@@ -59,6 +59,7 @@ export const CompletionPage: React.FC = () => {
 
   const streak = summary?.currentStreak || 0;
   const totalWords = summary?.totalWords || 0;
+  const dayNumber = summary?.dayNumber || 0;
 
   return (
     <AppLayout activePath="#journal">
@@ -87,6 +88,7 @@ export const CompletionPage: React.FC = () => {
           <div className="md:col-span-7 space-y-8 md:space-y-10 px-4 md:pl-8 animate-fade-in-up delay-200">
             <div>
               <h2 className="font-headline font-extrabold text-4xl md:text-6xl tracking-tighter italic text-black mb-3 md:mb-4 -rotate-1 origin-left wobble-text hover:rotate-[-2deg] hover:scale-105 transition-transform cursor-default">
+                {dayNumber > 0 && <span className="block text-lg md:text-2xl not-italic text-tertiary mb-1">{t('dashboard.day')} {dayNumber}</span>}
                 {t('completion.title')}
               </h2>
               <p className="font-body text-lg md:text-xl text-on-surface-variant max-w-md">

@@ -9,18 +9,56 @@ const groq = new Groq({
  * Generate AI feedback for a journal entry.
  * Falls back to rule-based scoring if Groq API is unreachable.
  */
-async function generateJournalFeedback({ content, language = 'en', level = 'intermediate' }) {
+async function generateJournalFeedback({ content, language = 'en', level = 'intermediate', goal = '', knownWords = [], errorPatterns = [], lexiconContext = null }) {
+  const learnerGoal = goal || 'build a daily English habit';
+
+  // Build recurring error context so the AI coaches specifically on weak spots
+  const patternHint = Array.isArray(errorPatterns) && errorPatterns.length > 0
+    ? `\nThis student's known recurring problem areas (address these if relevant in this entry): ${errorPatterns.map(p => p.errorType.replace(/_/g, ' ')).join(', ')}.`
+    : '';
+
+  // Build learner lexicon context (new system — overrides knownWords when available)
+  let lexiconBlock = '';
+  if (lexiconContext && (lexiconContext.activeCount > 0 || lexiconContext.masteredCount > 0)) {
+    const parts = [];
+    if (lexiconContext.learningItems) {
+      parts.push(`Expressions the learner is currently acquiring (suggest as REINFORCE if they fit a meaning gap):\n${lexiconContext.learningItems}`);
+    }
+    if (lexiconContext.masteredList) {
+      parts.push(`Expressions the learner already owns (do NOT suggest these): ${lexiconContext.masteredList}`);
+    }
+    lexiconBlock = `\n\nLEARNER'S LANGUAGE MEMORY:\n${parts.join('\n\n')}`;
+  } else {
+    // Fallback to old knownWords list
+    const knownWordsList = Array.isArray(knownWords) && knownWords.length > 0
+      ? knownWords.slice(0, 12).join(', ')
+      : 'none yet';
+    lexiconBlock = `\nWords or phrases already saved in the learner's notebook: ${knownWordsList}.`;
+  }
+
   const systemPrompt = `You are a warm, encouraging English tutor for the STICK app — a daily micro-learning tool that helps Vietnamese learners think in English.
 The student's proficiency level is: ${level}.
+The student's current learning goal is: ${learnerGoal}.${lexiconBlock}${patternHint}
 
 CRITICAL RULES:
 1. The student may write in Vietnamese, English, or a mix of both (code-switching). This is NORMAL — never penalize it. Your job is to produce a FULLY ENGLISH version that preserves the student's original meaning and tone.
 2. The "enhancedText" must be natural, conversational English — not formal or academic. Write as a native speaker would casually express the same thought.
 3. For Vietnamese food names, cultural terms, or proper nouns (e.g. "bánh mì", "phở", "Tết"), keep them in the original Vietnamese form inside the English text — do NOT translate them.
 4. Keep corrections concise (max 4). Focus on the most impactful improvements.
-5. Vocabulary boosters should be practical everyday words, not obscure.
-6. Encouragement must be warm and personal — reference something specific the student wrote.
-7. Score 0-100 based on: effort (30%), English usage (30%), clarity of expression (20%), grammar (20%). A full-Vietnamese entry still gets 20-40 for effort + clarity.
+5. "learningCandidates" contains 0-3 expressions worth learning, tied to the learner's meaning gaps. Each must have a candidateType:
+   - "new": expression the learner has never encountered — fills a clear meaning gap from this entry
+   - "reinforce": expression the learner has seen/saved before but never used naturally — now there's a real context for it
+   - "upgrade": expression the learner attempted but used awkwardly — a better/more natural form
+6. Each learningCandidate must fill a MEANING GAP — something the learner was trying to express but couldn't say naturally. Describe the gap in "meaningGap".
+7. Prefer phrases/collocations over single words. Prefer "reinforce" over "new" when both fit equally well.
+8. Do NOT suggest expressions the learner has already mastered/owns (listed above as "do NOT suggest").
+9. After 5+ suggestions of the same expression with no user engagement, stop suggesting it.
+10. "expressionUsage": scan the learner's text for any expressions from their LANGUAGE MEMORY above. Report whether each detected expression was used correctly and naturally, with the relevant context quote.
+11. Still include "vocabularyBoosters" as a simplified mirror of learningCandidates for backward compatibility.
+12. The "meaning" field should be short and learner-facing. Explain both the meaning and when to use it in this exact context.
+13. Sentence patterns should contain only 0-2 reusable patterns that match the student's message.
+14. Encouragement must be warm and personal — reference something specific the student wrote.
+15. Score 0-100 based on: effort (30%), English usage (30%), clarity of expression (20%), grammar (20%). A full-Vietnamese entry still gets 20-40 for effort + clarity.
 
 Return a JSON object with this exact structure:
 {
@@ -33,11 +71,29 @@ Return a JSON object with this exact structure:
       "explanation": "<brief, friendly explanation>"
     }
   ],
+  "learningCandidates": [
+    {
+      "expression": "<a useful word, phrase, collocation, or chunk>",
+      "expressionType": "<word|phrase|collocation|chunk>",
+      "candidateType": "<new|reinforce|upgrade>",
+      "meaning": "<short definition + when to use>",
+      "example": "<natural example sentence>",
+      "level": "<CEFR level A1-C2>",
+      "meaningGap": "<what the learner was trying to say but couldn't>"
+    }
+  ],
+  "expressionUsage": [
+    {
+      "expression": "<expression from language memory>",
+      "usedCorrectly": <true|false>,
+      "context": "<quote from learner's text>"
+    }
+  ],
   "vocabularyBoosters": [
     {
-      "word": "<a useful word or phrase>",
+      "word": "<same as first learningCandidate expression>",
       "meaning": "<short definition>",
-      "level": "<CEFR level A1-C2>"
+      "level": "<CEFR level>"
     }
   ],
   "sentencePatterns": [
@@ -48,6 +104,13 @@ Return a JSON object with this exact structure:
   ],
   "encouragement": "<warm, personal message referencing what they wrote>"
 }
+
+Before answering, silently check:
+- Did I preserve the student's meaning?
+- Did I tie each learningCandidate to a real meaning gap?
+- Did I check the language memory for expressions the learner attempted?
+- Did I avoid suggesting mastered expressions?
+- If no meaning gap exists, did I return an empty learningCandidates array rather than forcing suggestions?
 
 IMPORTANT: Return ONLY valid JSON. No markdown fences, no extra text.`;
 

@@ -13,6 +13,22 @@ export interface FeedbackVocabBooster {
   level?: string;
 }
 
+export interface LearningCandidate {
+  expression: string;
+  expressionType: 'word' | 'phrase' | 'collocation' | 'chunk';
+  candidateType: 'new' | 'reinforce' | 'upgrade';
+  meaning: string;
+  example?: string;
+  level?: string;
+  meaningGap?: string;
+}
+
+export interface ExpressionUsage {
+  expression: string;
+  usedCorrectly: boolean;
+  context?: string;
+}
+
 export interface FeedbackSentencePattern {
   pattern: string;
   example: string;
@@ -23,6 +39,8 @@ export interface AiFeedbackDto {
   enhancedText: string;
   corrections: FeedbackCorrection[];
   vocabularyBoosters: FeedbackVocabBooster[];
+  learningCandidates: LearningCandidate[];
+  expressionUsage: ExpressionUsage[];
   sentencePatterns: FeedbackSentencePattern[];
   encouragement: string;
   mood?: string;
@@ -34,6 +52,8 @@ const EMPTY_FEEDBACK: AiFeedbackDto = {
   enhancedText: '',
   corrections: [],
   vocabularyBoosters: [],
+  learningCandidates: [],
+  expressionUsage: [],
   sentencePatterns: [],
   encouragement: '',
 };
@@ -58,15 +78,27 @@ export function parseFeedback(raw: string | object | null | undefined): AiFeedba
     return { ...EMPTY_FEEDBACK };
   }
 
+  const vocabularyBoosters = Array.isArray(parsed.vocabularyBoosters)
+    ? (parsed.vocabularyBoosters as FeedbackVocabBooster[])
+    : [];
+
+  const learningCandidates = Array.isArray(parsed.learningCandidates)
+    ? (parsed.learningCandidates as LearningCandidate[])
+    : [];
+
+  const expressionUsage = Array.isArray(parsed.expressionUsage)
+    ? (parsed.expressionUsage as ExpressionUsage[])
+    : [];
+
   return {
     overallScore: typeof parsed.overallScore === 'number' ? parsed.overallScore : 0,
     enhancedText: typeof parsed.enhancedText === 'string'
       ? parsed.enhancedText
       : (typeof parsed.enhancedContent === 'string' ? parsed.enhancedContent : ''),
     corrections: Array.isArray(parsed.corrections) ? (parsed.corrections as FeedbackCorrection[]) : [],
-    vocabularyBoosters: Array.isArray(parsed.vocabularyBoosters)
-      ? (parsed.vocabularyBoosters as FeedbackVocabBooster[])
-      : [],
+    vocabularyBoosters,
+    learningCandidates,
+    expressionUsage,
     sentencePatterns: Array.isArray(parsed.sentencePatterns)
       ? (parsed.sentencePatterns as FeedbackSentencePattern[])
       : [],

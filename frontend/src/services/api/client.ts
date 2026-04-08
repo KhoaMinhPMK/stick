@@ -3,6 +3,14 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?
 export const ACCESS_TOKEN_KEY = 'stick_access_token';
 export const USER_KEY = 'stick_user';
 
+export interface StoredUser {
+  id: string;
+  name?: string;
+  email?: string | null;
+  isGuest?: boolean;
+  avatarUrl?: string | null;
+}
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface RequestOptions {
@@ -33,14 +41,25 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+export function getStoredUser(): StoredUser | null {
+  const json = localStorage.getItem(USER_KEY);
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as StoredUser;
+  } catch {
+    return null;
+  }
+}
+
+export function isGuestSession(): boolean {
+  const user = getStoredUser();
+  return Boolean(user && user.isGuest === true);
+}
+
 /** True when a non-guest user is signed-in. */
 export function isRealUserLoggedIn(): boolean {
-  const json = localStorage.getItem(USER_KEY);
-  if (!json) return false;
-  try {
-    const u = JSON.parse(json);
-    return u && u.isGuest === false;
-  } catch { return false; }
+  const user = getStoredUser();
+  return Boolean(user && user.isGuest === false);
 }
 
 export function persistAuth(accessToken: string, user: unknown) {

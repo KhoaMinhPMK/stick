@@ -175,6 +175,21 @@ export async function deleteVocabItem(id: string) {
   });
 }
 
+// ─── Feedback Vocab Import ────────────────────────────
+// Save AI-suggested vocab boosters from a journal into the vocab notebook.
+export interface FeedbackVocabItem {
+  word: string;
+  meaning?: string;
+  example?: string;
+}
+
+export async function importFeedbackVocab(journalId: string, items: FeedbackVocabItem[]) {
+  return apiRequest<{ saved: number }>(`/journals/${journalId}/import-vocab`, {
+    method: 'POST',
+    body: { items },
+  });
+}
+
 // ─── Vocab SRS ───────────────────────────────────────
 export interface VocabSRSItem extends VocabItem {
   nextReviewAt: string | null;
@@ -249,6 +264,9 @@ export interface ProgressSummary {
   onboardingCompleted: boolean;
   level: string;
   memberSince: string | null;
+  todayCompleted: boolean;
+  todayJournalId: string | null;
+  dayNumber: number;
 }
 
 export interface ProgressDailyItem {

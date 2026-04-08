@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ApiError } from '../../services/api/client';
+import { ApiError, getStoredUser } from '../../services/api/client';
 import { registerWithEmail, loginWithGoogle } from '../../services/api/auth';
 
 export const RegisterPage: React.FC = () => {
   const { t } = useTranslation();
+  const isGuest = getStoredUser()?.isGuest === true;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -96,6 +97,12 @@ export const RegisterPage: React.FC = () => {
           </h1>
           <p className="text-on-surface-variant text-sm md:text-lg">{t('register.subtitle')}</p>
         </div>
+
+        {isGuest && (
+          <div className="w-full max-w-lg mb-4 sm:mb-5 md:mb-6 p-4 border-2 border-black rounded-xl bg-secondary-container/40 text-sm font-bold text-center">
+            {t('register.guest_upgrade_note', { defaultValue: 'Create an account to keep the progress from your guest session.' })}
+          </div>
+        )}
 
         {/* Registration Card */}
         <div className="w-full max-w-lg bg-surface-container-lowest sketch-card p-6 sm:p-8 md:p-10 lg:p-14 mb-4 sm:mb-6 md:mb-8">
