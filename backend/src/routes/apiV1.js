@@ -2647,9 +2647,11 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
   }
 
   // finalScore as percentage (server-authoritative)
-  const finalScore = totalPossiblePoints > 0
-    ? Math.min(100, Math.round((serverScore / totalPossiblePoints) * 100))
-    : (typeof score === 'number' ? Math.min(100, Math.max(0, score)) : 0);
+  // Reading-only lessons (no exercises): score = 100% for completing all sections
+  const isReadingOnly = totalPossiblePoints === 0;
+  const finalScore = isReadingOnly
+    ? 100
+    : Math.min(100, Math.round((serverScore / totalPossiblePoints) * 100));
 
   let starRating = 0;
   if (finalScore >= 90) starRating = 3;

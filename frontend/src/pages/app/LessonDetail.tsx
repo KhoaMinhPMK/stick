@@ -186,10 +186,15 @@ export const LessonDetailPage: React.FC = () => {
       };
     });
 
+    // Reading-only lessons (no exercises): score = 100% for completing all sections
+    const isReadingOnly = allExercises.length === 0;
+    const submitScore = isReadingOnly ? 100 : totalScore;
+    const submitTotalPoints = isReadingOnly ? 100 : totalPoints;
+
     try {
       const result = await completeLessonProgress(id, {
-        score: totalScore,
-        totalPoints,
+        score: submitScore,
+        totalPoints: submitTotalPoints,
         maxCombo,
         answers,
         duration: durationSec,
@@ -228,11 +233,12 @@ export const LessonDetailPage: React.FC = () => {
   };
 
   // Auto-complete when all sections done and all exercises done
+  // GUARD: sections.length > 0 prevents firing on initial mount when lesson hasn't loaded yet
   useEffect(() => {
-    if (allSectionsDone && allExercisesDone && !completed && !completionSentRef.current) {
+    if (sections.length > 0 && allSectionsDone && allExercisesDone && !completed && !completionSentRef.current) {
       handleComplete();
     }
-  }, [allSectionsDone, allExercisesDone, completed, handleComplete]);
+  }, [sections.length, allSectionsDone, allExercisesDone, completed, handleComplete]);
 
   // ─── Render ────────────────────────────────────────
 
