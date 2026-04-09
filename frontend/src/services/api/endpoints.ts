@@ -432,7 +432,6 @@ export interface LessonDetail extends LessonSummary {
 export interface LessonValidationResult {
   exerciseIndex: number;
   correct: boolean;
-  correctAnswer?: string;
   explanation?: string;
   pointsEarned: number;
 }

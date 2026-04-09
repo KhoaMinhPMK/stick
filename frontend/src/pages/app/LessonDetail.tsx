@@ -143,11 +143,12 @@ export const LessonDetailPage: React.FC = () => {
           answered: true,
           correct: result.correct,
           answer,
-          pointsEarned: result.pointsEarned,
+          // P0-E: BE now returns pointsEarned (not points)
+          pointsEarned: result.pointsEarned ?? 0,
           explanation: result.explanation,
         },
       }));
-      setTotalScore(prev => prev + result.pointsEarned);
+      setTotalScore(prev => prev + (result.pointsEarned ?? 0));
       if (result.correct) {
         setCombo(prev => {
           const newCombo = prev + 1;
@@ -203,15 +204,15 @@ export const LessonDetailPage: React.FC = () => {
         totalAttempts: result.progress.totalAttempts,
       });
     } catch {
-      const scorePercent = totalPoints > 0 ? Math.round((totalScore / totalPoints) * 100) : 100;
+      // P0-H: No local fallback XP — if server fails, show error state instead of fake success
       setCompletionResult({
-        score: scorePercent,
-        starRating: scorePercent >= 90 ? 3 : scorePercent >= 70 ? 2 : scorePercent >= 50 ? 1 : 0,
-        xpEarned: lesson?.xpReward ?? 15,
+        score: 0,
+        starRating: 0,
+        xpEarned: 0,
         comboMax: maxCombo,
         isReview: false,
-        bestScore: scorePercent,
-        totalAttempts: 1,
+        bestScore: 0,
+        totalAttempts: 0,
       });
     }
     setCompleted(true);
