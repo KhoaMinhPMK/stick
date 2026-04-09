@@ -15,7 +15,7 @@ export const FeedbackPage: React.FC = () => {
   useEffect(() => {
     async function getFeedback() {
       if (!journalId) {
-        window.location.hash = '#journal-workspace';
+        window.location.hash = '#journal';
         return;
       }
       try {

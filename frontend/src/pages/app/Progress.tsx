@@ -93,7 +93,7 @@ export const ProgressPage: React.FC = () => {
   const completedCount = days.filter(d => d.status === 'completed').length;
   const streak = summary?.currentStreak || 0;
   const bestStreak = summary?.bestStreak || 0;
-  const totalDaysAllTime = summary?.totalJournals || 0;
+  const totalDaysAllTime = summary?.totalActiveDays || 0;
 
   // Build XP-per-date map for bar chart heights in calendar cells
   const xpByDate = React.useMemo(() => {

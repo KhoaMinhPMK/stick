@@ -98,7 +98,7 @@ export const FeedbackResultPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
           <p className="font-headline font-bold text-xl">{t('feedback_result.not_found', { defaultValue: 'Result not found' })}</p>
-          <button onClick={() => window.location.hash = '#journal-workspace'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group">
+          <button onClick={() => window.location.hash = '#journal'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group">
             <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
             <span className="font-headline font-bold text-sm">{t('common.go_back')}</span>
           </button>
@@ -352,7 +352,7 @@ export const FeedbackResultPage: React.FC = () => {
                   {t('feedback_result.skip_speaking', { defaultValue: 'Skip to Done' })} <span className="material-symbols-outlined text-sm md:text-base">check_circle</span>
                 </button>
                 <button
-                  onClick={() => (window.location.hash = '#journal-workspace')}
+                  onClick={() => (window.location.hash = '#journal')}
                   className="w-full py-3 md:py-4 sketch-border bg-transparent font-headline font-bold text-on-surface-variant text-sm md:text-base hover:text-primary transition-colors flex items-center justify-center gap-2 active:scale-95"
                 >
                   {t('feedback_result.try_another')} <span className="material-symbols-outlined text-sm md:text-base">refresh</span>

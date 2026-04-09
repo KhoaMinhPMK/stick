@@ -101,7 +101,7 @@ export const DailyChallengePage: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-4">
-              <button onClick={() => window.location.hash = '#journal-workspace'} className="w-full sketch-border bg-black text-white px-6 py-5 rounded-2xl font-headline font-black text-xl flex items-center justify-center gap-3 transition-transform hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#96753f]">
+              <button onClick={() => window.location.hash = '#journal'} className="w-full sketch-border bg-black text-white px-6 py-5 rounded-2xl font-headline font-black text-xl flex items-center justify-center gap-3 transition-transform hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#96753f]">
                 <span className="material-symbols-outlined">edit_document</span>
                 {t('challenge.start_writing', { defaultValue: 'Start Journal Entry' })}
               </button>

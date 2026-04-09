@@ -278,7 +278,9 @@ export interface ProgressSummary {
   memberSince: string | null;
   todayCompleted: boolean;
   todayJournalId: string | null;
+  dailyLimitReached: boolean;
   dayNumber: number;
+  totalActiveDays: number;
   streakFreezeCount: number;
   isPremium: boolean;
   avatarUrl: string | null;

@@ -2205,16 +2205,19 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   const vnToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
   const vnTodayStart = new Date(vnToday + 'T00:00:00+07:00');
   const vnTodayEnd = new Date(vnToday + 'T23:59:59.999+07:00');
-  const todayJournal = await prisma.journal.findFirst({
+  const todayJournals = await prisma.journal.findMany({
     where: {
       userId: req.authUser.id,
       deletedAt: null,
       createdAt: { gte: vnTodayStart, lte: vnTodayEnd },
     },
     select: { id: true },
+    orderBy: { createdAt: 'desc' },
   });
-  const todayCompleted = !!todayJournal;
-  const todayJournalId = todayJournal?.id || null;
+  const todayCompleted = todayJournals.length > 0;
+  const todayJournalId = todayJournals[0]?.id || null;
+  const dailyJournalLimit = Boolean(user?.isPremium) ? 3 : 1;
+  const dailyLimitReached = todayJournals.length >= dailyJournalLimit;
 
   // dayNumber = số ngày unique có BẤT KỲ hoạt động nào (đồng bộ với streak)
   const totalActiveDays = await prisma.progressDaily.count({
@@ -2261,7 +2264,9 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     memberSince: user?.createdAt || null,
     todayCompleted,
     todayJournalId,
+    dailyLimitReached,
     dayNumber,
+    totalActiveDays,
     streakFreezeCount,
     isPremium: Boolean(user?.isPremium),
     avatarUrl: user?.avatarUrl || null,

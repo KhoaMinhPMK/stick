@@ -6,6 +6,7 @@ import { createVocabItem } from '../../services/api/endpoints';
 import { ApiError } from '../../services/api/client';
 import { trackSessionStart, trackSubmissionSent } from '../../services/analytics/coreLoop';
 import { usePremium } from '../../hooks/usePremium';
+import { getProgressSummary } from '../../services/api/endpoints';
 
 const QUICK_PROMPTS = [
   { icon: 'lightbulb', key: 'prompt_meal' },
@@ -26,16 +27,30 @@ export const JournalWorkspacePage: React.FC = () => {
   const sessionTrackedRef = useRef(false);
   const startTimeRef = useRef(Date.now());
 
+  const journalIdFromUrl = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
+  }, []);
+
+  // Guard: redirect if daily limit reached and not editing an existing draft
+  useEffect(() => {
+    if (journalIdFromUrl) return; // editing existing draft is always allowed
+    let cancelled = false;
+    getProgressSummary().then(res => {
+      if (cancelled) return;
+      if (res.dailyLimitReached && res.todayJournalId) {
+        // Daily limit reached → redirect to feedback of today's journal
+        window.location.hash = `#feedback?journalId=${res.todayJournalId}`;
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [journalIdFromUrl]);
+
   // Track session start once
   useEffect(() => {
     if (!sessionTrackedRef.current) {
       trackSessionStart({});
       sessionTrackedRef.current = true;
     }
-  }, []);
-
-  const journalIdFromUrl = useMemo(() => {
-    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
   }, []);
 
   // Load existing draft if journalId is in URL
@@ -96,11 +111,16 @@ export const JournalWorkspacePage: React.FC = () => {
     try {
       let id = journalId;
       if (!id) {
-        const res = await apiRequest<{ journal: { id: string } }>('/journals', {
+        const res = await apiRequest<{ journal: { id: string }; reused?: boolean; dailyLimitReached?: boolean }>('/journals', {
           method: 'POST',
           body: { title: t('journal_workspace.daily_title', { defaultValue: 'Daily Journal' }), content: text, status: 'draft', language: 'en' },
         });
         id = res.journal.id;
+        // If daily limit reached, redirect to feedback of existing journal
+        if (res.dailyLimitReached) {
+          window.location.hash = `#feedback?journalId=${id}`;
+          return;
+        }
       } else {
         await apiRequest(`/journals/${id}`, {
           method: 'PATCH',

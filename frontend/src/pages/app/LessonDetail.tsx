@@ -833,7 +833,7 @@ const CompletionCard: React.FC<CompletionCardProps> = ({ result, lessonTitle, on
 
       {/* Actions */}
       <div className="flex gap-3 justify-center flex-wrap">
-        <button onClick={() => { window.location.hash = '#journal-workspace'; }}
+        <button onClick={() => { window.location.hash = '#journal'; }}
           className="px-6 py-3 sketch-border bg-primary text-white font-headline font-bold text-sm flex items-center gap-2 active:scale-95 transition-all">
           {t('lesson_detail.practice_writing', { defaultValue: 'Practice Writing' })}
           <span className="material-symbols-outlined text-sm">edit_note</span>
