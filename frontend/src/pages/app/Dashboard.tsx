@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getProgressSummary, getProgressDaily, getDueVocab, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
+import { getProgressSummary, getProgressDaily, getDueVocab, getSettings, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 import { consumeGuestMergedFlag } from '../../services/api/auth';
 import { usePremium } from '../../hooks/usePremium';
 
@@ -14,6 +14,7 @@ export const DashboardPage: React.FC = () => {
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
   const [dueVocabCount, setDueVocabCount] = useState(0);
+  const [dailyGoalMinutes, setDailyGoalMinutes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMergedBanner, setShowMergedBanner] = useState(() => consumeGuestMergedFlag());
@@ -31,14 +32,18 @@ export const DashboardPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [summaryRes, dailyRes, dueRes] = await Promise.all([
+      const [summaryRes, dailyRes, dueRes, settingsRes] = await Promise.all([
         getProgressSummary(),
         getProgressDaily(14),
         getDueVocab(1).catch(() => ({ items: [], total: 0 })),
+        getSettings().catch(() => null),
       ]);
       setSummary(summaryRes);
       setDailyData(dailyRes.items);
       setDueVocabCount(dueRes.total);
+      if (settingsRes?.settings?.dailyGoalMinutes) {
+        setDailyGoalMinutes(settingsRes.settings.dailyGoalMinutes);
+      }
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(t('dashboard.error_load'));
@@ -64,12 +69,17 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   // Build chart data from daily progress (last 7 days)
+  const getLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayStr = getLocalDate(new Date());
+  const todayProgress = dailyData.find(p => getLocalDate(new Date(p.day)) === todayStr);
+  const todayMinutes = todayProgress?.minutesSpent ?? 0;
+  const goalPct = dailyGoalMinutes > 0 ? Math.min(100, Math.round((todayMinutes / dailyGoalMinutes) * 100)) : 0;
+
   const dayLabels = ['dashboard.mon', 'dashboard.tue', 'dashboard.wed', 'dashboard.thu', 'dashboard.fri', 'dashboard.sat', 'dashboard.sun'];
   const chartBars = (() => {
     const now = new Date();
     const bars = [];
     const offset = selectedPeriod === 'last_week' ? 7 : 0;
-    const getLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i - offset);
@@ -139,14 +149,30 @@ export const DashboardPage: React.FC = () => {
               </button>
             )}
           </div>
-          <div className="w-full md:w-1/3 flex justify-center items-center z-10 mt-6 md:mt-0">
-            <div className={`relative w-48 h-48 md:w-56 md:h-56 border-[3px] md:border-[4px] border-black rounded-full bg-white overflow-hidden flex items-center justify-center sketch-card group ${isPremium ? 'streak-ring-premium' : ''}`}>
+          <div className="w-full md:w-1/3 flex justify-center items-center gap-6 z-10 mt-6 md:mt-0">
+            {/* Streak Ring */}
+            <div className={`relative w-40 h-40 md:w-48 md:h-48 border-[3px] md:border-[4px] border-black rounded-full bg-white overflow-hidden flex items-center justify-center sketch-card group ${isPremium ? 'streak-ring-premium' : ''}`}>
               <div className="flex flex-col items-center">
                 <span className={`material-symbols-outlined text-5xl md:text-6xl ${isPremium ? 'streak-fire-premium' : 'text-black'}`} data-icon="local_fire_department">local_fire_department</span>
                 <span className="font-headline font-black text-3xl md:text-4xl mt-1">{summary?.currentStreak || 0}</span>
                 <span className="text-xs font-bold text-on-surface-variant">streak</span>
               </div>
             </div>
+            {/* Daily Goal Ring */}
+            {dailyGoalMinutes > 0 && (
+              <div className="flex flex-col items-center gap-1">
+                <div className="relative w-20 h-20">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="32" strokeWidth="6" fill="transparent" className="text-surface-container stroke-current" />
+                    <circle cx="40" cy="40" r="32" strokeWidth="6" fill="transparent" strokeDasharray="201" strokeDashoffset={201 - (201 * goalPct) / 100} strokeLinecap="round" className="text-tertiary stroke-current transition-all duration-700" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="font-headline font-black text-lg leading-none">{goalPct}%</span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-on-surface-variant text-center leading-tight">{todayMinutes}/{dailyGoalMinutes}<br />min</span>
+              </div>
+            )}
           </div>
           <div className="absolute bottom-[-10px] md:bottom-[-20px] right-[-10px] md:right-[-20px] opacity-5 select-none pointer-events-none">
             <span className="material-symbols-outlined text-[10rem] md:text-[20rem]" data-icon="accessibility_new">accessibility_new</span>

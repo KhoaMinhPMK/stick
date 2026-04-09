@@ -532,6 +532,54 @@ Return ONLY valid JSON with this structure:
   }
 }
 
+/**
+ * Evaluate whether a user's sentence correctly uses the daily challenge phrase.
+ * Returns { correct, feedback, suggestion }.
+ */
+async function evaluateDailyChallenge({ sentence, phrase, meaning }) {
+  const fallback = {
+    correct: true,
+    feedback: 'Great attempt! Keep practising to express yourself more naturally.',
+    suggestion: sentence,
+  };
+  try {
+    const response = await openai.chat.completions.create({
+      model: FAST_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a friendly English language coach helping learners use phrases naturally. 
+Evaluate whether the user's sentence correctly and naturally uses the given phrase. 
+Respond in JSON only:
+{
+  "correct": true|false,
+  "feedback": "<short, encouraging 1-2 sentence comment>",
+  "suggestion": "<an improved or alternative version of the sentence if needed, otherwise repeat the user's sentence>"
+}`,
+        },
+        {
+          role: 'user',
+          content: `Phrase: "${phrase}" (meaning: "${meaning}")
+User's sentence: "${sentence}"
+Evaluate the usage.`,
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 300,
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return {
+      correct: parsed.correct !== false,
+      feedback: parsed.feedback || fallback.feedback,
+      suggestion: parsed.suggestion || sentence,
+    };
+  } catch (err) {
+    console.error('evaluateDailyChallenge error:', err.message);
+    return fallback;
+  }
+}
+
 module.exports = {
   generateJournalFeedback,
   generateDailyChallenge,
@@ -539,4 +587,5 @@ module.exports = {
   generateReadingContent,
   generateLessonExercises,
   generateLessonContent,
+  evaluateDailyChallenge,
 };

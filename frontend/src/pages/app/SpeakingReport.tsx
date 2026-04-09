@@ -17,14 +17,14 @@ export const SpeakingReportPage: React.FC = () => {
 
   useEffect(() => {
     // Load latest journal feedback
-    apiRequest<{ journals: Array<{ id: string; status: string }> }>('/journals?limit=5')
+    apiRequest<{ items: Array<{ id: string; status: string }> }>('/journals?limit=5')
       .then(async (res) => {
-        const completed = res.journals?.find(j => j.status === 'completed') || res.journals?.[0];
+        const completed = res.items?.find(j => j.status === 'completed') || res.items?.[0];
         if (completed) {
-          const detail = await apiRequest<{ journal: { aiFeedback?: string } }>(`/journals/${completed.id}`);
-          if (detail.journal?.aiFeedback) {
+          const detail = await apiRequest<{ journal: { feedback?: string } }>(`/journals/${completed.id}`);
+          if (detail.journal?.feedback) {
             try {
-              const parsed = JSON.parse(detail.journal.aiFeedback);
+              const parsed = JSON.parse(detail.journal.feedback);
               setFeedback({
                 rewrittenVersion: parsed.rewritten_version || parsed.rewrittenVersion,
                 corrections: parsed.corrections || [],

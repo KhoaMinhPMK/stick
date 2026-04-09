@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import LandingPage from './pages/landing';
 import { ensureSession } from './services/api/auth';
 import { isRealUserLoggedIn } from './services/api/client';
+import { getSettings } from './services/api/endpoints';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { OnboardingFlow } from './pages/app/onboarding/OnboardingFlow';
 import { LevelSelectionPage } from './pages/app/LevelSelection';
@@ -204,6 +205,29 @@ function App() {
     ensureSession().catch(() => {
       // Non-blocking: app still renders if session bootstrap fails
     });
+  }, []);
+
+  // Apply theme from user settings
+  useEffect(() => {
+    const applyTheme = (theme: string) => {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const useDark = theme === 'dark' || (theme === 'system' && prefersDark);
+      document.documentElement.classList.toggle('dark', useDark);
+    };
+    if (isRealUserLoggedIn()) {
+      getSettings()
+        .then(res => applyTheme(res.settings.theme || 'system'))
+        .catch(() => {});
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = () => {
+      const stored = document.documentElement.dataset.themeMode || 'system';
+      if (stored === 'system') {
+        document.documentElement.classList.toggle('dark', mq.matches);
+      }
+    };
+    mq.addEventListener('change', listener);
+    return () => mq.removeEventListener('change', listener);
   }, []);
 
   const renderCurrentView = () => {

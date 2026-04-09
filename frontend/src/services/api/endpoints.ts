@@ -209,6 +209,22 @@ export async function reviewVocabItem(id: string, quality: number) {
   });
 }
 
+// ─── Journal Bookmark ─────────────────────────────────
+export async function bookmarkJournal(id: string, isBookmarked: boolean) {
+  return apiRequest<{ journal: { id: string; isBookmarked: boolean } }>(`/journals/${id}/bookmark`, {
+    method: 'PATCH',
+    body: { isBookmarked },
+  });
+}
+
+// ─── Daily Challenge Evaluate ─────────────────────────
+export async function evaluateDailyChallenge(sentence: string, phrase: string, meaning: string) {
+  return apiRequest<{ correct: boolean; feedback: string; suggestion: string }>('/daily-challenge/evaluate', {
+    method: 'POST',
+    body: { sentence, phrase, meaning },
+  });
+}
+
 // ─── History ─────────────────────────────────────────
 export interface LearningSession {
   id: string;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
-import { createLearningSession } from '../../services/api/endpoints';
+import { createLearningSession, getSettings } from '../../services/api/endpoints';
 
 interface ListeningContent {
   sentence: string;
@@ -21,8 +21,13 @@ export const ListeningPracticePage: React.FC = () => {
   const [checked, setChecked] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const sessionSavedRef = useRef(false);
+  const speechRateRef = useRef(0.85);
 
   useEffect(() => {
+    getSettings().then(res => {
+      const s = res.settings.speechSpeed ?? 1;
+      speechRateRef.current = s === 0 ? 0.65 : s === 2 ? 1.1 : 0.85;
+    }).catch(() => {});
     apiRequest<{ sentence?: string; content?: string }>('/ai/reading-content?topic=daily+conversation&level=intermediate')
       .then(res => {
         const sentence = res.sentence || res.content?.split('.')[0] || 'When you start a new habit, consistency is key.';
@@ -49,7 +54,7 @@ export const ListeningPracticePage: React.FC = () => {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(content.sentence);
     utt.lang = 'en-US';
-    utt.rate = 0.85;
+    utt.rate = speechRateRef.current;
     utt.onend = () => setIsPlaying(false);
     utt.onerror = () => setIsPlaying(false);
     utteranceRef.current = utt;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { evaluateDailyChallenge } from '../../services/api/endpoints';
 
 interface ChallengeData {
   phrase: string;
@@ -13,11 +14,21 @@ interface ChallengeData {
   dayNumber: number;
 }
 
+interface EvalResult {
+  correct: boolean;
+  feedback: string;
+  suggestion: string;
+}
+
 export const DailyChallengePage: React.FC = () => {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [challenge, setChallenge] = useState<ChallengeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userSentence, setUserSentence] = useState('');
+  const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
 
   useEffect(() => {
     apiRequest<ChallengeData>('/daily-challenge')
@@ -32,6 +43,21 @@ export const DailyChallengePage: React.FC = () => {
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleEvaluate = async () => {
+    if (!challenge || !userSentence.trim()) return;
+    setEvaluating(true);
+    setEvalError(null);
+    setEvalResult(null);
+    try {
+      const result = await evaluateDailyChallenge(userSentence.trim(), challenge.phrase, challenge.meaning);
+      setEvalResult(result);
+    } catch {
+      setEvalError('Could not evaluate your sentence. Please try again.');
+    } finally {
+      setEvaluating(false);
+    }
   };
 
   const typeLabel = challenge?.type === 'phrasal_verb' ? 'Phrasal Verb of the Day'
@@ -97,6 +123,64 @@ export const DailyChallengePage: React.FC = () => {
                   {challenge.task}
                 </p>
               </div>
+            </div>
+
+            {/* Try It Section */}
+            <div className="mb-8">
+              <h3 className="font-headline font-bold text-lg mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-xl">edit</span>
+                Try it — write a sentence using "{challenge.phrase}"
+              </h3>
+              <textarea
+                value={userSentence}
+                onChange={(e) => { setUserSentence(e.target.value); setEvalResult(null); setEvalError(null); }}
+                placeholder={`E.g. "Yesterday I had to ${challenge.phrase.toLowerCase()} with my new colleagues..."`}
+                rows={3}
+                className="w-full sketch-border rounded-xl p-4 font-body resize-none text-base focus:outline-none focus:ring-2 focus:ring-primary bg-surface-container-lowest"
+              />
+              <button
+                onClick={handleEvaluate}
+                disabled={evaluating || userSentence.trim().length < 5}
+                className="mt-3 w-full sketch-border bg-primary text-white px-6 py-3 rounded-xl font-headline font-bold text-base flex items-center justify-center gap-2 transition-all hover:bg-primary/90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {evaluating ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                    Checking…
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                    Check My Sentence
+                  </>
+                )}
+              </button>
+
+              {evalError && (
+                <div className="mt-3 p-3 bg-error-container text-on-error-container rounded-xl sketch-border text-sm font-body">
+                  {evalError}
+                </div>
+              )}
+
+              {evalResult && (
+                <div className={`mt-4 p-5 rounded-2xl sketch-border ${evalResult.correct ? 'bg-[#e8f5e9]' : 'bg-[#fff3e0]'}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`material-symbols-outlined text-2xl ${evalResult.correct ? 'text-green-600' : 'text-amber-600'}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {evalResult.correct ? 'check_circle' : 'lightbulb'}
+                    </span>
+                    <span className={`font-headline font-bold text-lg ${evalResult.correct ? 'text-green-800' : 'text-amber-800'}`}>
+                      {evalResult.correct ? 'Great usage!' : 'Good try!'}
+                    </span>
+                  </div>
+                  <p className="font-body text-sm text-stone-700 mb-3">{evalResult.feedback}</p>
+                  {evalResult.suggestion && evalResult.suggestion !== userSentence && (
+                    <div className="bg-white/70 rounded-xl p-3 sketch-border border-dashed">
+                      <p className="text-[11px] font-headline font-bold uppercase tracking-widest text-stone-500 mb-1">Suggested version</p>
+                      <p className="font-body text-sm italic text-stone-800">"{evalResult.suggestion}"</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
+import { bookmarkJournal } from '../../services/api/endpoints';
 
 export const JournalArchivePage: React.FC = () => {
   const { t } = useTranslation();
@@ -34,6 +35,18 @@ export const JournalArchivePage: React.FC = () => {
     }
     return true;
   });
+
+  const handleBookmark = async (e: React.MouseEvent, id: string, current: boolean) => {
+    e.stopPropagation();
+    const next = !current;
+    setEntries(prev => prev.map(item => item.id === id ? { ...item, isBookmarked: next } : item));
+    try {
+      await bookmarkJournal(id, next);
+    } catch {
+      // revert on error
+      setEntries(prev => prev.map(item => item.id === id ? { ...item, isBookmarked: current } : item));
+    }
+  };
 
   return (
     <AppLayout activePath="#history">
@@ -118,7 +131,13 @@ export const JournalArchivePage: React.FC = () => {
                         <span className="font-headline font-black leading-none">{item.score || '--'}</span>
                      </div>
                      <div className="flex items-center gap-1">
-                        {item.isBookmarked && <span className="material-symbols-outlined text-primary text-xl">bookmark</span>}
+                        <button
+                          onClick={(e) => handleBookmark(e, item.id, item.isBookmarked)}
+                          className={`transition-colors hover:scale-110 active:scale-95 ${item.isBookmarked ? 'text-primary' : 'text-stone-300 hover:text-primary opacity-0 group-hover:opacity-100'}`}
+                          aria-label={item.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                        >
+                          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: item.isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
+                        </button>
                         <button className="text-on-surface-variant hover:text-black opacity-0 group-hover:opacity-100 transition-opacity">
                           <span className="material-symbols-outlined">more_vert</span>
                         </button>

@@ -339,3 +339,65 @@ textarea.caret-primary:focus {
   animation: none;
   caret-color: var(--md-sys-color-primary, #6750A4);
 }
+
+/* ─── Dark Mode Overrides ────────────────────────────── */
+html.dark {
+  color-scheme: dark;
+}
+html.dark body {
+  background-color: #1a1918;
+  color: #e5e1d8;
+}
+html.dark .bg-background,
+html.dark .bg-surface,
+html.dark .bg-surface-bright {
+  background-color: #1a1918 !important;
+}
+html.dark .bg-surface-container-lowest,
+html.dark .bg-white {
+  background-color: #252421 !important;
+}
+html.dark .bg-surface-container-low {
+  background-color: #2a2826 !important;
+}
+html.dark .bg-surface-container {
+  background-color: #302e2b !important;
+}
+html.dark .bg-surface-container-high {
+  background-color: #383532 !important;
+}
+html.dark .bg-surface-container-highest {
+  background-color: #403e3a !important;
+}
+html.dark .bg-surface-dim {
+  background-color: #100f0e !important;
+}
+html.dark .text-on-background,
+html.dark .text-on-surface {
+  color: #e5e1d8 !important;
+}
+html.dark .text-on-surface-variant {
+  color: #bab6ae !important;
+}
+html.dark .text-outline {
+  color: #908c86 !important;
+}
+html.dark .border-outline-variant,
+html.dark .divide-outline-variant > * {
+  border-color: #4a4844 !important;
+}
+html.dark .border-outline {
+  border-color: #706d68 !important;
+}
+html.dark .bg-secondary-container {
+  background-color: #2e2a22 !important;
+}
+html.dark .text-on-secondary-container {
+  color: #d5c5a8 !important;
+}
+html.dark .bg-primary-container {
+  background-color: #2e2d2d !important;
+}
+html.dark .text-on-primary-container {
+  color: #d8d6d5 !important;
+}

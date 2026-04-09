@@ -87,19 +87,20 @@ model OnboardingState {
 
 // ─── Journals ────────────────────────────────────────
 model Journal {
-  id        String    @id @default(uuid())
-  userId    String
-  title     String
-  content   String    @db.Text
-  status    String    @default("draft")
-  score     Int?
-  feedback  String?   @db.Text
-  language  String    @default("en")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id           String    @id @default(uuid())
+  userId       String
+  title        String
+  content      String    @db.Text
+  status       String    @default("draft")
+  score        Int?
+  feedback     String?   @db.Text
+  language     String    @default("en")
+  isBookmarked Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
 }

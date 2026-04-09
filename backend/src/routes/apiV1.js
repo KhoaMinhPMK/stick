@@ -8,7 +8,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent } = require('../lib/openaiAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
@@ -1246,6 +1246,23 @@ router.patch('/journals/:id', requireAuth, asyncHandler(async (req, res) => {
   res.status(200).json({ journal });
 }));
 
+router.patch('/journals/:id/bookmark', requireAuth, asyncHandler(async (req, res) => {
+  const existing = await prisma.journal.findFirst({
+    where: { id: req.params.id, userId: req.authUser.id, deletedAt: null },
+  });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Journal not found' });
+  }
+  const isBookmarked = req.body?.isBookmarked !== undefined
+    ? Boolean(req.body.isBookmarked)
+    : !existing.isBookmarked;
+  const journal = await prisma.journal.update({
+    where: { id: req.params.id },
+    data: { isBookmarked },
+  });
+  res.status(200).json({ journal });
+}));
+
 router.delete('/journals/:id', requireAuth, asyncHandler(async (req, res) => {
   const existing = await prisma.journal.findFirst({
     where: { id: req.params.id, userId: req.authUser.id, deletedAt: null },
@@ -1302,6 +1319,23 @@ router.get('/daily-challenge', requireAuth, asyncHandler(async (req, res) => {
     date: today,
     dayNumber: totalActiveDays + 1,
   });
+}));
+
+// ─── Daily Challenge Evaluate ─────────────────────────
+router.post('/daily-challenge/evaluate', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
+  const { sentence, phrase, meaning } = req.body || {};
+  if (!sentence || typeof sentence !== 'string' || sentence.trim().length < 3) {
+    return res.status(400).json({ code: 'INVALID_INPUT', message: 'sentence is required' });
+  }
+  if (!phrase || typeof phrase !== 'string') {
+    return res.status(400).json({ code: 'INVALID_INPUT', message: 'phrase is required' });
+  }
+  const result = await evaluateDailyChallenge({
+    sentence: sentence.trim(),
+    phrase,
+    meaning: meaning || '',
+  });
+  res.status(200).json(result);
 }));
 
 // ─── Grammar Quiz ────────────────────────────────────
