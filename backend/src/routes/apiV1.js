@@ -2608,10 +2608,8 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
   // Accept both timeSpent (old) and duration (new FE sends duration)
   const effectiveDuration = typeof duration === 'number' ? duration : (typeof timeSpent === 'number' ? timeSpent : 0);
 
-  // Minimum time gate: must spend at least 5s (anti-spam, not punishing fast readers)
-  if (effectiveDuration < 5) {
-    return res.status(400).json({ code: 'TOO_FAST', message: 'Please spend more time on the lesson before completing.' });
-  }
+  // MVP: time gate disabled — pilot prioritizes user experience over anti-spam
+  // TODO: re-enable after pilot with sensible threshold based on real data
 
   // P0-F: Server-authoritative scoring — recompute from exercise attempts
   const exerciseAttempts = await prisma.exerciseAttempt.findMany({
