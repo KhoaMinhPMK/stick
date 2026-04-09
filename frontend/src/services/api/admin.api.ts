@@ -15,6 +15,12 @@ import type {
   AdminLoginResponse,
   UserFilterParams,
   AILogFilterParams,
+  AdminLessonDTO,
+  AdminLessonDetailDTO,
+  CreateLessonDTO,
+  LessonFilterParams,
+  AdminLearningPathDTO,
+  LessonContentJSON,
 } from '../../types/dto/admin.dto';
 
 const ADMIN_TOKEN_KEY = 'stick_admin_token';
@@ -221,4 +227,88 @@ export function updateConfig(key: string, value: string) {
     method: 'PUT',
     body: { value },
   });
+}
+
+// ─── Lessons ──────────────────────────
+export function getLessons(params: LessonFilterParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.status && params.status !== 'all') qs.set('status', params.status);
+  if (params.category && params.category !== 'all') qs.set('category', params.category);
+  if (params.level && params.level !== 'all') qs.set('level', params.level);
+  if (params.search) qs.set('search', params.search);
+  if (params.page) qs.set('page', params.page);
+  if (params.limit) qs.set('limit', params.limit);
+  const query = qs.toString();
+  return adminRequest<PaginatedResponse<AdminLessonDTO>>(`/admin/lessons${query ? `?${query}` : ''}`);
+}
+
+export function getLesson(id: string) {
+  return adminRequest<{ lesson: AdminLessonDetailDTO }>(`/admin/lessons/${id}`);
+}
+
+export function createLesson(data: CreateLessonDTO) {
+  return adminRequest<{ lesson: AdminLessonDetailDTO }>('/admin/lessons', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export function updateLesson(id: string, data: Partial<CreateLessonDTO> & { status?: string }) {
+  return adminRequest<{ lesson: AdminLessonDetailDTO }>(`/admin/lessons/${id}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export function deleteLesson(id: string) {
+  return adminRequest<{ message: string }>(`/admin/lessons/${id}`, { method: 'DELETE' });
+}
+
+export function duplicateLesson(id: string) {
+  return adminRequest<{ lesson: AdminLessonDetailDTO }>(`/admin/lessons/${id}/duplicate`, {
+    method: 'POST',
+  });
+}
+
+export function aiGenerateLesson(opts: { topic: string; level?: string; category?: string; includeExercises?: boolean }) {
+  return adminRequest<{ lesson: LessonContentJSON & { title: string; titleVi: string | null; description: string }; latencyMs: number }>(
+    '/admin/lessons/ai-generate',
+    { method: 'POST', body: opts },
+  );
+}
+
+export function aiGenerateExercises(opts: {
+  topic: string;
+  level?: string;
+  category?: string;
+  exerciseCount?: number;
+  exerciseTypes?: string[];
+}) {
+  return adminRequest<{ exercises: AdminLessonDetailDTO['content']['sections'][0]['exercises']; latencyMs: number }>(
+    '/admin/lessons/ai-exercises',
+    { method: 'POST', body: opts },
+  );
+}
+
+// ─── Learning Paths ───────────────────
+export function getLearningPaths() {
+  return adminRequest<{ items: AdminLearningPathDTO[]; total: number }>('/admin/learning-paths');
+}
+
+export function createLearningPath(data: { title: string; titleVi?: string; slug: string; description: string; level?: string; isPremium?: boolean }) {
+  return adminRequest<{ path: AdminLearningPathDTO }>('/admin/learning-paths', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export function updateLearningPath(id: string, data: Partial<AdminLearningPathDTO>) {
+  return adminRequest<{ path: AdminLearningPathDTO }>(`/admin/learning-paths/${id}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export function deleteLearningPath(id: string) {
+  return adminRequest<{ message: string }>(`/admin/learning-paths/${id}`, { method: 'DELETE' });
 }

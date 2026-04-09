@@ -324,3 +324,18 @@ html.lang-vi .font-headline {
   background-size: 100% 250%;
   animation: streakFireGlow 2s ease-in-out infinite;
 }
+
+/* ─── Journal Textarea Caret ────────────────────────── */
+@keyframes caretPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+textarea.caret-primary {
+  caret-color: var(--md-sys-color-primary, #6750A4);
+}
+
+textarea.caret-primary:focus {
+  animation: none;
+  caret-color: var(--md-sys-color-primary, #6750A4);
+}

@@ -178,3 +178,134 @@ export interface AILogFilterParams {
   from?: string;
   to?: string;
 }
+
+// ─── Lesson ──────────────────────────
+export interface AdminLessonDTO {
+  id: string;
+  title: string;
+  titleVi: string | null;
+  category: string;
+  level: string;
+  status: string;
+  published: boolean;
+  xpReward: number;
+  isPremium: boolean;
+  duration: number;
+  orderIndex: number;
+  moduleId: string | null;
+  aiGenerated: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { attempts: number };
+}
+
+export interface AdminLessonDetailDTO {
+  id: string;
+  title: string;
+  titleVi: string | null;
+  description: string;
+  category: string;
+  level: string;
+  content: LessonContentJSON;
+  status: string;
+  published: boolean;
+  xpReward: number;
+  isPremium: boolean;
+  tags: string[];
+  duration: number;
+  orderIndex: number;
+  moduleId: string | null;
+  aiGenerated: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  module?: {
+    id: string;
+    title: string;
+    unit: {
+      id: string;
+      title: string;
+      learningPath: { id: string; title: string; slug: string };
+    };
+  } | null;
+  _count?: { attempts: number };
+}
+
+export interface LessonContentJSON {
+  sections: LessonSection[];
+}
+
+export interface LessonSection {
+  type: 'text' | 'vocab' | 'grammar' | 'exercises' | 'summary';
+  title: string;
+  content?: string;
+  items?: VocabItem[];
+  pattern?: string;
+  examples?: string[];
+  notes?: string;
+  exercises?: LessonExercise[];
+}
+
+export interface VocabItem {
+  word: string;
+  meaning: string;
+  example?: string;
+  pronunciation?: string;
+}
+
+export interface LessonExercise {
+  type: 'multiple_choice' | 'fill_blank' | 'match' | 'reorder';
+  question?: string;
+  instruction?: string;
+  options?: string[];
+  correctAnswer?: string;
+  acceptableAnswers?: string[];
+  correctPairs?: [string, string][];
+  correctOrder?: string[];
+  words?: string[];
+  points: number;
+  explanation?: string;
+}
+
+export interface CreateLessonDTO {
+  title: string;
+  titleVi?: string;
+  description: string;
+  category: string;
+  level: string;
+  content: string | LessonContentJSON;
+  duration?: number;
+  orderIndex?: number;
+  xpReward?: number;
+  isPremium?: boolean;
+  tags?: string[];
+  status?: string;
+  moduleId?: string;
+}
+
+export interface LessonFilterParams {
+  status?: string;
+  category?: string;
+  level?: string;
+  search?: string;
+  page?: string;
+  limit?: string;
+}
+
+// ─── Learning Path ───────────────────
+export interface AdminLearningPathDTO {
+  id: string;
+  slug: string;
+  title: string;
+  titleVi: string | null;
+  description: string;
+  coverImage: string | null;
+  level: string;
+  isPremium: boolean;
+  orderIndex: number;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { units: number };
+}

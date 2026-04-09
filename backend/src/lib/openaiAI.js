@@ -310,9 +310,233 @@ Return JSON:
   }
 }
 
+/**
+ * Generate exercises for a lesson based on topic, level, and vocabulary
+ * @param {Object} opts - { topic, level, category, vocabulary, exerciseCount, exerciseTypes }
+ * @returns {Object} - { exercises: [...] }
+ */
+async function generateLessonExercises(opts = {}) {
+  const {
+    topic = 'daily conversation',
+    level = 'beginner',
+    category = 'grammar',
+    vocabulary = [],
+    exerciseCount = 5,
+    exerciseTypes = ['multiple_choice', 'fill_blank'],
+  } = opts;
+
+  const vocabContext = vocabulary.length > 0
+    ? `Use these vocabulary items where possible: ${vocabulary.map(v => `${v.word} (${v.meaning})`).join(', ')}`
+    : '';
+
+  const fallback = {
+    exercises: [
+      {
+        type: 'multiple_choice',
+        question: 'What is the correct form?',
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctAnswer: 'Option A',
+        points: 10,
+        explanation: 'This is a placeholder exercise. Please regenerate.',
+      },
+    ],
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: FAST_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a professional English language exercise creator for a mobile learning app.
+Create ${exerciseCount} exercises for ${level} level learners. Category: ${category}. Topic: ${topic}.
+${vocabContext}
+
+Allowed exercise types: ${exerciseTypes.join(', ')}
+
+RULES:
+- Each exercise must be clear, concise, and appropriate for the level
+- Avoid trick questions
+- Provide helpful explanations for each answer
+- For fill_blank exercises, include acceptableAnswers as an array of valid answers
+- For match exercises, provide correctPairs as [[left, right], ...]
+- For reorder exercises, provide correctOrder as an array of words/phrases in correct order
+- Points per exercise: 10 for standard, 15 for harder ones
+
+Return ONLY valid JSON:
+{
+  "exercises": [
+    {
+      "type": "multiple_choice",
+      "question": "<question text>",
+      "options": ["A", "B", "C", "D"],
+      "correctAnswer": "<correct option text>",
+      "points": 10,
+      "explanation": "<why this is correct>"
+    },
+    {
+      "type": "fill_blank",
+      "question": "I ___ to school every day.",
+      "correctAnswer": "go",
+      "acceptableAnswers": ["go", "walk"],
+      "points": 10,
+      "explanation": "<explanation>"
+    },
+    {
+      "type": "match",
+      "instruction": "Match the words with their meanings",
+      "correctPairs": [["hello", "xin chao"], ["goodbye", "tam biet"]],
+      "points": 15,
+      "explanation": "<explanation>"
+    },
+    {
+      "type": "reorder",
+      "instruction": "Put the words in the correct order",
+      "words": ["to", "I", "school", "go"],
+      "correctOrder": ["I", "go", "to", "school"],
+      "points": 10,
+      "explanation": "<explanation>"
+    }
+  ]
+}`,
+        },
+        {
+          role: 'user',
+          content: `Create ${exerciseCount} exercises about "${topic}" for ${level} ${category} learners. Use types: ${exerciseTypes.join(', ')}.`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
+    });
+
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return parsed.exercises ? parsed : fallback;
+  } catch (err) {
+    console.error('generateLessonExercises error:', err.message);
+    return fallback;
+  }
+}
+
+/**
+ * Generate complete lesson content from a topic
+ * @param {Object} opts - { topic, level, category, includeExercises }
+ * @returns {Object} - { title, titleVi, description, sections: [...] }
+ */
+async function generateLessonContent(opts = {}) {
+  const {
+    topic = 'daily conversation',
+    level = 'beginner',
+    category = 'grammar',
+    includeExercises = true,
+  } = opts;
+
+  const fallback = {
+    title: topic,
+    titleVi: null,
+    description: `Learn about ${topic}`,
+    sections: [
+      { type: 'text', title: 'Introduction', content: `This lesson covers ${topic}.` },
+    ],
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a professional English language lesson creator for a mobile learning app called STICK.
+STICK helps Vietnamese learners build the habit of thinking in English daily.
+
+Create a complete lesson about "${topic}" for ${level} level. Category: ${category}.
+
+RULES:
+- Content must be practical, relatable to daily life
+- Language must be appropriate for ${level} level
+- Vietnamese translations are helpful where noted
+- Keep sections short and scannable (mobile-first)
+- Exercises should be fun, not exam-like
+- Total lesson should take about 5 minutes
+
+Return ONLY valid JSON with this structure:
+{
+  "title": "<lesson title in English>",
+  "titleVi": "<Vietnamese title>",
+  "description": "<1-2 sentence description>",
+  "sections": [
+    {
+      "type": "text",
+      "title": "<section heading>",
+      "content": "<explanatory text, keep short>"
+    },
+    {
+      "type": "vocab",
+      "title": "Key Vocabulary",
+      "items": [
+        { "word": "<word>", "meaning": "<Vietnamese meaning>", "example": "<example sentence>", "pronunciation": "<IPA if helpful>" }
+      ]
+    },
+    {
+      "type": "grammar",
+      "title": "<grammar point>",
+      "pattern": "<pattern like: S + V + O>",
+      "examples": ["<example 1>", "<example 2>"],
+      "notes": "<brief note in Vietnamese if helpful>"
+    },
+    {
+      "type": "exercises",
+      "title": "Practice",
+      "exercises": [
+        {
+          "type": "multiple_choice",
+          "question": "<question>",
+          "options": ["A", "B", "C", "D"],
+          "correctAnswer": "<correct>",
+          "points": 10,
+          "explanation": "<why>"
+        },
+        {
+          "type": "fill_blank",
+          "question": "She ___ to work every day.",
+          "correctAnswer": "goes",
+          "acceptableAnswers": ["goes", "walks"],
+          "points": 10,
+          "explanation": "<why>"
+        }
+      ]
+    },
+    {
+      "type": "summary",
+      "title": "Quick Review",
+      "content": "<brief summary of key takeaways>"
+    }
+  ]
+}`,
+        },
+        {
+          role: 'user',
+          content: `Create a complete ${level} ${category} lesson about: ${topic}${includeExercises ? '. Include 3-5 exercises.' : '. No exercises needed.'}`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+      response_format: { type: 'json_object' },
+    });
+
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return parsed.title ? parsed : fallback;
+  } catch (err) {
+    console.error('generateLessonContent error:', err.message);
+    return fallback;
+  }
+}
+
 module.exports = {
   generateJournalFeedback,
   generateDailyChallenge,
   generateGrammarQuiz,
   generateReadingContent,
+  generateLessonExercises,
+  generateLessonContent,
 };

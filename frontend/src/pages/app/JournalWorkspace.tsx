@@ -194,7 +194,9 @@ export const JournalWorkspacePage: React.FC = () => {
             {/* Text Area */}
             <div className="relative flex-1 z-10">
               <textarea
-                className="w-full h-full min-h-[150px] md:min-h-[250px] bg-transparent border-none focus:ring-0 text-lg md:text-xl lg:text-2xl font-body leading-relaxed text-black/90 font-medium placeholder:text-stone-300 resize-none selection:bg-secondary-container"
+                autoFocus
+                className="w-full h-full min-h-[150px] md:min-h-[250px] bg-transparent border-none focus:ring-0 text-lg md:text-xl lg:text-2xl font-body leading-relaxed text-black/90 font-medium placeholder:text-stone-300 resize-none selection:bg-secondary-container caret-primary"
+                style={{ caretColor: 'var(--md-sys-color-primary, #6750A4)' }}
                 placeholder={t('journal_workspace.placeholder')}
                 spellCheck={false}
                 value={text}

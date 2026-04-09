@@ -8,6 +8,8 @@ import { AdminUsersPage } from './AdminUsers';
 import { AdminUserDetailPage } from './AdminUserDetail';
 import { AdminAILogsPage } from './AdminAILogs';
 import { AdminSettingsPage } from './AdminSettings';
+import { AdminLessonListPage } from './AdminLessonList';
+import { AdminLessonEditPage } from './AdminLessonEdit';
 
 /**
  * Hash-based router for all #admin/* routes.
@@ -43,6 +45,10 @@ export const AdminApp: React.FC<{ route: string }> = ({ route }) => {
       return <AdminAILogsPage />;
     case 'settings':
       return <AdminSettingsPage />;
+    case 'lessons':
+      return <AdminLessonListPage />;
+    case 'lesson-edit':
+      return <AdminLessonEditPage />;
     default:
       return <AdminDashboardPage />;
   }

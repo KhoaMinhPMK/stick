@@ -384,15 +384,95 @@ export async function getStreakFreezes() {
 export interface LessonSummary {
   id: string;
   title: string;
+  titleVi?: string;
   description: string;
   category: string;
   level: string;
   duration: number;
   orderIndex: number;
+  xpReward: number;
+  isPremium: boolean;
+  tags: string[];
+  progress?: {
+    bestScore: number;
+    starRating: number;
+    totalAttempts: number;
+  } | null;
+}
+
+export interface LessonContentSection {
+  type: 'text' | 'vocab' | 'grammar' | 'exercises' | 'summary';
+  title: string;
+  content?: string;
+  items?: { word: string; meaning: string; example?: string; phonetic?: string }[];
+  pattern?: string;
+  examples?: string[];
+  notes?: string;
+  exercises?: LessonExerciseItem[];
+}
+
+export interface LessonExerciseItem {
+  type: 'multiple_choice' | 'fill_blank' | 'match' | 'reorder';
+  question?: string;
+  instruction?: string;
+  options?: string[];
+  correctAnswer?: string;
+  acceptableAnswers?: string[];
+  correctPairs?: [string, string][];
+  words?: string[];
+  correctOrder?: string[];
+  points: number;
+  explanation?: string;
 }
 
 export interface LessonDetail extends LessonSummary {
-  content: string;
+  content: string | { sections: LessonContentSection[] };
+}
+
+export interface LessonValidationResult {
+  exerciseIndex: number;
+  correct: boolean;
+  correctAnswer?: string;
+  explanation?: string;
+  pointsEarned: number;
+}
+
+export interface LessonCompletionResult {
+  attempt: {
+    id: string;
+    score: number;
+    starRating: number;
+    xpEarned: number;
+    comboMax: number;
+    isReview: boolean;
+  };
+  progress: {
+    bestScore: number;
+    starRating: number;
+    totalAttempts: number;
+    totalXpEarned: number;
+  };
+  vocabAdded: number;
+}
+
+export interface LessonProgressResult {
+  progress: {
+    bestScore: number;
+    starRating: number;
+    totalAttempts: number;
+    totalXpEarned: number;
+    firstCompletedAt: string;
+    lastAttemptAt: string;
+  } | null;
+  recentAttempts: {
+    id: string;
+    score: number;
+    starRating: number;
+    xpEarned: number;
+    comboMax: number;
+    isReview: boolean;
+    createdAt: string;
+  }[];
 }
 
 export async function getLessons(category?: string, level?: string) {
@@ -407,12 +487,25 @@ export async function getLessonDetail(id: string) {
   return apiRequest<{ lesson: LessonDetail }>(`/library/lessons/${id}`);
 }
 
-// GAP-15: Lesson completion tracking
-export async function completeLessonProgress(lessonId: string, duration?: number, timeSpent?: number) {
-  return apiRequest<{ session: LearningSession; alreadyCompleted?: boolean; xpAwarded?: number }>(`/library/lessons/${lessonId}/complete`, {
+export async function validateExercise(lessonId: string, exerciseIndex: number, answer: string | string[] | [string, string][]) {
+  return apiRequest<LessonValidationResult>(`/library/lessons/${lessonId}/validate`, {
     method: 'POST',
-    body: { duration, timeSpent: timeSpent ?? duration ?? 60 },
+    body: { exerciseIndex, answer },
   });
+}
+
+export async function completeLessonProgress(
+  lessonId: string,
+  data: { score: number; totalPoints: number; maxCombo: number; answers: Record<string, unknown>[]; duration: number }
+) {
+  return apiRequest<LessonCompletionResult>(`/library/lessons/${lessonId}/complete`, {
+    method: 'POST',
+    body: data,
+  });
+}
+
+export async function getLessonProgress(lessonId: string) {
+  return apiRequest<LessonProgressResult>(`/library/lessons/${lessonId}/progress`);
 }
 
 // GAP-13: Account deletion

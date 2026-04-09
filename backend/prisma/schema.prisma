@@ -52,6 +52,10 @@ model User {
   lexiconItems     LearnerLexicon[]
   xpLogs           UserXpLog[]
   streakFreezes    StreakFreeze[]
+  lessonAttempts   LessonAttempt[]
+  exerciseAttempts ExerciseAttempt[]
+  lessonProgress   UserLessonProgress[]
+  pathProgress     UserPathProgress[]
 }
 
 // ─── Auth ────────────────────────────────────────────
@@ -248,20 +252,154 @@ model ProgressDaily {
 }
 
 // ─── Lessons (Library content) ───────────────────────
-model Lesson {
+model LearningPath {
   id          String   @id @default(uuid())
+  slug        String   @unique
   title       String
+  titleVi     String?
   description String   @db.Text
-  category    String   // "grammar", "vocabulary", "reading", "listening", "speaking"
-  level       String   // "beginner", "intermediate", "advanced"
-  content     String   @db.LongText
-  duration    Int      @default(10) // in minutes
+  coverImage  String?  @db.Text
+  level       String   @default("beginner")
+  isPremium   Boolean  @default(false)
   orderIndex  Int      @default(0)
-  published   Boolean  @default(true)
+  published   Boolean  @default(false)
+  units       Unit[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Unit {
+  id             String       @id @default(uuid())
+  learningPathId String
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  slug           String
+  title          String
+  titleVi        String?
+  description    String?      @db.Text
+  coverImage     String?      @db.Text
+  orderIndex     Int          @default(0)
+  isPremium      Boolean      @default(false)
+  published      Boolean      @default(false)
+  modules        Module[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([learningPathId, slug])
+  @@index([learningPathId, orderIndex])
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  title       String
+  titleVi     String?
+  orderIndex  Int      @default(0)
+  published   Boolean  @default(false)
+  lessons     Lesson[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([unitId, orderIndex])
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  moduleId    String?
+  module      Module?  @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  title       String
+  titleVi     String?
+  description String   @db.Text
+  category    String   @default("grammar")
+  level       String   @default("beginner")
+  content     String   @db.LongText
+  duration    Int      @default(5)
+  orderIndex  Int      @default(0)
+  published   Boolean  @default(true)
+  xpReward    Int      @default(15)
+  isPremium   Boolean  @default(false)
+  tags        String?  @db.Text
+  aiGenerated Boolean  @default(false)
+  status      String   @default("published") // "draft" | "review" | "published" | "archived"
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attempts    LessonAttempt[]
+
   @@index([category, level])
+  @@index([moduleId, orderIndex])
+  @@index([status])
+}
+
+model LessonAttempt {
+  id            String   @id @default(uuid())
+  userId        String
+  lessonId      String
+  score         Int      @default(0)
+  starRating    Int      @default(0)
+  xpEarned      Int      @default(0)
+  comboMax      Int      @default(0)
+  duration      Int      @default(0)
+  answers       String   @db.LongText
+  isReview      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson        Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lessonId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model ExerciseAttempt {
+  id            String   @id @default(uuid())
+  userId        String
+  lessonId      String
+  exerciseIndex Int
+  exerciseType  String
+  answer        String   @db.Text
+  correct       Boolean  @default(false)
+  points        Int      @default(0)
+  timeSpent     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, exerciseType])
+  @@index([userId, lessonId])
+}
+
+model UserLessonProgress {
+  id               String    @id @default(uuid())
+  userId           String
+  lessonId         String
+  bestScore        Int       @default(0)
+  starRating       Int       @default(0)
+  totalAttempts    Int       @default(0)
+  totalXpEarned    Int       @default(0)
+  firstCompletedAt DateTime?
+  lastAttemptAt    DateTime?
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model UserPathProgress {
+  id               String    @id @default(uuid())
+  userId           String
+  learningPathId   String
+  unitsCompleted   Int       @default(0)
+  totalUnits       Int       @default(0)
+  currentUnitId    String?
+  currentLessonId  String?
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, learningPathId])
 }
 
 // ─── Daily Prompts (Admin-managed) ───────────────────

@@ -8,7 +8,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent } = require('../lib/openaiAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
@@ -2361,6 +2361,7 @@ router.post('/progress/backfill', requireAuth, asyncHandler(async (req, res) => 
 router.get('/library/lessons', asyncHandler(async (req, res) => {
   const category = req.query.category || undefined;
   const level = req.query.level || undefined;
+  const userId = req.headers.authorization ? (await getUserFromBearer(req))?.id : null;
 
   const where = { published: true };
   if (category) where.category = category;
@@ -2372,14 +2373,37 @@ router.get('/library/lessons', asyncHandler(async (req, res) => {
     select: {
       id: true,
       title: true,
+      titleVi: true,
       description: true,
       category: true,
       level: true,
       duration: true,
       orderIndex: true,
+      xpReward: true,
+      isPremium: true,
+      tags: true,
     },
   });
-  res.status(200).json({ items: lessons, total: lessons.length });
+
+  // If authenticated, attach user progress
+  let progressMap = {};
+  if (userId) {
+    const progress = await prisma.userLessonProgress.findMany({
+      where: { userId, lessonId: { in: lessons.map(l => l.id) } },
+      select: { lessonId: true, bestScore: true, starRating: true, totalAttempts: true },
+    });
+    for (const p of progress) {
+      progressMap[p.lessonId] = p;
+    }
+  }
+
+  const items = lessons.map(l => ({
+    ...l,
+    tags: l.tags ? (function() { try { return JSON.parse(l.tags); } catch { return l.tags; } })() : [],
+    progress: progressMap[l.id] || null,
+  }));
+
+  res.status(200).json({ items, total: items.length });
 }));
 
 router.get('/library/lessons/:id', asyncHandler(async (req, res) => {
@@ -2389,10 +2413,140 @@ router.get('/library/lessons/:id', asyncHandler(async (req, res) => {
   if (!lesson) {
     return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
   }
-  res.status(200).json({ lesson });
+
+  // Parse content JSON
+  let parsedContent;
+  try {
+    parsedContent = typeof lesson.content === 'string' ? JSON.parse(lesson.content) : lesson.content;
+  } catch {
+    parsedContent = lesson.content;
+  }
+
+  let parsedTags;
+  try {
+    parsedTags = lesson.tags ? JSON.parse(lesson.tags) : [];
+  } catch {
+    parsedTags = lesson.tags || [];
+  }
+
+  res.status(200).json({
+    lesson: {
+      ...lesson,
+      content: parsedContent,
+      tags: parsedTags,
+    },
+  });
 }));
 
-// ─── GAP-15: Lesson completion tracking ──────────────
+// ─── Lesson Exercise Validation ──────────────────────
+router.post('/library/lessons/:id/validate', requireAuth, asyncHandler(async (req, res) => {
+  const lesson = await prisma.lesson.findFirst({
+    where: { id: req.params.id, published: true },
+  });
+  if (!lesson) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+
+  const { exerciseIndex, exerciseType, answer, timeSpent } = req.body || {};
+  if (exerciseIndex === undefined || !exerciseType || answer === undefined) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'exerciseIndex, exerciseType, and answer are required' });
+  }
+
+  // Parse lesson content to get exercises
+  let content;
+  try {
+    content = typeof lesson.content === 'string' ? JSON.parse(lesson.content) : lesson.content;
+  } catch {
+    return res.status(500).json({ code: 'CONTENT_ERROR', message: 'Could not parse lesson content' });
+  }
+
+  // Find exercises from content sections
+  const exercises = [];
+  if (content && content.sections) {
+    for (const section of content.sections) {
+      if (section.exercises) {
+        exercises.push(...section.exercises);
+      }
+    }
+  }
+
+  if (exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+    return res.status(400).json({ code: 'INVALID_INDEX', message: 'Exercise index out of range' });
+  }
+
+  const exercise = exercises[exerciseIndex];
+  let correct = false;
+  let points = 0;
+  let correctAnswer = null;
+
+  switch (exerciseType) {
+    case 'multiple_choice': {
+      correct = String(answer).toLowerCase().trim() === String(exercise.correctAnswer || exercise.correct).toLowerCase().trim();
+      points = correct ? (exercise.points || 10) : 0;
+      correctAnswer = exercise.correctAnswer || exercise.correct;
+      break;
+    }
+    case 'fill_blank': {
+      const acceptableAnswers = (exercise.acceptableAnswers || [exercise.correctAnswer || exercise.correct])
+        .map(a => String(a).toLowerCase().trim());
+      correct = acceptableAnswers.includes(String(answer).toLowerCase().trim());
+      points = correct ? (exercise.points || 10) : 0;
+      correctAnswer = exercise.correctAnswer || exercise.correct;
+      break;
+    }
+    case 'match': {
+      // answer should be an array of pairs
+      if (Array.isArray(answer) && Array.isArray(exercise.correctPairs)) {
+        const correctPairs = exercise.correctPairs;
+        let matchCount = 0;
+        for (const pair of answer) {
+          const found = correctPairs.find(
+            cp => String(cp[0]).toLowerCase().trim() === String(pair[0]).toLowerCase().trim() &&
+                  String(cp[1]).toLowerCase().trim() === String(pair[1]).toLowerCase().trim()
+          );
+          if (found) matchCount++;
+        }
+        correct = matchCount === correctPairs.length;
+        points = Math.round((matchCount / Math.max(correctPairs.length, 1)) * (exercise.points || 10));
+        correctAnswer = correctPairs;
+      }
+      break;
+    }
+    case 'reorder': {
+      if (Array.isArray(answer) && Array.isArray(exercise.correctOrder)) {
+        correct = JSON.stringify(answer) === JSON.stringify(exercise.correctOrder);
+        points = correct ? (exercise.points || 10) : 0;
+        correctAnswer = exercise.correctOrder;
+      }
+      break;
+    }
+    default:
+      return res.status(400).json({ code: 'INVALID_TYPE', message: `Unknown exercise type: ${exerciseType}` });
+  }
+
+  // Log the exercise attempt
+  await prisma.exerciseAttempt.create({
+    data: {
+      userId: req.authUser.id,
+      lessonId: lesson.id,
+      exerciseIndex,
+      exerciseType,
+      answer: typeof answer === 'string' ? answer : JSON.stringify(answer),
+      correct,
+      points,
+      timeSpent: typeof timeSpent === 'number' ? timeSpent : 0,
+    },
+  });
+
+  res.status(200).json({
+    correct,
+    points,
+    correctAnswer,
+    explanation: exercise.explanation || null,
+  });
+}));
+
+// ─── Lesson Completion with Scoring ──────────────────
 router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (req, res) => {
   const lesson = await prisma.lesson.findFirst({
     where: { id: req.params.id, published: true },
@@ -2401,46 +2555,224 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
     return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
   }
 
-  // Idempotency: each lesson can only be completed once per user
-  const alreadyCompleted = await prisma.learningSession.findFirst({
-    where: { userId: req.authUser.id, type: 'lesson', metadata: { path: ['lessonId'], equals: req.params.id } },
-  });
-  if (alreadyCompleted) {
-    return res.status(200).json({ session: alreadyCompleted, alreadyCompleted: true, xpAwarded: 0 });
-  }
+  const { duration, timeSpent, score, totalExercises, correctCount, comboMax, answers } = req.body || {};
 
-  const { duration, timeSpent } = req.body || {};
-
-  // Minimum time gate: must spend at least 30s reading
+  // Minimum time gate: must spend at least 30s
   if (!timeSpent || typeof timeSpent !== 'number' || timeSpent < 30) {
-    return res.status(400).json({ code: 'TOO_FAST', message: 'Please spend more time reading the lesson before completing.' });
+    return res.status(400).json({ code: 'TOO_FAST', message: 'Please spend more time on the lesson before completing.' });
   }
 
+  // Daily XP cap check (200 XP/day)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dailyProgress = await prisma.progressDaily.findUnique({
+    where: { userId_day: { userId: req.authUser.id, day: today } },
+  });
+  const dailyXpSoFar = dailyProgress ? dailyProgress.xpEarned : 0;
+  const DAILY_XP_CAP = 200;
+
+  // Check if this is a review attempt
+  const previousProgress = await prisma.userLessonProgress.findUnique({
+    where: { userId_lessonId: { userId: req.authUser.id, lessonId: lesson.id } },
+  });
+  const isReview = !!previousProgress;
+
+  // Calculate score and star rating
+  const finalScore = typeof score === 'number' ? Math.min(100, Math.max(0, score)) : 0;
+  let starRating = 0;
+  if (finalScore >= 90) starRating = 3;
+  else if (finalScore >= 70) starRating = 2;
+  else if (finalScore >= 50) starRating = 1;
+
+  // Calculate XP earned
+  let baseXp = lesson.xpReward || 15;
+  // Review gives 50% XP
+  if (isReview) {
+    baseXp = Math.round(baseXp * 0.5);
+  }
+  // Bonus XP for high scores
+  if (finalScore >= 90) baseXp = Math.round(baseXp * 1.2);
+  else if (finalScore >= 70) baseXp = Math.round(baseXp * 1.1);
+
+  // Apply daily cap
+  const xpEarned = Math.min(baseXp, Math.max(0, DAILY_XP_CAP - dailyXpSoFar));
+
+  // Record the lesson attempt
+  const attempt = await prisma.lessonAttempt.create({
+    data: {
+      userId: req.authUser.id,
+      lessonId: lesson.id,
+      score: finalScore,
+      starRating,
+      xpEarned,
+      comboMax: typeof comboMax === 'number' ? comboMax : 0,
+      duration: typeof duration === 'number' ? duration : 0,
+      answers: answers ? JSON.stringify(answers) : '[]',
+      isReview,
+    },
+  });
+
+  // Upsert user lesson progress
+  await prisma.userLessonProgress.upsert({
+    where: { userId_lessonId: { userId: req.authUser.id, lessonId: lesson.id } },
+    create: {
+      userId: req.authUser.id,
+      lessonId: lesson.id,
+      bestScore: finalScore,
+      starRating,
+      totalAttempts: 1,
+      totalXpEarned: xpEarned,
+      firstCompletedAt: new Date(),
+      lastAttemptAt: new Date(),
+    },
+    update: {
+      bestScore: { set: previousProgress && previousProgress.bestScore > finalScore ? previousProgress.bestScore : finalScore },
+      starRating: { set: previousProgress && previousProgress.starRating > starRating ? previousProgress.starRating : starRating },
+      totalAttempts: { increment: 1 },
+      totalXpEarned: { increment: xpEarned },
+      lastAttemptAt: new Date(),
+    },
+  });
+
+  // Record learning session
   const session = await prisma.learningSession.create({
     data: {
       userId: req.authUser.id,
       type: 'lesson',
       title: lesson.title,
-      summary: `Completed lesson: ${lesson.category} / ${lesson.level}`,
-      score: 100,
+      summary: `${isReview ? 'Reviewed' : 'Completed'} lesson: ${lesson.category} / ${lesson.level} - Score: ${finalScore}%`,
+      score: finalScore,
       duration: typeof duration === 'number' ? duration : null,
-      metadata: JSON.stringify({ lessonId: lesson.id, category: lesson.category, level: lesson.level }),
+      metadata: JSON.stringify({
+        lessonId: lesson.id,
+        category: lesson.category,
+        level: lesson.level,
+        starRating,
+        comboMax: comboMax || 0,
+        correctCount: correctCount || 0,
+        totalExercises: totalExercises || 0,
+        isReview,
+      }),
     },
   });
 
-  // Update daily progress + ACTUALLY award XP to User.totalXp
-  const lessonDay = new Date();
-  lessonDay.setHours(0, 0, 0, 0);
-  await prisma.progressDaily.upsert({
-    where: { userId_day: { userId: req.authUser.id, day: lessonDay } },
-    create: { userId: req.authUser.id, day: lessonDay, xpEarned: 15, minutesSpent: lesson.duration || 0 },
-    update: { xpEarned: { increment: 15 }, minutesSpent: { increment: lesson.duration || 0 } },
-  });
-  awardXp(req.authUser.id, 15, 'lesson', { description: `Completed lesson: ${lesson.title}` });
+  // Update daily progress + award XP
+  if (xpEarned > 0) {
+    await prisma.progressDaily.upsert({
+      where: { userId_day: { userId: req.authUser.id, day: today } },
+      create: { userId: req.authUser.id, day: today, xpEarned, minutesSpent: lesson.duration || 0 },
+      update: { xpEarned: { increment: xpEarned }, minutesSpent: { increment: lesson.duration || 0 } },
+    });
+    awardXp(req.authUser.id, xpEarned, 'lesson', { description: `${isReview ? 'Reviewed' : 'Completed'} lesson: ${lesson.title}` });
+  }
+
+  // Auto-add vocabulary from lesson to user's notebook
+  try {
+    let content;
+    try {
+      content = typeof lesson.content === 'string' ? JSON.parse(lesson.content) : lesson.content;
+    } catch { content = null; }
+
+    if (content && content.sections) {
+      const vocabItems = [];
+      for (const section of content.sections) {
+        if (section.type === 'vocab' && Array.isArray(section.items)) {
+          vocabItems.push(...section.items);
+        }
+      }
+      for (const vocab of vocabItems) {
+        if (vocab.word || vocab.expression) {
+          const word = vocab.word || vocab.expression;
+          // Check if already exists
+          const exists = await prisma.vocabNotebookItem.findFirst({
+            where: { userId: req.authUser.id, expression: word },
+          });
+          if (!exists) {
+            await prisma.vocabNotebookItem.create({
+              data: {
+                userId: req.authUser.id,
+                expression: word,
+                meaning: vocab.meaning || vocab.definition || '',
+                example: vocab.example || '',
+                source: 'lesson',
+                sourceId: lesson.id,
+                tags: lesson.category,
+              },
+            }).catch(() => {}); // Ignore duplicates
+          }
+        }
+      }
+    }
+  } catch (vocabErr) {
+    console.error('Auto-add vocab error:', vocabErr.message);
+  }
 
   await checkAndUnlockAchievements(req.authUser.id);
 
-  res.status(201).json({ session, alreadyCompleted: false, xpAwarded: 15 });
+  res.status(201).json({
+    session,
+    attempt: {
+      id: attempt.id,
+      score: finalScore,
+      starRating,
+      xpEarned,
+      comboMax: attempt.comboMax,
+      isReview,
+    },
+    dailyXpRemaining: Math.max(0, DAILY_XP_CAP - dailyXpSoFar - xpEarned),
+  });
+}));
+
+// ─── User Lesson Progress ────────────────────────────
+router.get('/library/lessons/:id/progress', requireAuth, asyncHandler(async (req, res) => {
+  const progress = await prisma.userLessonProgress.findUnique({
+    where: { userId_lessonId: { userId: req.authUser.id, lessonId: req.params.id } },
+  });
+  const attempts = await prisma.lessonAttempt.findMany({
+    where: { userId: req.authUser.id, lessonId: req.params.id },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: {
+      id: true,
+      score: true,
+      starRating: true,
+      xpEarned: true,
+      comboMax: true,
+      isReview: true,
+      createdAt: true,
+    },
+  });
+  res.status(200).json({ progress, attempts });
+}));
+
+// ─── Learning Paths (public) ─────────────────────────
+router.get('/library/paths', asyncHandler(async (req, res) => {
+  const paths = await prisma.learningPath.findMany({
+    where: { published: true },
+    orderBy: { orderIndex: 'asc' },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      titleVi: true,
+      description: true,
+      coverImage: true,
+      level: true,
+      isPremium: true,
+      units: {
+        where: { published: true },
+        orderBy: { orderIndex: 'asc' },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          titleVi: true,
+          _count: { select: { modules: true } },
+        },
+      },
+    },
+  });
+  res.status(200).json({ items: paths, total: paths.length });
 }));
 
 // ─── Leaderboard ─────────────────────────────────────
@@ -3417,6 +3749,428 @@ router.put('/admin/config/:key', requireAuth, requireAdmin, asyncHandler(async (
   res.status(200).json({ config });
 }));
 
+// ─── Admin: Lessons CRUD ─────────────────────────────
+router.get('/admin/lessons', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
+  const status = req.query.status || undefined;
+  const category = req.query.category || undefined;
+  const level = req.query.level || undefined;
+  const search = req.query.search || undefined;
+
+  const where = {};
+  if (status && status !== 'all') where.status = status;
+  if (category && category !== 'all') where.category = category;
+  if (level && level !== 'all') where.level = level;
+  if (search) {
+    where.OR = [
+      { title: { contains: search } },
+      { description: { contains: search } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.lesson.findMany({
+      where,
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        titleVi: true,
+        category: true,
+        level: true,
+        status: true,
+        published: true,
+        xpReward: true,
+        isPremium: true,
+        duration: true,
+        orderIndex: true,
+        moduleId: true,
+        aiGenerated: true,
+        version: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { attempts: true } },
+      },
+    }),
+    prisma.lesson.count({ where }),
+  ]);
+
+  res.status(200).json({ items, total, page, limit });
+}));
+
+router.get('/admin/lessons/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: req.params.id },
+    include: {
+      module: {
+        include: {
+          unit: {
+            include: { learningPath: { select: { id: true, title: true, slug: true } } },
+          },
+        },
+      },
+      _count: { select: { attempts: true } },
+    },
+  });
+  if (!lesson) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+  res.status(200).json({ lesson });
+}));
+
+router.post('/admin/lessons', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { title, titleVi, description, category, level, content, duration, orderIndex, xpReward, isPremium, tags, status, moduleId } = req.body || {};
+
+  if (!title || !description || !content) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'title, description, and content are required' });
+  }
+
+  const lesson = await prisma.lesson.create({
+    data: {
+      title: String(title).trim(),
+      titleVi: titleVi ? String(titleVi).trim() : null,
+      description: String(description),
+      category: category || 'grammar',
+      level: level || 'beginner',
+      content: typeof content === 'string' ? content : JSON.stringify(content),
+      duration: typeof duration === 'number' ? duration : 5,
+      orderIndex: typeof orderIndex === 'number' ? orderIndex : 0,
+      xpReward: typeof xpReward === 'number' ? xpReward : 15,
+      isPremium: isPremium === true,
+      tags: tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : null,
+      status: status || 'draft',
+      published: status === 'published',
+      moduleId: moduleId || null,
+    },
+  });
+
+  res.status(201).json({ lesson });
+}));
+
+router.put('/admin/lessons/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.lesson.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+
+  const { title, titleVi, description, category, level, content, duration, orderIndex, xpReward, isPremium, tags, status, moduleId } = req.body || {};
+
+  const data = {};
+  if (title !== undefined) data.title = String(title).trim();
+  if (titleVi !== undefined) data.titleVi = titleVi ? String(titleVi).trim() : null;
+  if (description !== undefined) data.description = String(description);
+  if (category !== undefined) data.category = category;
+  if (level !== undefined) data.level = level;
+  if (content !== undefined) data.content = typeof content === 'string' ? content : JSON.stringify(content);
+  if (duration !== undefined) data.duration = duration;
+  if (orderIndex !== undefined) data.orderIndex = orderIndex;
+  if (xpReward !== undefined) data.xpReward = xpReward;
+  if (isPremium !== undefined) data.isPremium = isPremium;
+  if (tags !== undefined) data.tags = tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : null;
+  if (moduleId !== undefined) data.moduleId = moduleId || null;
+  if (status !== undefined) {
+    data.status = status;
+    data.published = status === 'published';
+  }
+
+  const lesson = await prisma.lesson.update({
+    where: { id: req.params.id },
+    data,
+  });
+
+  res.status(200).json({ lesson });
+}));
+
+router.delete('/admin/lessons/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.lesson.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+  await prisma.lesson.delete({ where: { id: req.params.id } });
+  res.status(200).json({ message: 'Lesson deleted' });
+}));
+
+router.post('/admin/lessons/:id/duplicate', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const source = await prisma.lesson.findUnique({ where: { id: req.params.id } });
+  if (!source) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+
+  const lesson = await prisma.lesson.create({
+    data: {
+      title: `${source.title} (copy)`,
+      titleVi: source.titleVi,
+      description: source.description,
+      category: source.category,
+      level: source.level,
+      content: source.content,
+      duration: source.duration,
+      orderIndex: source.orderIndex + 1,
+      xpReward: source.xpReward,
+      isPremium: source.isPremium,
+      tags: source.tags,
+      status: 'draft',
+      published: false,
+      moduleId: source.moduleId,
+    },
+  });
+
+  res.status(201).json({ lesson });
+}));
+
+// ─── Admin: Learning Paths CRUD ──────────────────────
+router.get('/admin/learning-paths', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const paths = await prisma.learningPath.findMany({
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      _count: { select: { units: true } },
+    },
+  });
+  res.status(200).json({ items: paths, total: paths.length });
+}));
+
+router.post('/admin/learning-paths', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { title, titleVi, slug, description, level, isPremium, coverImage, orderIndex } = req.body || {};
+
+  if (!title || !slug || !description) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'title, slug, and description are required' });
+  }
+
+  const existingSlug = await prisma.learningPath.findUnique({ where: { slug } });
+  if (existingSlug) {
+    return res.status(409).json({ code: 'SLUG_EXISTS', message: 'A learning path with this slug already exists' });
+  }
+
+  const path = await prisma.learningPath.create({
+    data: {
+      title: String(title).trim(),
+      titleVi: titleVi ? String(titleVi).trim() : null,
+      slug: String(slug).trim().toLowerCase(),
+      description: String(description),
+      level: level || 'beginner',
+      isPremium: isPremium === true,
+      coverImage: coverImage || null,
+      orderIndex: typeof orderIndex === 'number' ? orderIndex : 0,
+    },
+  });
+
+  res.status(201).json({ path });
+}));
+
+router.put('/admin/learning-paths/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.learningPath.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Learning path not found' });
+  }
+
+  const { title, titleVi, slug, description, level, isPremium, coverImage, orderIndex, published } = req.body || {};
+  const data = {};
+  if (title !== undefined) data.title = String(title).trim();
+  if (titleVi !== undefined) data.titleVi = titleVi ? String(titleVi).trim() : null;
+  if (slug !== undefined) data.slug = String(slug).trim().toLowerCase();
+  if (description !== undefined) data.description = String(description);
+  if (level !== undefined) data.level = level;
+  if (isPremium !== undefined) data.isPremium = isPremium;
+  if (coverImage !== undefined) data.coverImage = coverImage;
+  if (orderIndex !== undefined) data.orderIndex = orderIndex;
+  if (published !== undefined) data.published = published;
+
+  const path = await prisma.learningPath.update({
+    where: { id: req.params.id },
+    data,
+  });
+
+  res.status(200).json({ path });
+}));
+
+router.delete('/admin/learning-paths/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.learningPath.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Learning path not found' });
+  }
+  await prisma.learningPath.delete({ where: { id: req.params.id } });
+  res.status(200).json({ message: 'Learning path deleted' });
+}));
+
+// ─── Admin: Units CRUD ───────────────────────────────
+router.get('/admin/learning-paths/:pathId/units', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const units = await prisma.unit.findMany({
+    where: { learningPathId: req.params.pathId },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      _count: { select: { modules: true } },
+    },
+  });
+  res.status(200).json({ items: units, total: units.length });
+}));
+
+router.post('/admin/learning-paths/:pathId/units', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { title, titleVi, slug, description, coverImage, orderIndex, isPremium } = req.body || {};
+  if (!title || !slug) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'title and slug are required' });
+  }
+
+  const unit = await prisma.unit.create({
+    data: {
+      learningPathId: req.params.pathId,
+      title: String(title).trim(),
+      titleVi: titleVi ? String(titleVi).trim() : null,
+      slug: String(slug).trim().toLowerCase(),
+      description: description || null,
+      coverImage: coverImage || null,
+      orderIndex: typeof orderIndex === 'number' ? orderIndex : 0,
+      isPremium: isPremium === true,
+    },
+  });
+
+  res.status(201).json({ unit });
+}));
+
+router.put('/admin/units/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.unit.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Unit not found' });
+  }
+
+  const { title, titleVi, slug, description, coverImage, orderIndex, isPremium, published } = req.body || {};
+  const data = {};
+  if (title !== undefined) data.title = String(title).trim();
+  if (titleVi !== undefined) data.titleVi = titleVi ? String(titleVi).trim() : null;
+  if (slug !== undefined) data.slug = String(slug).trim().toLowerCase();
+  if (description !== undefined) data.description = description;
+  if (coverImage !== undefined) data.coverImage = coverImage;
+  if (orderIndex !== undefined) data.orderIndex = orderIndex;
+  if (isPremium !== undefined) data.isPremium = isPremium;
+  if (published !== undefined) data.published = published;
+
+  const unit = await prisma.unit.update({ where: { id: req.params.id }, data });
+  res.status(200).json({ unit });
+}));
+
+router.delete('/admin/units/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.unit.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Unit not found' });
+  }
+  await prisma.unit.delete({ where: { id: req.params.id } });
+  res.status(200).json({ message: 'Unit deleted' });
+}));
+
+// ─── Admin: Modules CRUD ─────────────────────────────
+router.get('/admin/units/:unitId/modules', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const modules = await prisma.module.findMany({
+    where: { unitId: req.params.unitId },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      _count: { select: { lessons: true } },
+    },
+  });
+  res.status(200).json({ items: modules, total: modules.length });
+}));
+
+router.post('/admin/units/:unitId/modules', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { title, titleVi, orderIndex } = req.body || {};
+  if (!title) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'title is required' });
+  }
+
+  const mod = await prisma.module.create({
+    data: {
+      unitId: req.params.unitId,
+      title: String(title).trim(),
+      titleVi: titleVi ? String(titleVi).trim() : null,
+      orderIndex: typeof orderIndex === 'number' ? orderIndex : 0,
+    },
+  });
+
+  res.status(201).json({ module: mod });
+}));
+
+router.put('/admin/modules/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.module.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Module not found' });
+  }
+
+  const { title, titleVi, orderIndex, published } = req.body || {};
+  const data = {};
+  if (title !== undefined) data.title = String(title).trim();
+  if (titleVi !== undefined) data.titleVi = titleVi ? String(titleVi).trim() : null;
+  if (orderIndex !== undefined) data.orderIndex = orderIndex;
+  if (published !== undefined) data.published = published;
+
+  const mod = await prisma.module.update({ where: { id: req.params.id }, data });
+  res.status(200).json({ module: mod });
+}));
+
+router.delete('/admin/modules/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = await prisma.module.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Module not found' });
+  }
+  await prisma.module.delete({ where: { id: req.params.id } });
+  res.status(200).json({ message: 'Module deleted' });
+}));
+
+// ─── Admin: AI Lesson Generation ─────────────────────
+router.post('/admin/lessons/ai-generate', requireAuth, requireAdmin, aiRateLimiter, asyncHandler(async (req, res) => {
+  const { topic, level, category, includeExercises } = req.body || {};
+
+  if (!topic) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'topic is required' });
+  }
+
+  const startTime = Date.now();
+  const result = await generateLessonContent({
+    topic,
+    level: level || 'beginner',
+    category: category || 'grammar',
+    includeExercises: includeExercises !== false,
+  });
+  const latencyMs = Date.now() - startTime;
+
+  // Log the AI call
+  try {
+    await prisma.aILog.create({
+      data: {
+        userId: req.authUser.id,
+        inputText: JSON.stringify({ topic, level, category }),
+        outputText: JSON.stringify(result).substring(0, 10000),
+        model: 'gpt-4.1',
+        statusCode: 200,
+        latencyMs,
+      },
+    });
+  } catch {}
+
+  res.status(200).json({ lesson: result, latencyMs });
+}));
+
+router.post('/admin/lessons/ai-exercises', requireAuth, requireAdmin, aiRateLimiter, asyncHandler(async (req, res) => {
+  const { topic, level, category, vocabulary, exerciseCount, exerciseTypes } = req.body || {};
+
+  if (!topic) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'topic is required' });
+  }
+
+  const startTime = Date.now();
+  const result = await generateLessonExercises({
+    topic,
+    level: level || 'beginner',
+    category: category || 'grammar',
+    vocabulary: vocabulary || [],
+    exerciseCount: exerciseCount || 5,
+    exerciseTypes: exerciseTypes || ['multiple_choice', 'fill_blank'],
+  });
+  const latencyMs = Date.now() - startTime;
+
+  res.status(200).json({ exercises: result.exercises, latencyMs });
+}));
+
 // ─── Account Deletion ────────────────────────────────
 router.delete('/me', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.authUser.id;
@@ -3432,6 +4186,10 @@ router.delete('/me', requireAuth, asyncHandler(async (req, res) => {
   await prisma.progressDaily.deleteMany({ where: { userId } });
   await prisma.journal.deleteMany({ where: { userId } });
   await prisma.reminder.deleteMany({ where: { userId } });
+  await prisma.lessonAttempt.deleteMany({ where: { userId } }).catch(() => {});
+  await prisma.exerciseAttempt.deleteMany({ where: { userId } }).catch(() => {});
+  await prisma.userLessonProgress.deleteMany({ where: { userId } }).catch(() => {});
+  await prisma.userPathProgress.deleteMany({ where: { userId } }).catch(() => {});
 
   // Delete settings & onboarding
   await prisma.userSettings.deleteMany({ where: { userId } }).catch(() => {});

@@ -296,20 +296,18 @@ export const DashboardPage: React.FC = () => {
       </section>
 
       {/* FAB */}
-      <button onClick={() => {
-        if (!isPremium && summary?.todayCompleted) {
-          setShowLimitToast(true);
-          setTimeout(() => setShowLimitToast(false), 3000);
-          return;
-        }
-        window.location.hash = '#journal-workspace';
-      }} className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle ${isPremium ? 'premium-galaxy-btn border-purple-400' : 'bg-black text-white border-white'}`}>
-        <span className="material-symbols-outlined text-2xl md:text-3xl" data-icon="add">add</span>
-      </button>
-      {showLimitToast && (
-        <div className="fixed bottom-40 md:bottom-28 right-4 md:right-8 z-50 bg-surface-container-highest border-2 border-black rounded-2xl px-4 py-3 shadow-[4px_4px_0_0_#000] max-w-xs text-sm font-headline font-bold animate-fade-in">
-          {t('dashboard.daily_limit_toast', { defaultValue: "You\'ve written today! Come back tomorrow \uD83D\uDC4D" })}
-        </div>
+      {summary?.todayCompleted && summary?.todayJournalId ? (
+        <button onClick={() => {
+          window.location.hash = `#feedback-result?journalId=${summary.todayJournalId}`;
+        }} className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle ${isPremium ? 'premium-galaxy-btn border-purple-400' : 'bg-tertiary text-white border-white'}`}>
+          <span className="material-symbols-outlined text-2xl md:text-3xl">rate_review</span>
+        </button>
+      ) : (
+        <button onClick={() => {
+          window.location.hash = '#journal-workspace';
+        }} className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle ${isPremium ? 'premium-galaxy-btn border-purple-400' : 'bg-black text-white border-white'}`}>
+          <span className="material-symbols-outlined text-2xl md:text-3xl">add</span>
+        </button>
       )}
     </AppLayout>
   );
