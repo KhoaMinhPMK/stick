@@ -2314,11 +2314,15 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
       deletedAt: null,
       createdAt: { gte: vnTodayStart, lte: vnTodayEnd },
     },
-    select: { id: true },
+    select: { id: true, status: true },
     orderBy: { createdAt: 'desc' },
   });
-  const todayCompleted = todayJournals.length > 0;
-  const todayJournalId = todayJournals[0]?.id || null;
+  // Only count submitted journals as "completed" — drafts are still in-progress
+  const submittedJournals = todayJournals.filter(j => j.status === 'submitted');
+  const draftJournals = todayJournals.filter(j => j.status !== 'submitted');
+  const todayCompleted = submittedJournals.length > 0;
+  const todayJournalId = submittedJournals[0]?.id || null;
+  const todayDraftId = draftJournals[0]?.id || null;
   const dailyJournalLimit = Boolean(user?.isPremium) ? 3 : 1;
   const dailyLimitReached = todayJournals.length >= dailyJournalLimit;
 
@@ -2367,6 +2371,7 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     memberSince: user?.createdAt || null,
     todayCompleted,
     todayJournalId,
+    todayDraftId,
     dailyLimitReached,
     dayNumber,
     totalActiveDays,

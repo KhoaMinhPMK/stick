@@ -26,6 +26,7 @@ export const JournalWorkspacePage: React.FC = () => {
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const sessionTrackedRef = useRef(false);
   const startTimeRef = useRef(Date.now());
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const journalIdFromUrl = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -37,9 +38,12 @@ export const JournalWorkspacePage: React.FC = () => {
     let cancelled = false;
     getProgressSummary().then(res => {
       if (cancelled) return;
-      if (res.dailyLimitReached && res.todayJournalId) {
-        // Daily limit reached → redirect to feedback of today's journal
+      if (res.todayCompleted && res.todayJournalId) {
+        // Already submitted today → redirect to feedback
         window.location.hash = `#feedback?journalId=${res.todayJournalId}`;
+      } else if (res.todayDraftId) {
+        // Has a draft → load it in the workspace
+        window.location.hash = `#journal-workspace?journalId=${res.todayDraftId}`;
       }
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -212,10 +216,14 @@ export const JournalWorkspacePage: React.FC = () => {
             </div>
 
             {/* Text Area */}
-            <div className="relative flex-1 z-10">
+            <div
+              className="relative flex-1 z-10 cursor-text"
+              onClick={() => textareaRef.current?.focus()}
+            >
               <textarea
+                ref={textareaRef}
                 autoFocus
-                className="w-full h-full min-h-[150px] md:min-h-[250px] bg-transparent border-none focus:ring-0 text-lg md:text-xl lg:text-2xl font-body leading-relaxed text-black/90 font-medium placeholder:text-stone-300 resize-none selection:bg-secondary-container caret-primary"
+                className="w-full h-full min-h-[150px] md:min-h-[250px] bg-transparent border-none outline-none focus:ring-0 text-lg md:text-xl lg:text-2xl font-body leading-relaxed text-black/90 font-medium placeholder:text-stone-300 resize-none selection:bg-secondary-container"
                 style={{ caretColor: 'var(--md-sys-color-primary, #6750A4)' }}
                 placeholder={t('journal_workspace.placeholder')}
                 spellCheck={false}

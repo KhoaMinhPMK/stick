@@ -294,6 +294,7 @@ export interface ProgressSummary {
   memberSince: string | null;
   todayCompleted: boolean;
   todayJournalId: string | null;
+  todayDraftId: string | null;
   dailyLimitReached: boolean;
   dayNumber: number;
   totalActiveDays: number;

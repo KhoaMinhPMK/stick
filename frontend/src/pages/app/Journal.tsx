@@ -31,6 +31,7 @@ export const JournalPage: React.FC = () => {
   const dayNumber = summary?.dayNumber ?? '...';
   const todayCompleted = summary?.todayCompleted ?? false;
   const todayJournalId = summary?.todayJournalId ?? null;
+  const todayDraftId = summary?.todayDraftId ?? null;
   const isVi = i18n.language === 'vi';
 
   // Get prompt text from daily prompt or fallback
@@ -125,6 +126,22 @@ export const JournalPage: React.FC = () => {
                     >
                       {t('journal.view_feedback')}
                       <span className="material-symbols-outlined transition-transform group-hover:translate-x-2">visibility</span>
+                    </button>
+                  </div>
+                ) : todayDraftId ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-secondary-container/30 border-2 border-secondary/30 rounded-xl flex items-center gap-3">
+                      <span className="material-symbols-outlined text-secondary text-xl">edit_note</span>
+                      <span className="text-sm md:text-base font-medium text-on-surface">{t('journal.draft_in_progress', 'You have a draft in progress')}</span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        window.location.hash = `#journal-workspace?journalId=${todayDraftId}`;
+                      }}
+                      className="w-full md:w-auto px-8 md:px-12 py-3 md:py-4 bg-secondary-container hover:bg-on-secondary-fixed-variant hover:text-white transition-all duration-300 font-headline font-black text-lg md:text-xl sketch-border flex items-center justify-center gap-3 md:gap-4 group active:scale-95 mx-auto md:mx-0"
+                    >
+                      {t('journal.continue_writing', 'Continue Writing')}
+                      <span className="material-symbols-outlined transition-transform group-hover:translate-x-2">edit</span>
                     </button>
                   </div>
                 ) : (

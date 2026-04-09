@@ -356,6 +356,8 @@
                     "day_title":  "Ngày {{day}}: Nhật ký của bạn",
                     "already_done":  "Bạn đã hoàn thành nhật ký hôm nay rồi. Giỏi lắm!",
                     "view_feedback":  "Xem phản hồi của bạn",
+                    "draft_in_progress":  "Bạn đang có bản nháp chưa gửi",
+                    "continue_writing":  "Tiếp tục viết",
                     "estimated_time":  "Chỉ mất khoảng 5–7 phút",
                     "journey_today":  "Bạn sẽ làm được điều này:",
                     "task_1":  "Viết vài câu về ngày hôm nay của bạn",
