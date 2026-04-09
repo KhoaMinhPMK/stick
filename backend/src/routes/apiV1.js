@@ -1288,14 +1288,14 @@ router.get('/journals/:id/review-items', requireAuth, asyncHandler(async (req, r
 router.get('/daily-challenge', requireAuth, asyncHandler(async (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const challenge = await generateDailyChallenge(today);
-  // Get user's day number from journal count
-  const totalJournals = await prisma.journal.count({
-    where: { userId: req.authUser.id, deletedAt: null },
+  // dayNumber = số ngày unique có activity, không phải số bài viết
+  const totalActiveDays = await prisma.progressDaily.count({
+    where: { userId: req.authUser.id, journalsCount: { gt: 0 } },
   });
   res.status(200).json({
     ...challenge,
     date: today,
-    dayNumber: totalJournals + 1,
+    dayNumber: totalActiveDays + 1,
   });
 }));
 
@@ -2195,7 +2195,13 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
   });
   const todayCompleted = !!todayJournal;
   const todayJournalId = todayJournal?.id || null;
-  const dayNumber = todayCompleted ? totalJournals : totalJournals + 1;
+
+  // dayNumber = số ngày unique có hoạt động, không dựa trên số bài journal
+  // Dùng progressDaily vì đã unique theo userId_day
+  const totalActiveDays = await prisma.progressDaily.count({
+    where: { userId: req.authUser.id, journalsCount: { gt: 0 } },
+  });
+  const dayNumber = todayCompleted ? totalActiveDays : totalActiveDays + 1;
 
   // Count available streak freezes for this user
   const now = new Date();

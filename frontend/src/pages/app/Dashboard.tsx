@@ -79,11 +79,13 @@ export const DashboardPage: React.FC = () => {
       const found = dailyData.find(p => getLocalDate(new Date(p.day)) === dateStr);
       const activity = found ? (found.journalsCount * 10 + found.minutesSpent + found.xpEarned) : 0;
       const hasActivity = activity > 0;
+      const isToday = offset === 0 && i === 0;
       bars.push({
         label: dayLabels[labelIdx],
         value: activity,
         isAlt: i % 2 === 0,
         hasActivity,
+        isToday,
       });
     }
     return bars;
@@ -253,13 +255,21 @@ export const DashboardPage: React.FC = () => {
               return (
                 <div key={i} className="flex flex-col items-center gap-1 md:gap-1.5 group z-10 w-full">
                   <div
-                    className={`w-3 sm:w-5 md:w-8 ${bar.hasActivity ? (isPremium ? 'premium-galaxy-bar' : 'bg-gradient-to-t from-amber-500 to-yellow-300') : bar.isAlt ? 'bg-secondary-container' : 'bg-black/20'} border-2 border-black rounded-t-lg transition-all group-hover:scale-y-110 origin-bottom sketch-border-subtle`}
+                    className={`w-3 sm:w-5 md:w-8 ${
+                      bar.hasActivity
+                        ? (isPremium ? 'premium-galaxy-bar' : 'bg-gradient-to-t from-amber-500 to-yellow-300')
+                        : bar.isToday
+                          ? 'bg-primary/20 border-primary/60'
+                          : bar.isAlt ? 'bg-secondary-container' : 'bg-black/20'
+                    } border-2 ${bar.isToday && !bar.hasActivity ? 'border-primary/60 border-dashed' : 'border-black'} rounded-t-lg transition-all group-hover:scale-y-110 origin-bottom sketch-border-subtle`}
                     style={{ height: `${pct}%` }}
                   ></div>
-                  <span className={`text-[10px] md:text-xs font-bold font-label ${bar.hasActivity ? 'text-amber-700' : ''}`}>{t(bar.label)}</span>
-                  {bar.hasActivity && (
+                  <span className={`text-[10px] md:text-xs font-bold font-label ${bar.hasActivity ? 'text-amber-700' : bar.isToday ? 'text-primary font-black' : ''}`}>{t(bar.label)}</span>
+                  {bar.hasActivity ? (
                     <span className="material-symbols-outlined text-[12px] text-amber-500 -mt-0.5">local_fire_department</span>
-                  )}
+                  ) : bar.isToday ? (
+                    <span className="material-symbols-outlined text-[12px] text-primary/60 -mt-0.5">fiber_manual_record</span>
+                  ) : null}
                 </div>
               );
             })}
