@@ -5,8 +5,21 @@ from _vps_cmd import sftp_write, sftp_read, run_cmd
 
 BUILD_SCRIPT = r"""$ErrorActionPreference = 'Continue'
 $env:PATH = "C:/inetpub/wwwroot/stick/frontend/node_modules/.bin;C:/Program Files/nodejs;" + $env:PATH
-Set-Location 'C:/inetpub/wwwroot/stick/frontend'
 "[BUILD STARTED] $(Get-Date)" | Out-File C:/stick_build.log -Encoding utf8
+
+# Pull latest code
+"[GIT PULL] $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+Set-Location 'C:/inetpub/wwwroot/stick'
+git pull origin main 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
+"[GIT DONE] Exit: $LASTEXITCODE $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+
+# Restart backend
+"[PM2 RESTART] $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+pm2 restart stick-api-prod 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
+"[PM2 DONE] Exit: $LASTEXITCODE $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+
+# Build frontend
+Set-Location 'C:/inetpub/wwwroot/stick/frontend'
 node 'C:/inetpub/wwwroot/stick/frontend/node_modules/vite/bin/vite.js' build 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
 "[BUILD DONE] Exit: $LASTEXITCODE $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
 """
