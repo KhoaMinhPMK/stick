@@ -2447,69 +2447,102 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
 router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
   const scope = req.query.scope || 'weekly'; // 'weekly' or 'all-time'
 
-  let dateFilter = {};
-  if (scope === 'weekly') {
+  let items = [];
+
+  if (scope === 'all-time') {
+    // All-time: use User.totalXp (canonical cached value, includes admin adjustments)
+    const topUsers = await prisma.user.findMany({
+      where: { totalXp: { gt: 0 } },
+      orderBy: { totalXp: 'desc' },
+      take: 20,
+      select: { id: true, name: true, avatarUrl: true, isPremium: true, totalXp: true },
+    });
+
+    items = topUsers.map((u, idx) => ({
+      rank: idx + 1,
+      userId: u.id,
+      name: u.name,
+      score: u.totalXp,
+      isUser: u.id === req.authUser.id,
+      avatarUrl: u.avatarUrl || null,
+      isPremium: Boolean(u.isPremium),
+    }));
+
+    const userInList = items.some(i => i.isUser);
+    if (!userInList) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: req.authUser.id },
+        select: { totalXp: true },
+      });
+      const userXpTotal = currentUser?.totalXp || 0;
+      const usersAbove = await prisma.user.count({ where: { totalXp: { gt: userXpTotal } } });
+      items.push({
+        rank: usersAbove + 1,
+        userId: req.authUser.id,
+        name: req.authUser.name || 'You',
+        score: userXpTotal,
+        isUser: true,
+        avatarUrl: req.authUser.avatarUrl || null,
+        isPremium: Boolean(req.authUser.isPremium),
+      });
+    }
+  } else {
+    // Weekly: use progressDaily.xpEarned for this week
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     weekAgo.setHours(0, 0, 0, 0);
-    dateFilter = { day: { gte: weekAgo } };
-  }
+    const dateFilter = { day: { gte: weekAgo } };
 
-  // Get all users' XP totals
-  const userXp = await prisma.progressDaily.groupBy({
-    by: ['userId'],
-    where: dateFilter,
-    _sum: { xpEarned: true },
-    orderBy: { _sum: { xpEarned: 'desc' } },
-    take: 20,
-  });
-
-  // Get user details
-  const userIds = userXp.map(u => u.userId);
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, name: true, avatarUrl: true, isPremium: true },
-  });
-  const userMap = {};
-  for (const u of users) userMap[u.id] = u;
-
-  const items = userXp.map((entry, idx) => ({
-    rank: idx + 1,
-    userId: entry.userId,
-    name: userMap[entry.userId]?.name || 'Unknown',
-    score: entry._sum.xpEarned || 0,
-    isUser: entry.userId === req.authUser.id,
-    avatarUrl: userMap[entry.userId]?.avatarUrl || null,
-    isPremium: Boolean(userMap[entry.userId]?.isPremium),
-  }));
-
-  // If current user isn't in top 20, calculate their real rank
-  const userInList = items.some(i => i.isUser);
-  if (!userInList) {
-    const userTotal = await prisma.progressDaily.aggregate({
-      where: { userId: req.authUser.id, ...dateFilter },
-      _sum: { xpEarned: true },
-    });
-    const userXpTotal = userTotal._sum.xpEarned || 0;
-
-    // Count how many users have more XP than current user
-    const usersAbove = await prisma.progressDaily.groupBy({
+    const userXp = await prisma.progressDaily.groupBy({
       by: ['userId'],
       where: dateFilter,
       _sum: { xpEarned: true },
-      having: { xpEarned: { _sum: { gt: userXpTotal } } },
+      orderBy: { _sum: { xpEarned: 'desc' } },
+      take: 20,
     });
-    const realRank = usersAbove.length + 1;
 
-    items.push({
-      rank: realRank,
-      userId: req.authUser.id,
-      name: req.authUser.name || 'You',
-      score: userXpTotal,
-      isUser: true,
-      avatarUrl: req.authUser.avatarUrl || null,
-      isPremium: Boolean(req.authUser.isPremium),
+    const userIds = userXp.map(u => u.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, avatarUrl: true, isPremium: true },
     });
+    const userMap = {};
+    for (const u of users) userMap[u.id] = u;
+
+    items = userXp.map((entry, idx) => ({
+      rank: idx + 1,
+      userId: entry.userId,
+      name: userMap[entry.userId]?.name || 'Unknown',
+      score: entry._sum.xpEarned || 0,
+      isUser: entry.userId === req.authUser.id,
+      avatarUrl: userMap[entry.userId]?.avatarUrl || null,
+      isPremium: Boolean(userMap[entry.userId]?.isPremium),
+    }));
+
+    const userInList = items.some(i => i.isUser);
+    if (!userInList) {
+      const userTotal = await prisma.progressDaily.aggregate({
+        where: { userId: req.authUser.id, ...dateFilter },
+        _sum: { xpEarned: true },
+      });
+      const userXpTotal = userTotal._sum.xpEarned || 0;
+      const usersAbove = await prisma.progressDaily.groupBy({
+        by: ['userId'],
+        where: dateFilter,
+        _sum: { xpEarned: true },
+        having: { xpEarned: { _sum: { gt: userXpTotal } } },
+      });
+      const realRank = usersAbove.length + 1;
+      items.push({
+        rank: realRank,
+        userId: req.authUser.id,
+        name: req.authUser.name || 'You',
+        score: userXpTotal,
+        isUser: true,
+        avatarUrl: req.authUser.avatarUrl || null,
+        isPremium: Boolean(req.authUser.isPremium),
+      });
+    }
   }
 
   res.status(200).json({ items, scope });

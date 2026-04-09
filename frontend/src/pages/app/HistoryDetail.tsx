@@ -35,6 +35,20 @@ export const HistoryDetailPage: React.FC = () => {
     load();
   }, [id]);
 
+  // Must be defined before early returns to satisfy Rules of Hooks
+  const handleSaveWord = useCallback(async (index: number, word: any) => {
+    if (!id || savedWordIndices.has(index) || savingWordIndex !== null) return;
+    setSavingWordIndex(index);
+    try {
+      await importFeedbackVocab(id, [{ word: word.word, meaning: word.meaning, example: word.example }]);
+      setSavedWordIndices(prev => new Set(prev).add(index));
+    } catch {
+      // silently fail
+    } finally {
+      setSavingWordIndex(null);
+    }
+  }, [id, savedWordIndices, savingWordIndex]);
+
   if (loading) {
     return (
       <AppLayout activePath="#history">
@@ -68,19 +82,6 @@ export const HistoryDetailPage: React.FC = () => {
     : feedbackDto.vocabularyBoosters.map((v: any) => ({ word: v.word, meaning: v.meaning || v.translation, example: v.context }));
   const sentencePatterns = feedbackDto.sentencePatterns;
   const score = journal.score;
-
-  const handleSaveWord = useCallback(async (index: number, word: any) => {
-    if (!id || savedWordIndices.has(index) || savingWordIndex !== null) return;
-    setSavingWordIndex(index);
-    try {
-      await importFeedbackVocab(id, [{ word: word.word, meaning: word.meaning, example: word.example }]);
-      setSavedWordIndices(prev => new Set(prev).add(index));
-    } catch {
-      // silently fail
-    } finally {
-      setSavingWordIndex(null);
-    }
-  }, [id, savedWordIndices, savingWordIndex]);
 
   return (
     <AppLayout activePath="#history">
