@@ -270,24 +270,24 @@ export const DashboardPage: React.FC = () => {
       {/* Secondary Task Suggestions */}
       <section className="mt-10 md:mt-12">
         <h5 className="font-headline text-lg md:text-xl font-black mb-5 md:mb-6">{t('dashboard.suggested_for_you')}</h5>
-        <div className="flex gap-4 md:gap-6 justify-start md:justify-start lg:justify-between overflow-x-auto pb-4 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="flex gap-4 md:gap-6 justify-start md:justify-start lg:justify-between overflow-x-auto pb-6 pt-2 px-2 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', marginLeft: '-8px', marginRight: '-8px' }}>
            <style suppressHydrationWarning>{`
              div::-webkit-scrollbar { display: none; }
            `}</style>
           
-          <div onClick={() => (window.location.hash = '#library')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-2 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
+          <div onClick={() => (window.location.hash = '#library')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="auto_stories">auto_stories</span>
             <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.reading_story')}</h6>
             <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.explore_library')}</p>
           </div>
           
-          <div onClick={() => (window.location.hash = '#saved-phrases')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-2 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
+          <div onClick={() => (window.location.hash = '#saved-phrases')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="format_quote">format_quote</span>
             <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.saved_phrases')}</h6>
             <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.phrases_collected', { count: summary?.totalPhrases || 0 })}</p>
           </div>
           
-          <div onClick={() => (window.location.hash = '#achievements')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-2 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
+          <div onClick={() => (window.location.hash = '#achievements')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="emoji_events">emoji_events</span>
             <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.achievements_title')}</h6>
             <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.achievements_desc')}</p>
