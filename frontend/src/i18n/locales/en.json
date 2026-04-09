@@ -1,4 +1,4 @@
-﻿{
+{
     "nav":  {
                 "why_stick":  "Why STICK",
                 "features":  "Features",
@@ -692,8 +692,6 @@
     "library":  {
                     "title":  "Lessons",
                     "subtitle":  "Browse lessons by topic, grammar, and skills.",
-                    "vocab_shortcut_title":  "Vocabulary Notebook",
-                    "vocab_shortcut_desc":  "View and manage your saved word
                     "vocab_shortcut_title":  "Vocabulary Notebook",
                     "vocab_shortcut_desc":  "View and manage your saved words.",
                     "search_placeholder":  "Search lessons...",
