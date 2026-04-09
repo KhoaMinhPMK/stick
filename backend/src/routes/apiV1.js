@@ -1905,11 +1905,13 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
   const normalizedWord = String(word).trim();
 
   // ── Dedup: reject duplicate words per user (case-insensitive) ──
+  // MySQL utf8mb4_unicode_ci collation is case-insensitive by default — no mode needed
   const duplicate = await prisma.vocabNotebookItem.findFirst({
     where: {
       userId: req.authUser.id,
-      word: { equals: normalizedWord, mode: 'insensitive' },
+      word: normalizedWord,
     },
+    select: { id: true },
   });
   if (duplicate) {
     return res.status(409).json({
