@@ -3,13 +3,22 @@ import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getLessonDetail, completeLessonProgress, type LessonDetail } from '../../services/api/endpoints';
 
+interface VocabItem {
+  word: string;
+  meaning: string;
+  example?: string;
+}
+
 interface LessonSection {
   type: string;
   icon: string;
   title: string;
   content: string;
-  items?: string[];
+  items?: (string | VocabItem)[];
   exercises?: FillBlankExercise[];
+  examples?: string[];
+  speakers?: string[];
+  lines?: string[];
 }
 
 interface FillBlankExercise {
@@ -75,8 +84,34 @@ export const LessonDetailPage: React.FC = () => {
     if (lesson?.content) {
       try {
         const parsed = JSON.parse(lesson.content);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        if (parsed.sections && Array.isArray(parsed.sections)) return parsed.sections;
+        let rawSections: Record<string, unknown>[] = [];
+        if (Array.isArray(parsed) && parsed.length > 0) rawSections = parsed;
+        else if (parsed.sections && Array.isArray(parsed.sections)) rawSections = parsed.sections;
+
+        if (rawSections.length > 0) {
+          const typeMap: Record<string, { icon: string; title: string }> = {
+            text: { icon: 'info', title: t('lesson_detail.section_intro', 'Introduction') },
+            vocabulary: { icon: 'translate', title: t('lesson_detail.section_vocabulary', 'Vocabulary') },
+            grammar_rule: { icon: 'school', title: t('lesson_detail.section_grammar', 'Grammar') },
+            practice: { icon: 'fitness_center', title: t('lesson_detail.section_practice', 'Practice') },
+            dialogue: { icon: 'forum', title: t('lesson_detail.section_dialogue', 'Dialogue') },
+          };
+          return rawSections.map((s) => {
+            const sType = (s.type as string) || 'text';
+            const mapped = typeMap[sType] || { icon: 'article', title: sType };
+            return {
+              type: sType,
+              icon: (s.icon as string) || mapped.icon,
+              title: (s.title as string) || mapped.title,
+              content: (s.content as string) || (s.prompt as string) || (s.rule as string) || '',
+              items: s.items as LessonSection['items'],
+              exercises: s.exercises as FillBlankExercise[],
+              examples: s.examples as string[],
+              speakers: s.speakers as string[],
+              lines: s.lines as string[],
+            };
+          });
+        }
       } catch { /* not JSON */ }
     }
     return [
@@ -378,16 +413,48 @@ export const LessonDetailPage: React.FC = () => {
                     <div className="px-5 pb-6 space-y-4 border-t border-black/10">
                       <p className="text-on-surface-variant text-sm md:text-base leading-relaxed whitespace-pre-wrap pt-4">{section.content}</p>
 
-                      {/* Bullet items */}
+                      {/* Bullet items / Vocabulary cards */}
                       {section.items && section.items.length > 0 && (
                         <ul className="space-y-2 pl-1">
                           {section.items.map((item, i) => (
                             <li key={i} className="flex items-start gap-2.5 text-sm">
                               <span className="mt-2 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                              <span>{item}</span>
+                              {typeof item === 'string' ? (
+                                <span>{item}</span>
+                              ) : (
+                                <div>
+                                  <span className="font-bold">{item.word}</span>
+                                  <span className="text-on-surface-variant"> — {item.meaning}</span>
+                                  {item.example && <p className="text-on-surface-variant text-xs mt-0.5 italic">"{item.example}"</p>}
+                                </div>
+                              )}
                             </li>
                           ))}
                         </ul>
+                      )}
+
+                      {/* Grammar examples */}
+                      {section.examples && section.examples.length > 0 && (
+                        <div className="space-y-1.5 pl-1">
+                          <p className="font-headline font-bold text-xs uppercase tracking-widest text-on-surface-variant">Examples</p>
+                          {section.examples.map((ex, i) => (
+                            <p key={i} className="text-sm pl-3 border-l-2 border-primary/40 text-on-surface-variant italic">{ex}</p>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Dialogue */}
+                      {section.lines && section.lines.length > 0 && (
+                        <div className="space-y-2 pl-1">
+                          {section.lines.map((line, i) => (
+                            <div key={i} className={`flex gap-2 text-sm ${i % 2 === 0 ? '' : 'pl-6'}`}>
+                              {section.speakers && (
+                                <span className="font-bold text-primary shrink-0">{section.speakers[i % section.speakers.length]}:</span>
+                              )}
+                              <span className="text-on-surface-variant italic">{line}</span>
+                            </div>
+                          ))}
+                        </div>
                       )}
 
                       {/* Fill-in-blank exercises */}
