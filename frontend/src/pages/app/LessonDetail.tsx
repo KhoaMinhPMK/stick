@@ -333,6 +333,8 @@ export const LessonDetailPage: React.FC = () => {
           <CompletionCard
             result={completionResult}
             lessonTitle={lesson.title}
+            sections={sections}
+            exerciseStates={exerciseStates}
             onRetry={() => {
               setCompleted(false);
               setCompletionResult(null);
@@ -791,6 +793,19 @@ const ExerciseFeedback: React.FC<{
   </div>
 );
 
+// ─── Completion Card helpers ────────────────────────
+
+function checkUsedWell(word: string, usedSet: Set<string>): boolean {
+  const w = word.toLowerCase();
+  if (usedSet.has(w)) return true;
+  for (const token of usedSet) {
+    if (token === w) return true;
+    if (token.length > 3 && w.includes(token)) return true;
+    if (w.length > 3 && token.includes(w)) return true;
+  }
+  return false;
+}
+
 // ─── Completion Card ─────────────────────────────────
 
 interface CompletionCardProps {
@@ -799,66 +814,189 @@ interface CompletionCardProps {
     isReview: boolean; bestScore: number; totalAttempts: number;
   };
   lessonTitle: string;
+  sections: LessonContentSection[];
+  exerciseStates: Record<string, ExerciseState>;
   onRetry: () => void;
 }
 
-const CompletionCard: React.FC<CompletionCardProps> = ({ result, lessonTitle, onRetry }) => {
+const CompletionCard: React.FC<CompletionCardProps> = ({ result, lessonTitle, sections, exerciseStates, onRetry }) => {
   const { t } = useTranslation();
 
+  // ─── Recap: extract vocab & grammar from lesson ────
+  const vocabItems = useMemo(() =>
+    sections.flatMap(s => (s.type === 'vocab' || s.type === 'vocabulary') ? (s.items || []) : []),
+    [sections]
+  );
+
+  const grammarItems = useMemo(() =>
+    sections
+      .filter(s => s.type === 'grammar' || s.type === 'grammar_rule')
+      .map(s => ({ label: (s.pattern || s.rule || '').trim() }))
+      .filter(g => g.label.length > 0),
+    [sections]
+  );
+
+  // Tokens from correctly-answered exercises
+  const usedWellSet = useMemo(() => {
+    const tokens = new Set<string>();
+    sections.forEach((section, sIdx) => {
+      (section.exercises || []).forEach((ex, eIdx) => {
+        const state = exerciseStates[`${sIdx}-${eIdx}`];
+        if (!state?.correct) return;
+        if (typeof ex.correctAnswer === 'string') {
+          ex.correctAnswer.toLowerCase().split(/[\s,;.]+/).forEach(w => { if (w.length > 1) tokens.add(w); });
+        }
+        (ex.correctOrder || []).forEach((w: string) => tokens.add(w.toLowerCase()));
+      });
+    });
+    return tokens;
+  }, [sections, exerciseStates]);
+
+  const sortedVocab = useMemo(() =>
+    [...vocabItems].sort((a, b) => Number(checkUsedWell(b.word, usedWellSet)) - Number(checkUsedWell(a.word, usedWellSet))),
+    [vocabItems, usedWellSet]
+  );
+
+  const sortedGrammar = useMemo(() =>
+    [...grammarItems].sort((a, b) => Number(checkUsedWell(b.label, usedWellSet)) - Number(checkUsedWell(a.label, usedWellSet))),
+    [grammarItems, usedWellSet]
+  );
+
+  const usedVocab = sortedVocab.filter(v => checkUsedWell(v.word, usedWellSet));
+  const hasRecap = sortedVocab.length > 0 || sortedGrammar.length > 0;
+
   return (
-    <div className="sketch-card p-8 bg-tertiary-container/20 text-center">
-      {/* Star display */}
-      <div className="flex justify-center gap-1 mb-4">
-        {[1, 2, 3].map(star => (
-          <span
-            key={star}
-            className={`material-symbols-outlined text-4xl transition-all ${
-              star <= result.starRating ? 'text-yellow-500' : 'text-black/10'
-            }`}
-            style={{ fontVariationSettings: star <= result.starRating ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            star
-          </span>
-        ))}
+    <div className="sketch-card p-6 md:p-8 bg-tertiary-container/20">
+      {/* ── Score header ── */}
+      <div className="text-center">
+        <div className="flex justify-center gap-1 mb-4">
+          {[1, 2, 3].map(star => (
+            <span
+              key={star}
+              className={`material-symbols-outlined text-4xl transition-all ${
+                star <= result.starRating ? 'text-yellow-500' : 'text-black/10'
+              }`}
+              style={{ fontVariationSettings: star <= result.starRating ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              star
+            </span>
+          ))}
+        </div>
+
+        <h3 className="font-headline font-black text-2xl mb-2">
+          {result.starRating >= 3
+            ? t('lesson_detail.perfect', { defaultValue: 'Perfect!' })
+            : result.starRating >= 2
+            ? t('lesson_detail.great', { defaultValue: 'Great job!' })
+            : result.starRating >= 1
+            ? t('lesson_detail.good', { defaultValue: 'Good effort!' })
+            : t('lesson_detail.try_again_msg', { defaultValue: 'Keep practicing!' })}
+        </h3>
+
+        <p className="text-on-surface-variant text-sm mb-4">{lessonTitle}</p>
+
+        <div className="flex justify-center gap-6 mb-4">
+          <div className="text-center">
+            <p className="font-headline font-black text-2xl text-primary">{result.score}%</p>
+            <p className="text-[10px] text-outline">Score</p>
+          </div>
+          <div className="text-center">
+            <p className="font-headline font-black text-2xl text-secondary">+{result.xpEarned}</p>
+            <p className="text-[10px] text-outline">XP</p>
+          </div>
+          <div className="text-center">
+            <p className="font-headline font-black text-2xl text-tertiary">{result.comboMax}x</p>
+            <p className="text-[10px] text-outline">Max Combo</p>
+          </div>
+        </div>
+
+        {result.isReview && <p className="text-xs text-outline mb-2">Review mode (50% XP)</p>}
+        {result.totalAttempts > 1 && <p className="text-xs text-outline mb-2">Best: {result.bestScore}% ({result.totalAttempts} attempts)</p>}
       </div>
 
-      <h3 className="font-headline font-black text-2xl mb-2">
-        {result.starRating >= 3
-          ? t('lesson_detail.perfect', { defaultValue: 'Perfect!' })
-          : result.starRating >= 2
-          ? t('lesson_detail.great', { defaultValue: 'Great job!' })
-          : result.starRating >= 1
-          ? t('lesson_detail.good', { defaultValue: 'Good effort!' })
-          : t('lesson_detail.try_again_msg', { defaultValue: 'Keep practicing!' })}
-      </h3>
+      {/* ── 7.1 Words you used today ── */}
+      {hasRecap && (
+        <div className="mt-6 border-t-2 border-dashed border-black/20 pt-5 text-left">
+          <h4 className="font-headline font-black text-sm uppercase tracking-tight mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">stylus_note</span>
+            Words you used today
+          </h4>
 
-      <p className="text-on-surface-variant text-sm mb-4">{lessonTitle}</p>
+          {/* Used well pill-tags */}
+          {usedVocab.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] font-headline font-bold uppercase tracking-widest text-green-700 mb-2">✓ Used well</p>
+              <div className="flex flex-wrap gap-1.5">
+                {usedVocab.map((item, i) => (
+                  <span key={i} className="px-2.5 py-1 text-xs font-bold bg-green-100 border border-green-300 rounded-full line-through text-green-700 decoration-green-500 decoration-2">
+                    {item.word}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Stats */}
-      <div className="flex justify-center gap-6 mb-6">
-        <div className="text-center">
-          <p className="font-headline font-black text-2xl text-primary">{result.score}%</p>
-          <p className="text-[10px] text-outline">Score</p>
+          {/* Vocab list — used first (strikethrough), unused below */}
+          {sortedVocab.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] font-headline font-bold uppercase tracking-widest text-outline mb-2">Vocab list</p>
+              <div className="space-y-1.5">
+                {sortedVocab.map((item, i) => {
+                  const used = checkUsedWell(item.word, usedWellSet);
+                  return (
+                    <div key={i} className={`flex items-center gap-2 text-xs py-0.5 ${used ? 'opacity-50' : ''}`}>
+                      <span className={`font-bold shrink-0 ${used ? 'line-through text-green-700 decoration-green-500' : ''}`}>{item.word}</span>
+                      {item.phonetic && <span className="text-outline text-[10px]">/{item.phonetic}/</span>}
+                      <span className="text-on-surface-variant truncate">— {item.meaning}</span>
+                      {used && <span className="material-symbols-outlined text-green-600 text-sm shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Grammar list */}
+          {sortedGrammar.length > 0 && (
+            <div>
+              <p className="text-[10px] font-headline font-bold uppercase tracking-widest text-outline mb-2">Grammar list</p>
+              <div className="flex flex-wrap gap-2">
+                {sortedGrammar.map((item, i) => {
+                  const used = checkUsedWell(item.label, usedWellSet);
+                  return (
+                    <div key={i} className={`text-xs px-3 py-1.5 rounded-lg border font-bold flex items-center gap-1 ${
+                      used
+                        ? 'bg-green-100 border-green-300 text-green-700 line-through decoration-green-500'
+                        : 'bg-surface-container border-black/20 text-on-surface'
+                    }`}>
+                      {item.label}
+                      {used && <span className="material-symbols-outlined text-xs no-underline" style={{ fontVariationSettings: "'FILL' 1", textDecoration: 'none' }}>check</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-        <div className="text-center">
-          <p className="font-headline font-black text-2xl text-secondary">+{result.xpEarned}</p>
-          <p className="text-[10px] text-outline">XP</p>
-        </div>
-        <div className="text-center">
-          <p className="font-headline font-black text-2xl text-tertiary">{result.comboMax}x</p>
-          <p className="text-[10px] text-outline">Max Combo</p>
+      )}
+
+      {/* ── 6.2 Speaking prompt ── */}
+      <div className="mt-5 border-t-2 border-dashed border-black/20 pt-5">
+        <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-xl p-4 text-left">
+          <span className="material-symbols-outlined text-2xl text-primary shrink-0 mt-0.5">record_voice_over</span>
+          <div>
+            <p className="font-headline font-black text-sm mb-1">
+              {t('lesson_detail.speaking_prompt_title', { defaultValue: 'Luyện nói & Tự review' })}
+            </p>
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              {t('lesson_detail.speaking_prompt_body', { defaultValue: 'Hãy review lại bài học và đọc lại nó bằng tiếng Anh nhé! Nhớ lại những từ vựng và cấu trúc đã học, rồi bắt đầu tự speaking.' })}
+            </p>
+          </div>
         </div>
       </div>
 
-      {result.isReview && (
-        <p className="text-xs text-outline mb-3">Review mode (50% XP)</p>
-      )}
-      {result.totalAttempts > 1 && (
-        <p className="text-xs text-outline mb-3">Best: {result.bestScore}% ({result.totalAttempts} attempts)</p>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-3 justify-center flex-wrap">
+      {/* ── Actions ── */}
+      <div className="flex gap-3 justify-center flex-wrap mt-6">
         <button onClick={() => { window.location.hash = '#journal'; }}
           className="px-6 py-3 sketch-border bg-primary text-white font-headline font-bold text-sm flex items-center gap-2 active:scale-95 transition-all">
           {t('lesson_detail.practice_writing', { defaultValue: 'Practice Writing' })}
