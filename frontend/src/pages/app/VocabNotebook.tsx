@@ -94,7 +94,7 @@ export const VocabNotebookPage: React.FC = () => {
   const mastered = words.filter(w => w.mastery === 'mastered').length;
 
   return (
-    <AppLayout activePath="#library">
+    <AppLayout activePath="#vocab-notebook">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-6 md:mb-8">
