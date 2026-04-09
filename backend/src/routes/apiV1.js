@@ -1936,7 +1936,7 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
   // Check achievements (vocab milestones)
   checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
-  res.status(201).json({ item, xpAwarded: earnXp ? 3 : 0 });
+  res.status(201).json({ item, xpAwarded: 0 });
 }));
 
 // ─── Vocab: Due for review (SRS) ─────────────────────
