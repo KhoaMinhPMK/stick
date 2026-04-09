@@ -106,9 +106,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
             <span className="material-symbols-outlined text-sm md:text-base">language</span>
             <span className="leading-none mt-[2px]">{i18n.language?.startsWith('vi') ? 'VI' : 'EN'}</span>
           </button>
+          {/* Leaderboard Shortcut */}
+          <button
+            onClick={() => (window.location.hash = '#leaderboard')}
+            className="flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-black bg-white hover:bg-secondary-container hover:scale-105 active:scale-95 transition-all"
+            title="Leaderboard"
+          >
+            <span className="material-symbols-outlined text-sm md:text-base" style={{ fontVariationSettings: "'FILL' 1" }}>leaderboard</span>
+          </button>
+
           {/* Streak Badge */}
           <div onClick={() => (window.location.hash = '#progress')} className="flex items-center gap-1.5 md:gap-2 bg-secondary-container px-3 md:px-3 py-1.5 md:py-1.5 rounded-full border-2 border-black hover:scale-105 transition-transform cursor-pointer">
-            <span className="material-symbols-outlined text-orange-600 text-sm md:text-base" data-icon="local_fire_department" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
+            <span className="material-symbols-outlined streak-fire-premium text-sm md:text-base" data-icon="local_fire_department" style={{ fontVariationSettings: "'FILL' 1", fontSize: 'inherit' }}>local_fire_department</span>
             <span className="font-headline font-bold text-black text-xs md:text-sm">{summary?.currentStreak ?? 0}</span>
           </div>
 

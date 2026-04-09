@@ -2450,47 +2450,56 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
   let items = [];
 
   if (scope === 'all-time') {
-    // All-time: SUM(progressDaily.xpEarned) across all history — the single reliable source
-    // Admin XP adjustments also write to progressDaily, so both stay in sync
-    const userXpAll = await prisma.progressDaily.groupBy({
-      by: ['userId'],
-      _sum: { xpEarned: true },
-      orderBy: { _sum: { xpEarned: 'desc' } },
-      take: 20,
-    });
+    // All-time: use GREATEST(User.totalXp, SUM(progressDaily.xpEarned)) to cover
+    // both old data (only in progressDaily) and admin-adjusted users (only in totalXp)
+    const rawRows = await prisma.$queryRaw`
+      SELECT
+        u.id AS userId,
+        u.name,
+        u.avatarUrl,
+        u.isPremium,
+        GREATEST(COALESCE(u.totalXp, 0), COALESCE(SUM(pd.xpEarned), 0)) AS score
+      FROM \`User\` u
+      LEFT JOIN \`ProgressDaily\` pd ON pd.userId = u.id
+      GROUP BY u.id, u.name, u.avatarUrl, u.isPremium, u.totalXp
+      HAVING score > 0
+      ORDER BY score DESC
+      LIMIT 20
+    `;
 
-    const allUserIds = userXpAll.map(u => u.userId);
-    const allUsers = await prisma.user.findMany({
-      where: { id: { in: allUserIds } },
-      select: { id: true, name: true, avatarUrl: true, isPremium: true },
-    });
-    const allUserMap = {};
-    for (const u of allUsers) allUserMap[u.id] = u;
-
-    items = userXpAll.map((entry, idx) => ({
+    items = rawRows.map((row, idx) => ({
       rank: idx + 1,
-      userId: entry.userId,
-      name: allUserMap[entry.userId]?.name || 'Unknown',
-      score: entry._sum.xpEarned || 0,
-      isUser: entry.userId === req.authUser.id,
-      avatarUrl: allUserMap[entry.userId]?.avatarUrl || null,
-      isPremium: Boolean(allUserMap[entry.userId]?.isPremium),
+      userId: row.userId,
+      name: row.name || 'Unknown',
+      score: Number(row.score) || 0,
+      isUser: row.userId === req.authUser.id,
+      avatarUrl: row.avatarUrl || null,
+      isPremium: Boolean(row.isPremium),
     }));
 
     const userInAllList = items.some(i => i.isUser);
     if (!userInAllList) {
-      const userAllTotal = await prisma.progressDaily.aggregate({
-        where: { userId: req.authUser.id },
-        _sum: { xpEarned: true },
-      });
-      const userAllXp = userAllTotal._sum.xpEarned || 0;
-      const usersAboveAll = await prisma.progressDaily.groupBy({
-        by: ['userId'],
-        _sum: { xpEarned: true },
-        having: { xpEarned: { _sum: { gt: userAllXp } } },
-      });
+      const [userRow] = await prisma.$queryRaw`
+        SELECT
+          GREATEST(COALESCE(u.totalXp, 0), COALESCE(SUM(pd.xpEarned), 0)) AS score
+        FROM \`User\` u
+        LEFT JOIN \`ProgressDaily\` pd ON pd.userId = u.id
+        WHERE u.id = ${req.authUser.id}
+        GROUP BY u.id, u.totalXp
+      `;
+      const userAllXp = userRow ? Number(userRow.score) : 0;
+      const [{ aboveCount }] = await prisma.$queryRaw`
+        SELECT COUNT(*) AS aboveCount FROM (
+          SELECT u.id,
+            GREATEST(COALESCE(u.totalXp, 0), COALESCE(SUM(pd.xpEarned), 0)) AS score
+          FROM \`User\` u
+          LEFT JOIN \`ProgressDaily\` pd ON pd.userId = u.id
+          GROUP BY u.id, u.totalXp
+          HAVING score > ${userAllXp}
+        ) sub
+      `;
       items.push({
-        rank: usersAboveAll.length + 1,
+        rank: Number(aboveCount) + 1,
         userId: req.authUser.id,
         name: req.authUser.name || 'You',
         score: userAllXp,
