@@ -12,11 +12,9 @@ import { SaveProgressPage } from './pages/app/SaveProgress';
 import { RegisterPage } from './pages/app/Register';
 import { DashboardPage } from './pages/app/Dashboard';
 import { JournalPage } from './pages/app/Journal';
-import { JournalRecordPage } from './pages/app/JournalRecord';
 import { VocabularyReviewPage } from './pages/app/VocabularyReview';
 import { FeedbackPage } from './pages/app/Feedback';
 import { CompletionPage } from './pages/app/Completion';
-import { SpeakingPracticeIntroPage } from './pages/app/SpeakingPracticeIntro';
 import { JournalWorkspacePage } from './pages/app/JournalWorkspace';
 import { FeedbackResultPage } from './pages/app/FeedbackResult';
 import { ProgressPage } from './pages/app/Progress';
@@ -96,13 +94,19 @@ function App() {
       } else if (hash === '#journal') {
         setCurrentView('journal');
       } else if (hash === '#journal-record') {
-        setCurrentView('journal-record');
+        // Redirect legacy route to feedback-result
+        const qp = window.location.hash.split('?')[1] || '';
+        window.location.hash = qp ? `#feedback-result?${qp}` : '#feedback-result';
+        return;
       } else if (hash === '#completion') {
         setCurrentView('completion');
       } else if (hash === '#feedback') {
         setCurrentView('feedback');
       } else if (hash === '#speaking-intro') {
-        setCurrentView('speaking-intro');
+        // Redirect legacy route to feedback-result
+        const qp2 = window.location.hash.split('?')[1] || '';
+        window.location.hash = qp2 ? `#feedback-result?${qp2}` : '#feedback-result';
+        return;
       } else if (hash === '#vocab-review') {
         setCurrentView('vocab-review');
       } else if (hash === '#journal-workspace') {
@@ -249,7 +253,6 @@ function App() {
       case 'journal':
         return <JournalPage />;
       case 'journal-record':
-        return <JournalRecordPage />;
       case 'completion':
         return <CompletionPage />;
       case 'feedback':
@@ -257,7 +260,6 @@ function App() {
       case 'vocab-review':
         return <VocabularyReviewPage />;
       case 'speaking-intro':
-        return <SpeakingPracticeIntroPage />;
       case 'feedback-result':
         return <FeedbackResultPage />;
       case 'progress':

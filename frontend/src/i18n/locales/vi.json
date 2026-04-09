@@ -415,6 +415,16 @@
                            "press":  "Nhấn",
                            "to_toggle":  "để bật/tắt"
                        },
+    "speaking_practice": {
+                           "title":  "Nói lại nào!",
+                           "instruction":  "Hãy review lại đoạn nhật ký của bạn và nói lại nó bằng tiếng Anh nhé.",
+                           "tap_to_record":  "Nhấn mic để ghi âm",
+                           "pause":  "Dừng",
+                           "listen_back":  "Nghe lại",
+                           "mic_not_supported":  "Trình duyệt không hỗ trợ mic. Bạn có thể bỏ qua bước này.",
+                           "mic_denied":  "Quyền mic bị từ chối. Bạn có thể bỏ qua bước này.",
+                           "mic_error":  "Không thể ghi âm."
+                       },
     "vocab_review":  {
                          "title":  "Củng cố mẫu câu.",
                          "subtitle":  "Dựa trên phản hồi AI gần đây, hãy ghi nhớ những từ vựng thiết yếu này.",
@@ -506,7 +516,8 @@
                             "vocab_saved_count":  "Đã lưu {{count}} từ",
                             "vocab_already_saved":  "Đã có trong sổ",
                             "words_saved_notebook":  "Đã lưu {{count}} từ vào sổ tay",
-                            "view_notebook":  "Xem Sổ Tay"
+                            "view_notebook":  "Xem Sổ Tay",
+                            "complete":  "Hoàn thành"
                         },
     "progress":  {
                      "title":  "Bảng Kiên Trì",

@@ -415,6 +415,16 @@
                            "press":  "Press",
                            "to_toggle":  "to Toggle"
                        },
+    "speaking_practice": {
+                           "title":  "Say it aloud!",
+                           "instruction":  "Review your journal and try saying it in English.",
+                           "tap_to_record":  "Tap mic to record",
+                           "pause":  "Pause",
+                           "listen_back":  "Listen",
+                           "mic_not_supported":  "Microphone not supported. You can skip this step.",
+                           "mic_denied":  "Mic permission denied. You can skip this step.",
+                           "mic_error":  "Could not start recording."
+                       },
     "vocab_review":  {
                          "title":  "Reinforce your patterns.",
                          "subtitle":  "Based on your recent AI feedback, let\u0027s lock in these vocabulary essentials.",
@@ -506,7 +516,8 @@
                             "vocab_saved_count":  "Saved {{count}} word(s)",
                             "vocab_already_saved":  "Already in notebook",
                             "words_saved_notebook":  "{{count}} word(s) saved to your notebook",
-                            "view_notebook":  "View Notebook"
+                            "view_notebook":  "View Notebook",
+                            "complete":  "Complete"
                         },
     "progress":  {
                      "title":  "Consistency Board",
