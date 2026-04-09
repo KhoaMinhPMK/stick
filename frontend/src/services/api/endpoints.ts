@@ -403,11 +403,13 @@ export interface LessonSummary {
 }
 
 export interface LessonContentSection {
-  type: 'text' | 'vocab' | 'grammar' | 'exercises' | 'summary';
-  title: string;
+  type: 'text' | 'vocab' | 'vocabulary' | 'grammar' | 'grammar_rule' | 'exercises' | 'practice' | 'summary' | 'dialogue';
+  title?: string;
   content?: string;
+  prompt?: string;
   items?: { word: string; meaning: string; example?: string; phonetic?: string }[];
   pattern?: string;
+  rule?: string;
   examples?: string[];
   notes?: string;
   exercises?: LessonExerciseItem[];

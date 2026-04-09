@@ -373,7 +373,7 @@ export const LessonDetailPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-headline font-bold text-base">{section.title}</h3>
+                      <h3 className="font-headline font-bold text-base">{section.title || SECTION_DEFAULT_TITLES[section.type] || `Part ${idx + 1}`}</h3>
                       {isDone && <span className="text-xs text-primary font-headline font-bold">Completed</span>}
                     </div>
                     <span className="material-symbols-outlined text-on-surface-variant text-lg shrink-0">
@@ -389,7 +389,7 @@ export const LessonDetailPage: React.FC = () => {
                       )}
 
                       {/* Vocab items */}
-                      {section.type === 'vocab' && section.items && section.items.length > 0 && (
+                      {(section.type === 'vocab' || section.type === 'vocabulary') && section.items && section.items.length > 0 && (
                         <ul className="space-y-2 pl-1 pt-2">
                           {section.items.map((item, i) => (
                             <li key={i} className="flex items-start gap-2.5 text-sm">
@@ -405,12 +405,12 @@ export const LessonDetailPage: React.FC = () => {
                         </ul>
                       )}
 
-                      {/* Grammar */}
-                      {section.type === 'grammar' && (
+                      {/* Grammar / Grammar Rule */}
+                      {(section.type === 'grammar' || section.type === 'grammar_rule') && (
                         <div className="space-y-2 pt-2">
-                          {section.pattern && (
+                          {(section.pattern || section.rule) && (
                             <div className="px-4 py-2 bg-secondary-container/30 rounded-lg border border-secondary/20">
-                              <p className="font-headline font-bold text-sm">{section.pattern}</p>
+                              <p className="font-headline font-bold text-sm">{section.pattern || section.rule}</p>
                             </div>
                           )}
                           {section.examples && section.examples.length > 0 && (
@@ -424,6 +424,14 @@ export const LessonDetailPage: React.FC = () => {
                           {section.notes && (
                             <p className="text-xs text-outline italic mt-1">{section.notes}</p>
                           )}
+                        </div>
+                      )}
+
+                      {/* Practice prompt */}
+                      {section.type === 'practice' && section.prompt && (
+                        <div className="px-4 py-3 bg-primary/5 rounded-lg border border-primary/20 mt-2">
+                          <p className="font-headline font-bold text-xs uppercase tracking-widest text-primary mb-1">Practice</p>
+                          <p className="text-sm text-on-surface leading-relaxed">{section.prompt}</p>
                         </div>
                       )}
 
@@ -500,6 +508,18 @@ const SECTION_ICONS: Record<string, string> = {
   practice: 'fitness_center',
   summary: 'summarize',
   dialogue: 'forum',
+};
+
+const SECTION_DEFAULT_TITLES: Record<string, string> = {
+  text: 'Introduction',
+  vocab: 'Vocabulary',
+  vocabulary: 'Vocabulary',
+  grammar: 'Grammar',
+  grammar_rule: 'Grammar Rule',
+  exercises: 'Exercises',
+  practice: 'Practice',
+  summary: 'Summary',
+  dialogue: 'Dialogue',
 };
 
 // ─── Exercise Renderer ───────────────────────────────
