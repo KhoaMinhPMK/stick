@@ -153,6 +153,10 @@ export function patchUser(id: string, data: { role?: string; status?: string; is
   );
 }
 
+export function deleteUser(id: string) {
+  return adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'DELETE' });
+}
+
 // ─── Streak Freezes ───────────────────
 export interface AdminStreakFreeze {
   id: string;

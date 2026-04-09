@@ -5,12 +5,8 @@ import type { AppConfigDTO } from '../../types/dto/admin.dto';
 
 // Known config keys with human-readable descriptions
 const CONFIG_META: Record<string, { label: string; description: string; type: 'text' | 'number' | 'boolean' | 'textarea' }> = {
-  ai_model: { label: 'AI Model', description: 'Groq model name for feedback generation', type: 'text' },
-  ai_max_tokens: { label: 'AI Max Tokens', description: 'Maximum tokens per AI response', type: 'number' },
-  ai_temperature: { label: 'AI Temperature', description: 'Creativity level (0.0 – 2.0)', type: 'text' },
-  maintenance_mode: { label: 'Maintenance Mode', description: 'Enable to show maintenance page to users', type: 'boolean' },
-  min_journal_chars: { label: 'Min Journal Length', description: 'Minimum characters for a journal entry', type: 'number' },
-  system_prompt: { label: 'System Prompt', description: 'Base system prompt for AI feedback', type: 'textarea' },
+  maintenance_mode: { label: 'Maintenance Mode', description: 'Block all user API requests (returns 503). Admin panel remains accessible.', type: 'boolean' },
+  min_journal_chars: { label: 'Min Journal Length', description: 'Minimum characters required for a journal entry (0 = no limit)', type: 'number' },
 };
 
 export const AdminSettingsPage: React.FC = () => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { getUser, patchUser, getAdminUserStreakFreezes, grantStreakFreeze, revokeStreakFreeze, adjustUserStats } from '../../services/api/admin.api';
+import { getUser, patchUser, deleteUser, getAdminUserStreakFreezes, grantStreakFreeze, revokeStreakFreeze, adjustUserStats } from '../../services/api/admin.api';
 import type { AdminStreakFreeze } from '../../services/api/admin.api';
 import type { AdminUserDetailDTO } from '../../types/dto/admin.dto';
 
@@ -146,6 +146,27 @@ export const AdminUserDetailPage: React.FC = () => {
       setTimeout(() => setActionMsg(''), 2000);
     } catch (err: unknown) {
       setActionMsg(err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userId || !data) return;
+    const userName = data.user.name || data.user.email || userId;
+    const confirmed = prompt(
+      `⚠️ DANGER: This will permanently delete "${userName}" and all their data (journals, progress, vocab, etc.).\n\nThis action CANNOT be undone. If linked to Firebase, the Firebase account will also be deleted.\n\nType DELETE to confirm:`,
+    );
+    if (confirmed !== 'DELETE') return;
+
+    setActionLoading(true);
+    setActionMsg('');
+    try {
+      await deleteUser(userId);
+      setActionMsg('User deleted. Redirecting…');
+      setTimeout(() => { window.location.hash = '#admin/users'; }, 1500);
+    } catch (err: unknown) {
+      setActionMsg(err instanceof Error ? err.message : 'Delete failed');
     } finally {
       setActionLoading(false);
     }
@@ -338,8 +359,17 @@ export const AdminUserDetailPage: React.FC = () => {
               Grant Premium
             </button>
           )}
+          {/* Delete User */}
+          <button
+            onClick={handleDeleteUser}
+            disabled={actionLoading}
+            className="flex items-center gap-1.5 px-4 py-2 bg-error text-white font-headline font-bold text-xs rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity ml-auto"
+          >
+            <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+            Delete User
+          </button>
           {actionMsg && (
-            <span className={`text-xs font-headline font-bold ${actionMsg.includes('success') ? 'text-tertiary' : 'text-error'}`}>
+            <span className={`text-xs font-headline font-bold ${actionMsg.includes('success') || actionMsg.includes('deleted') ? 'text-tertiary' : 'text-error'}`}>
               {actionMsg}
             </span>
           )}

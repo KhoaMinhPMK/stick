@@ -7,7 +7,7 @@ const {
   getUserFromBearer,
   requireAuth,
 } = require('../lib/auth');
-const { verifyIdToken } = require('../lib/firebase');
+const { verifyIdToken, admin: firebaseAdmin } = require('../lib/firebase');
 const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
@@ -37,6 +37,63 @@ const router = express.Router();
 const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
+
+// ─── Maintenance mode middleware ─────────────────────
+// Reads `maintenance_mode` from AppConfig. Blocks non-admin API calls when enabled.
+let _maintenanceMode = false;
+let _maintenanceCacheTs = 0;
+const MAINTENANCE_CACHE_TTL = 30_000; // 30s
+
+async function refreshMaintenanceFlag() {
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT `value` FROM `AppConfig` WHERE `key` = 'maintenance_mode' LIMIT 1"
+    );
+    _maintenanceMode = rows.length > 0 && rows[0].value === 'true';
+    _maintenanceCacheTs = Date.now();
+  } catch {
+    // If table doesn't exist yet or query fails, default to not-maintenance
+  }
+}
+
+function maintenanceGuard(req, res, next) {
+  // Always allow admin routes and health checks
+  if (req.path.startsWith('/admin') || req.path === '/health') return next();
+
+  // Refresh cache if stale
+  if (Date.now() - _maintenanceCacheTs > MAINTENANCE_CACHE_TTL) {
+    refreshMaintenanceFlag().catch(() => {});
+  }
+
+  if (_maintenanceMode) {
+    return res.status(503).json({
+      code: 'MAINTENANCE',
+      message: 'The app is currently under maintenance. Please try again later.',
+    });
+  }
+  next();
+}
+
+router.use(maintenanceGuard);
+
+// ─── Helper: read config value from DB ───────────────
+const _configCache = new Map();
+const CONFIG_CACHE_TTL = 60_000; // 60s
+
+async function getConfigValue(key, fallback = null) {
+  const cached = _configCache.get(key);
+  if (cached && Date.now() - cached.ts < CONFIG_CACHE_TTL) return cached.value;
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT `value` FROM `AppConfig` WHERE `key` = ? LIMIT 1", key
+    );
+    const value = rows.length > 0 ? rows[0].value : fallback;
+    _configCache.set(key, { value, ts: Date.now() });
+    return value;
+  } catch {
+    return fallback;
+  }
+}
 
 // ─── Safe table helpers (work even if Prisma client not regenerated) ─────
 async function tableExists(tableName) {
@@ -1159,6 +1216,16 @@ router.post('/journals', requireAuth, asyncHandler(async (req, res) => {
     return res.status(400).json({
       code: 'VALIDATION_ERROR',
       message: 'title and content are required',
+    });
+  }
+
+  // Enforce min_journal_chars from admin config
+  const minChars = parseInt(await getConfigValue('min_journal_chars', '0')) || 0;
+  if (minChars > 0 && String(content).trim().length < minChars) {
+    return res.status(400).json({
+      code: 'VALIDATION_ERROR',
+      message: `Journal content must be at least ${minChars} characters`,
+      minChars,
     });
   }
 
@@ -3677,6 +3744,43 @@ router.patch('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (
   res.status(200).json({ user: updated });
 }));
 
+// ─── Admin: Delete User (with Firebase sync) ─────────
+router.delete('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const targetId = req.params.id;
+
+  // Prevent admin from deleting themselves
+  if (targetId === req.authUser.id) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Cannot delete your own account' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, name: true, email: true, firebaseUid: true },
+  });
+  if (!user) return res.status(404).json({ code: 'NOT_FOUND', message: 'User not found' });
+
+  // Delete from Firebase Auth if linked
+  if (user.firebaseUid) {
+    try {
+      await firebaseAdmin.auth().deleteUser(user.firebaseUid);
+    } catch (fbErr) {
+      // auth/user-not-found is OK (already deleted from Firebase)
+      if (fbErr.code !== 'auth/user-not-found') {
+        console.error('Firebase user delete error:', fbErr.message);
+        return res.status(500).json({
+          code: 'FIREBASE_ERROR',
+          message: 'Failed to delete user from Firebase: ' + fbErr.message,
+        });
+      }
+    }
+  }
+
+  // Delete from DB — Prisma cascade handles all related records
+  await prisma.user.delete({ where: { id: targetId } });
+
+  res.status(200).json({ message: `User ${user.name || user.email || targetId} deleted successfully` });
+}));
+
 // ─── Admin: Streak Freezes ───────────────────────────
 // Grant one or more streak freezes to a user
 router.post('/admin/users/:id/streak-freezes', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
@@ -3881,15 +3985,36 @@ router.put('/admin/config/:key', requireAuth, requireAdmin, asyncHandler(async (
   }
 
   const keyParam = req.params.key;
-  const existing = await safeFindManyRaw('AppConfig', `\`key\` = '${keyParam}'`, 'LIMIT 1');
+  const valStr = String(value);
+  const existing = await prisma.$queryRawUnsafe(
+    "SELECT * FROM `AppConfig` WHERE `key` = ? LIMIT 1", keyParam
+  );
   let config;
   if (existing.length > 0) {
-    await prisma.$queryRawUnsafe(`UPDATE \`AppConfig\` SET value = '${String(value)}', updatedBy = '${req.authUser.id}', updatedAt = NOW() WHERE \`key\` = '${keyParam}'`);
-    config = { ...existing[0], value: String(value), updatedBy: req.authUser.id };
+    await prisma.$queryRawUnsafe(
+      "UPDATE `AppConfig` SET value = ?, updatedBy = ?, updatedAt = NOW() WHERE `key` = ?",
+      valStr, req.authUser.id, keyParam
+    );
+    config = { ...existing[0], value: valStr, updatedBy: req.authUser.id };
+    // Serialize dates in existing row
+    for (const [k, v] of Object.entries(config)) {
+      if (v instanceof Date) config[k] = v.toISOString();
+      else if (typeof v === 'bigint') config[k] = Number(v);
+    }
   } else {
     const id = require('crypto').randomUUID();
-    await prisma.$queryRawUnsafe(`INSERT INTO \`AppConfig\` (id, \`key\`, value, updatedBy, createdAt, updatedAt) VALUES ('${id}', '${keyParam}', '${String(value)}', '${req.authUser.id}', NOW(), NOW())`);
-    config = { id, key: keyParam, value: String(value), updatedBy: req.authUser.id };
+    await prisma.$queryRawUnsafe(
+      "INSERT INTO `AppConfig` (id, `key`, value, updatedBy, createdAt, updatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())",
+      id, keyParam, valStr, req.authUser.id
+    );
+    config = { id, key: keyParam, value: valStr, updatedBy: req.authUser.id };
+  }
+
+  // Invalidate config cache so changes take effect immediately
+  _configCache.delete(keyParam);
+  if (keyParam === 'maintenance_mode') {
+    _maintenanceMode = valStr === 'true';
+    _maintenanceCacheTs = Date.now();
   }
 
   res.status(200).json({ config });
