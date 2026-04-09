@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getStoredUser } from '../services/api/client';
-import { getProgressSummary, type ProgressSummary } from '../services/api/endpoints';
+import { getProgressSummary, getLeaderboard, type ProgressSummary } from '../services/api/endpoints';
 import { logout } from '../services/api/auth';
 
 interface AppLayoutProps {
@@ -14,9 +14,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
   const storedUser = getStoredUser();
   const isGuest = storedUser?.isGuest === true;
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
+  const [isRankOne, setIsRankOne] = useState(false);
 
   useEffect(() => {
     getProgressSummary().then(setSummary).catch(() => {});
+    getLeaderboard('all-time').then(res => {
+      const top = res.items.find(i => i.isUser && i.rank === 1);
+      setIsRankOne(!!top);
+    }).catch(() => {});
   }, []);
 
   const navItems = [
@@ -133,12 +138,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
           )}
 
           {/* User Avatar */}
-          <div onClick={() => (window.location.hash = '#profile')} className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-black overflow-hidden hover:scale-105 transition-transform cursor-pointer bg-white">
-            {storedUser?.avatarUrl ? (
-              <img src={storedUser.avatarUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="material-symbols-outlined text-black w-full h-full flex items-center justify-center text-xl md:text-2xl bg-surface-container" data-icon="person_outline">person_outline</span>
+          <div onClick={() => (window.location.hash = '#profile')} className="relative w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-black overflow-visible hover:scale-105 transition-transform cursor-pointer bg-white">
+            {isRankOne && (
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none select-none" style={{ filter: 'drop-shadow(0 1px 3px rgba(184,134,11,0.9))' }}>
+                <svg width="22" height="16" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 22L4 8L12 16L20 3L28 16L36 8L36 22Z" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+                  <rect x="4" y="21" width="32" height="6" rx="1.5" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5"/>
+                  <circle cx="20" cy="3" r="2.5" fill="#FF4D4D" stroke="#B8860B" strokeWidth="1"/>
+                  <circle cx="4" cy="8" r="2" fill="#60A5FA" stroke="#B8860B" strokeWidth="1"/>
+                  <circle cx="36" cy="8" r="2" fill="#60A5FA" stroke="#B8860B" strokeWidth="1"/>
+                </svg>
+              </div>
             )}
+            <div className="w-full h-full rounded-full overflow-hidden">
+              {storedUser?.avatarUrl ? (
+                <img src={storedUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-black w-full h-full flex items-center justify-center text-xl md:text-2xl bg-surface-container" data-icon="person_outline">person_outline</span>
+              )}
+            </div>
           </div>
 
           {/* Logout */}

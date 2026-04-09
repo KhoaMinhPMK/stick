@@ -263,11 +263,20 @@ html.lang-vi .font-headline {
   border-image: linear-gradient(135deg, #6366f1, #a855f7, #3b82f6) 1;
 }
 
+.premium-galaxy-bar {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7, #3b82f6, #06b6d4);
+  background-size: 300% 100%;
+  animation: galaxyShimmer 3s ease infinite;
+}
+
 /* ─── Premium Streak Fire Animation ───────────────── */
-@keyframes fireRise {
-  0%   { background-position: 50% 100%; filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
-  50%  { background-position: 50% 20%;  filter: drop-shadow(0 0 8px rgba(252,211,77,0.7)); }
-  100% { background-position: 50% 100%; filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
+@keyframes fireColorShift {
+  0%   { color: #7c2d12; filter: drop-shadow(0 0 3px rgba(234,88,12,0.4)); }
+  20%  { color: #c2410c; filter: drop-shadow(0 0 5px rgba(249,115,22,0.5)); }
+  45%  { color: #f97316; filter: drop-shadow(0 0 8px rgba(251,191,36,0.6)); }
+  65%  { color: #fbbf24; filter: drop-shadow(0 0 10px rgba(253,224,71,0.7)); }
+  80%  { color: #f97316; filter: drop-shadow(0 0 6px rgba(249,115,22,0.5)); }
+  100% { color: #7c2d12; filter: drop-shadow(0 0 3px rgba(234,88,12,0.4)); }
 }
 
 @keyframes streakFireGlow {
@@ -276,32 +285,20 @@ html.lang-vi .font-headline {
   100% { background-position: 50% 100%; }
 }
 
-/* Mobile: gradient bottom-to-top always animating */
 .streak-fire-premium {
-  background: linear-gradient(to top, #9a3412 0%, #ea580c 30%, #f97316 55%, #fbbf24 80%, #fde68a 100%);
-  background-size: 100% 300%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: fireRise 2.5s ease-in-out infinite;
+  color: #ea580c;
+  animation: fireColorShift 2.5s ease-in-out infinite;
 }
 
-/* Desktop: static gradient, animate only on hover of parent group */
 @media (hover: hover) and (min-width: 768px) {
   .streak-fire-premium {
-    background: linear-gradient(to top, #ea580c, #f97316);
-    background-size: 100% 100%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #ea580c;
     animation: none;
     filter: drop-shadow(0 0 2px rgba(249,115,22,0.3));
-    transition: filter 0.3s;
+    transition: color 0.3s, filter 0.3s;
   }
   .group:hover .streak-fire-premium {
-    background: linear-gradient(to top, #9a3412 0%, #ea580c 30%, #f97316 55%, #fbbf24 80%, #fde68a 100%);
-    background-size: 100% 300%;
-    animation: fireRise 2.5s ease-in-out infinite;
+    animation: fireColorShift 2.5s ease-in-out infinite;
   }
 }
 

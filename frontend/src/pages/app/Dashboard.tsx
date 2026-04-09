@@ -202,7 +202,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="my-5 md:my-6 flex items-center gap-3 md:gap-4">
             <div className="flex-1 h-3 md:h-3.5 bg-surface-container rounded-full border-2 border-black overflow-hidden relative sketch-card">
-              <div className="absolute top-0 left-0 h-full bg-secondary-container border-r-2 border-black" style={{ width: `${Math.min(100, (summary?.totalJournals || 0) * 20)}%` }}></div>
+              <div className={`absolute top-0 left-0 h-full border-r-2 border-black ${isPremium ? 'premium-galaxy-bar' : 'bg-secondary-container'}`} style={{ width: `${Math.min(100, (summary?.totalJournals || 0) * 20)}%` }}></div>
             </div>
             <span className="font-bold text-base md:text-base font-headline">{Math.min(100, (summary?.totalJournals || 0) * 20)}%</span>
           </div>
@@ -253,7 +253,7 @@ export const DashboardPage: React.FC = () => {
               return (
                 <div key={i} className="flex flex-col items-center gap-1 md:gap-1.5 group z-10 w-full">
                   <div
-                    className={`w-3 sm:w-5 md:w-8 ${bar.hasActivity ? 'bg-gradient-to-t from-amber-500 to-yellow-300' : bar.isAlt ? 'bg-secondary-container' : 'bg-black/20'} border-2 border-black rounded-t-lg transition-all group-hover:scale-y-110 origin-bottom sketch-border-subtle`}
+                    className={`w-3 sm:w-5 md:w-8 ${bar.hasActivity ? (isPremium ? 'premium-galaxy-bar' : 'bg-gradient-to-t from-amber-500 to-yellow-300') : bar.isAlt ? 'bg-secondary-container' : 'bg-black/20'} border-2 border-black rounded-t-lg transition-all group-hover:scale-y-110 origin-bottom sketch-border-subtle`}
                     style={{ height: `${pct}%` }}
                   ></div>
                   <span className={`text-[10px] md:text-xs font-bold font-label ${bar.hasActivity ? 'text-amber-700' : ''}`}>{t(bar.label)}</span>

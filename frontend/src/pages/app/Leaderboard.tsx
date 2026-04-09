@@ -89,7 +89,7 @@ export const LeaderboardPage: React.FC = () => {
           <>
             {/* Podium (Top 3) */}
             {top3.length >= 3 && (
-              <div className="flex justify-center items-end gap-2 md:gap-4 lg:gap-8 mb-16 px-4">
+              <div className="flex justify-center items-end gap-2 md:gap-4 lg:gap-8 mb-16 px-4 pt-16">
                 {podiumOrder.map((entry, podiumIdx) => {
                   const actualRank = entry.rank;
                   const isGold = actualRank === 1;
@@ -99,7 +99,28 @@ export const LeaderboardPage: React.FC = () => {
                       {/* Avatar with crown for #1 */}
                       <div className="relative mb-4">
                         {isGold && (
-                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-10 text-2xl md:text-3xl select-none drop-shadow-md" style={{ filter: 'drop-shadow(0 2px 4px rgba(255,215,0,0.6))' }}>👑</div>
+                          <>
+                            {/* SVG Crown */}
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 select-none" style={{ filter: 'drop-shadow(0 2px 6px rgba(184,134,11,0.8))' }}>
+                              <svg width="40" height="30" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 22L4 8L12 16L20 3L28 16L36 8L36 22Z" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+                                <rect x="4" y="21" width="32" height="6" rx="1.5" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5"/>
+                                <circle cx="20" cy="3" r="2.5" fill="#FF4D4D" stroke="#B8860B" strokeWidth="1"/>
+                                <circle cx="4" cy="8" r="2" fill="#60A5FA" stroke="#B8860B" strokeWidth="1"/>
+                                <circle cx="36" cy="8" r="2" fill="#60A5FA" stroke="#B8860B" strokeWidth="1"/>
+                                <circle cx="12" cy="23.5" r="1.5" fill="#B8860B"/>
+                                <circle cx="20" cy="23.5" r="1.5" fill="#B8860B"/>
+                                <circle cx="28" cy="23.5" r="1.5" fill="#B8860B"/>
+                              </svg>
+                            </div>
+                            {/* Chat bubble */}
+                            <div className="absolute -top-16 left-1/2 z-20 whitespace-nowrap" style={{ transform: 'translateX(-20%)' }}>
+                              <div className="relative bg-black text-white text-[10px] md:text-xs font-bold px-2.5 py-1.5 rounded-xl leading-tight">
+                                Can you beat me?
+                                <span className="absolute top-full left-4 border-4 border-transparent" style={{ borderTopColor: '#000' }} />
+                              </div>
+                            </div>
+                          </>
                         )}
                         <div
                           className={`${isGold ? 'w-16 h-16 md:w-24 md:h-24 border-4' : 'w-12 h-12 md:w-16 md:h-16 border-2'} rounded-full overflow-hidden relative ${isGold ? 'shadow-[0_0_20px_rgba(255,215,0,0.5)]' : ''} ${entry.isPremium ? 'ring-2 ring-purple-400 ring-offset-2' : ''}`}
