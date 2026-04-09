@@ -14,16 +14,20 @@ export const AdminPromptListPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [levelFilter, setLevelFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const limit = 15;
 
-  const loadPrompts = async (params?: Partial<PromptFilterParams>) => {
+  const loadPrompts = async (params?: Partial<PromptFilterParams> & { search?: string }) => {
     setLoading(true);
     setError('');
     try {
       const res = await getPrompts({
         status: params?.status ?? statusFilter,
+        level: params?.level ?? (levelFilter !== 'all' ? levelFilter : undefined),
+        search: params?.search !== undefined ? params.search : search,
         page: String(params?.page ?? page),
         limit: String(limit),
       });
@@ -39,7 +43,7 @@ export const AdminPromptListPage: React.FC = () => {
   useEffect(() => {
     loadPrompts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter]);
+  }, [page, statusFilter, levelFilter]);
 
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Delete prompt "${title}"?`)) return;
@@ -79,8 +83,27 @@ export const AdminPromptListPage: React.FC = () => {
         </a>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
+      {/* Search */}
+      <form onSubmit={(e) => { e.preventDefault(); setPage(1); loadPrompts({ page: '1', search }); }} className="mb-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 px-3 py-2.5 border-2 border-outline-variant rounded-xl text-sm bg-surface focus:border-primary focus:outline-none transition-colors"
+            placeholder="Search by title or prompt text..."
+          />
+          <button
+            type="submit"
+            className="px-4 py-2.5 bg-primary text-on-primary-container text-sm font-headline font-bold rounded-xl hover:opacity-90 transition-opacity"
+          >
+            <span className="material-symbols-outlined text-[18px]">search</span>
+          </button>
+        </div>
+      </form>
+
+      {/* Status Filters */}
+      <div className="flex flex-wrap gap-2 mb-2">
         {['all', 'draft', 'scheduled', 'published'].map((s) => (
           <button
             key={s}
@@ -92,6 +115,23 @@ export const AdminPromptListPage: React.FC = () => {
             }`}
           >
             {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Level Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {['all', 'basic', 'intermediate', 'advanced'].map((lv) => (
+          <button
+            key={lv}
+            onClick={() => { setPage(1); setLevelFilter(lv); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-headline font-bold capitalize transition-colors ${
+              levelFilter === lv
+                ? 'bg-secondary text-on-secondary-container'
+                : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'
+            }`}
+          >
+            {lv}
           </button>
         ))}
       </div>

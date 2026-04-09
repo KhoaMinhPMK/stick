@@ -206,8 +206,14 @@ export const AdminUserDetailPage: React.FC = () => {
         {/* Profile Card */}
         <div className="border-2 border-black rounded-2xl p-5 bg-surface-container-lowest mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center text-lg font-bold font-headline shrink-0">
-              {user.name?.charAt(0)?.toUpperCase() || '?'}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold font-headline shrink-0 overflow-hidden ${user.isPremium ? 'ring-2 ring-amber-400 ring-offset-2' : 'bg-secondary-container'}`}>
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className={user.isPremium ? 'bg-amber-100 w-full h-full flex items-center justify-center' : ''}>
+                  {user.name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-headline font-bold text-base">{user.name}</h3>
@@ -245,7 +251,19 @@ export const AdminUserDetailPage: React.FC = () => {
               <p className="text-[10px] font-headline text-outline uppercase">Language</p>
               <p className="text-sm font-bold font-headline">{user.nativeLanguage || '—'}</p>
             </div>
-            {user.onboarding && (
+            {user.isPremium && (
+              <>
+                <div>
+                  <p className="text-[10px] font-headline text-outline uppercase">Premium Since</p>
+                  <p className="text-sm font-bold font-headline">{user.premiumSince ? user.premiumSince.slice(0, 10) : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-headline text-outline uppercase">Premium Until</p>
+                  <p className="text-sm font-bold font-headline text-amber-600">{user.premiumUntil ? user.premiumUntil.slice(0, 10) : 'Lifetime'}</p>
+                </div>
+              </>
+            )}
+            {user.onboarding && !user.isPremium && (
               <>
                 <div>
                   <p className="text-[10px] font-headline text-outline uppercase">Level</p>
@@ -328,12 +346,14 @@ export const AdminUserDetailPage: React.FC = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           {[
             { label: 'Total Days', value: user.stats.totalDays },
             { label: 'Streak', value: user.stats.currentStreak },
             { label: 'Journals', value: user.stats.totalJournals },
-            { label: 'Words Learned', value: user.stats.totalWordsLearned },
+            { label: 'Words', value: user.stats.totalWordsLearned },
+            { label: 'Total XP', value: user.stats.totalXp ?? 0 },
+            { label: 'Minutes', value: user.stats.totalMinutes ?? 0 },
           ].map((s) => (
             <div key={s.label} className="border-2 border-black rounded-2xl p-3 bg-surface-container-lowest text-center">
               <p className="text-[10px] font-headline text-outline uppercase">{s.label}</p>

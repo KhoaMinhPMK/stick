@@ -2642,7 +2642,7 @@ router.post('/admin/login', asyncHandler(async (req, res) => {
 
 // ─── Admin: Prompts CRUD ─────────────────────────────
 router.get('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const { status, page = '1', limit = '20', from, to } = req.query;
+  const { status, page = '1', limit = '20', from, to, search, level } = req.query;
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
 
@@ -2650,6 +2650,11 @@ router.get('/admin/prompts', requireAuth, requireAdmin, asyncHandler(async (req,
   if (status && status !== 'all') conditions.push(`status = '${status}'`);
   if (from) conditions.push(`publishDate >= '${from}'`);
   if (to) conditions.push(`publishDate <= '${to}'`);
+  if (level && level !== 'all') conditions.push(`level = '${String(level).replace(/'/g, "\\'")}'`);
+  if (search) {
+    const s = String(search).replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/_/g, '\\_');
+    conditions.push(`(internalTitle LIKE '%${s}%' OR promptEn LIKE '%${s}%' OR promptVi LIKE '%${s}%')`);
+  }
   const whereClause = conditions.join(' AND ');
 
   const offset = (pageNum - 1) * limitNum;
@@ -2939,7 +2944,7 @@ router.get('/admin/metrics/ai-health', requireAuth, requireAdmin, asyncHandler(a
 
 // ─── Admin: Users ────────────────────────────────────
 router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const { search, page = '1', limit = '20', sort = 'createdAt' } = req.query;
+  const { search, page = '1', limit = '20', sort = 'createdAt', premium } = req.query;
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
 
@@ -2953,6 +2958,9 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
       { email: { contains: search } },
       { name: { contains: search } },
     ];
+  }
+  if (premium === 'true') {
+    where.isPremium = true;
   }
 
   const [users, total] = await Promise.all([
@@ -3003,6 +3011,7 @@ router.get('/admin/users', requireAuth, requireAdmin, asyncHandler(async (req, r
       id: u.id,
       name: u.name,
       email: u.email,
+      avatarUrl: u.avatarUrl || null,
       isGuest: u.isGuest,
       role: u.role,
       status: u.status || 'active',
@@ -3069,6 +3078,7 @@ router.get('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (re
       id: user.id,
       name: user.name,
       email: user.email,
+      avatarUrl: user.avatarUrl || null,
       isGuest: user.isGuest,
       role: user.role,
       status: user.status || 'active',
@@ -3089,6 +3099,7 @@ router.get('/admin/users/:id', requireAuth, requireAdmin, asyncHandler(async (re
         totalJournals: journalCount,
         totalWordsLearned: wordCount._sum.wordsLearned || 0,
         totalMinutes: minuteSum._sum.minutesSpent || 0,
+        totalXp: user.totalXp || 0,
         lastActiveAt: daysData[0]?.day || null,
       },
     },

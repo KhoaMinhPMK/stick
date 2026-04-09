@@ -28,6 +28,8 @@ export interface PromptFilterParams {
   limit?: string;
   from?: string;
   to?: string;
+  search?: string;
+  level?: string;
 }
 
 // ─── Metrics ─────────────────────────
@@ -79,6 +81,7 @@ export interface AdminUserDTO {
   id: string;
   name: string;
   email: string | null;
+  avatarUrl?: string | null;
   isGuest: boolean;
   role: string;
   status: string;
@@ -107,6 +110,7 @@ export interface AdminUserDetailDTO {
     stats: AdminUserDTO['stats'] & {
       totalWordsLearned: number;
       totalMinutes: number;
+      totalXp: number;
     };
   };
   recentJournals: Array<{
@@ -164,6 +168,7 @@ export interface UserFilterParams {
   page?: string;
   limit?: string;
   sort?: string;
+  premium?: string;
 }
 
 export interface AILogFilterParams {

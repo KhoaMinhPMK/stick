@@ -9,11 +9,12 @@ export const AdminUsersPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent');
+  const [premiumFilter, setPremiumFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const limit = 20;
 
-  const loadUsers = async (params?: { page?: number; search?: string; sort?: string }) => {
+  const loadUsers = async (params?: { page?: number; search?: string; sort?: string; premium?: string }) => {
     setLoading(true);
     setError('');
     try {
@@ -22,6 +23,7 @@ export const AdminUsersPage: React.FC = () => {
         page: String(params?.page ?? page),
         limit: String(limit),
         sort: params?.sort ?? sort,
+        premium: params?.premium !== undefined ? params.premium : premiumFilter,
       });
       setUsers(res.items);
       setTotal(res.total);
@@ -35,7 +37,7 @@ export const AdminUsersPage: React.FC = () => {
   useEffect(() => {
     loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, sort]);
+  }, [page, sort, premiumFilter]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,10 +50,26 @@ export const AdminUsersPage: React.FC = () => {
   return (
     <AdminLayout activePath="users">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h2 className="font-headline font-bold text-lg">Users Explorer</h2>
-          <p className="text-xs text-outline">{total} users total</p>
+      <div className="mb-3">
+        <h2 className="font-headline font-bold text-lg">Users Explorer</h2>
+        <p className="text-xs text-outline">{total} users total</p>
+      </div>
+
+      {/* Filters row: premium tab + sort */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => { setPremiumFilter(''); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-headline font-bold transition-colors ${premiumFilter === '' ? 'bg-primary text-on-primary-container' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+          >
+            All Users
+          </button>
+          <button
+            onClick={() => { setPremiumFilter('true'); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-headline font-bold transition-colors flex items-center gap-1 ${premiumFilter === 'true' ? 'bg-amber-400 text-amber-900' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+          >
+            <span>★</span> Premium
+          </button>
         </div>
 
         {/* Sort */}
@@ -61,8 +79,8 @@ export const AdminUsersPage: React.FC = () => {
           className="px-3 py-2 border-2 border-outline-variant rounded-xl text-xs font-headline bg-surface focus:border-primary focus:outline-none"
         >
           <option value="recent">Newest first</option>
-          <option value="streak">Highest streak</option>
           <option value="active">Most active</option>
+          <option value="name">Name A-Z</option>
         </select>
       </div>
 
@@ -125,8 +143,14 @@ export const AdminUsersPage: React.FC = () => {
                   <tr key={u.id} className="border-b border-outline-variant hover:bg-surface-container transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-secondary-container flex items-center justify-center text-[11px] font-bold font-headline shrink-0">
-                          {u.name?.charAt(0)?.toUpperCase() || '?'}
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold font-headline shrink-0 overflow-hidden ${u.isPremium ? 'ring-1 ring-amber-400' : 'bg-secondary-container'}`}>
+                          {u.avatarUrl ? (
+                            <img src={u.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className={u.isPremium ? 'bg-amber-100 w-full h-full flex items-center justify-center' : ''}>
+                              {u.name?.charAt(0)?.toUpperCase() || '?'}
+                            </span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-sm truncate">

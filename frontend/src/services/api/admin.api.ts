@@ -69,6 +69,10 @@ export function getPrompts(params: PromptFilterParams = {}) {
   if (params.limit) qs.set('limit', params.limit);
   if (params.from) qs.set('from', params.from);
   if (params.to) qs.set('to', params.to);
+  if (params.search) qs.set('search', params.search);
+  if (params.level && params.level !== 'all') qs.set('level', params.level);
+  if (params.search) qs.set('search', params.search);
+  if (params.level && params.level !== 'all') qs.set('level', params.level);
   const query = qs.toString();
   return adminRequest<PaginatedResponse<DailyPromptDTO>>(`/admin/prompts${query ? `?${query}` : ''}`);
 }
@@ -124,8 +128,10 @@ export function getUsers(params: UserFilterParams = {}) {
   const qs = new URLSearchParams();
   if (params.search) qs.set('search', params.search);
   if (params.page) qs.set('page', params.page);
+  if (params.premium) qs.set('premium', params.premium);
   if (params.limit) qs.set('limit', params.limit);
   if (params.sort) qs.set('sort', params.sort);
+  if (params.premium) qs.set('premium', params.premium);
   const query = qs.toString();
   return adminRequest<PaginatedResponse<AdminUserDTO>>(`/admin/users${query ? `?${query}` : ''}`);
 }
