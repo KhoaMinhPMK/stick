@@ -114,10 +114,31 @@ export const LeaderboardPage: React.FC = () => {
                               </svg>
                             </div>
                             {/* Chat bubble */}
-                            <div className="absolute -top-16 left-1/2 z-20 whitespace-nowrap" style={{ transform: 'translateX(-20%)' }}>
-                              <div className="relative bg-black text-white text-[10px] md:text-xs font-bold px-2.5 py-1.5 rounded-xl leading-tight">
-                                Can you beat me?
-                                <span className="absolute top-full left-4 border-4 border-transparent" style={{ borderTopColor: '#000' }} />
+                            <div className="absolute -top-16 left-1/2 z-20 whitespace-nowrap" style={{ transform: 'translateX(-15%) rotate(-3deg)' }}>
+                              <div className="relative bg-white text-black text-[10px] md:text-xs font-black px-3 py-2 leading-tight"
+                                style={{
+                                  border: '2px solid #111',
+                                  borderRadius: '10px 10px 10px 2px',
+                                  boxShadow: '2px 2px 0 #111',
+                                  fontStyle: 'italic',
+                                  letterSpacing: '0.01em',
+                                }}>
+                                Still chasing me? Good luck.
+                                <span className="absolute top-full left-3" style={{
+                                  width: 0, height: 0,
+                                  borderLeft: '5px solid transparent',
+                                  borderRight: '5px solid transparent',
+                                  borderTop: '6px solid #111',
+                                  marginTop: '-1px',
+                                }} />
+                                <span className="absolute top-full left-3" style={{
+                                  width: 0, height: 0,
+                                  borderLeft: '4px solid transparent',
+                                  borderRight: '6px solid transparent',
+                                  borderTop: '5px solid #fff',
+                                  marginTop: '-2px',
+                                  marginLeft: '1px',
+                                }} />
                               </div>
                             </div>
                           </>
