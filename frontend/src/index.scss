@@ -264,28 +264,44 @@ html.lang-vi .font-headline {
 }
 
 /* ─── Premium Streak Fire Animation ───────────────── */
-@keyframes fireColorShift {
-  0%   { color: #f97316; filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
-  25%  { color: #ef4444; filter: drop-shadow(0 0 6px rgba(239,68,68,0.5)); }
-  50%  { color: #eab308; filter: drop-shadow(0 0 6px rgba(234,179,8,0.5)); }
-  75%  { color: #f97316; filter: drop-shadow(0 0 5px rgba(249,115,22,0.5)); }
-  100% { color: #f97316; filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
+@keyframes fireRise {
+  0%   { background-position: 50% 100%; filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
+  50%  { background-position: 50% 20%;  filter: drop-shadow(0 0 8px rgba(252,211,77,0.7)); }
+  100% { background-position: 50% 100%; filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
 }
 
-/* Mobile: animation always on */
+@keyframes streakFireGlow {
+  0%   { background-position: 50% 100%; }
+  50%  { background-position: 50% 0%;   }
+  100% { background-position: 50% 100%; }
+}
+
+/* Mobile: gradient bottom-to-top always animating */
 .streak-fire-premium {
-  animation: fireColorShift 2.5s ease-in-out infinite;
+  background: linear-gradient(to top, #9a3412 0%, #ea580c 30%, #f97316 55%, #fbbf24 80%, #fde68a 100%);
+  background-size: 100% 300%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fireRise 2.5s ease-in-out infinite;
 }
 
-/* Desktop: animation only on hover of parent group */
+/* Desktop: static gradient, animate only on hover of parent group */
 @media (hover: hover) and (min-width: 768px) {
   .streak-fire-premium {
-    color: #f97316;
+    background: linear-gradient(to top, #ea580c, #f97316);
+    background-size: 100% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     animation: none;
-    transition: color 0.3s, filter 0.3s;
+    filter: drop-shadow(0 0 2px rgba(249,115,22,0.3));
+    transition: filter 0.3s;
   }
   .group:hover .streak-fire-premium {
-    animation: fireColorShift 2.5s ease-in-out infinite;
+    background: linear-gradient(to top, #9a3412 0%, #ea580c 30%, #f97316 55%, #fbbf24 80%, #fde68a 100%);
+    background-size: 100% 300%;
+    animation: fireRise 2.5s ease-in-out infinite;
   }
 }
 
@@ -303,4 +319,11 @@ html.lang-vi .font-headline {
   .streak-ring-premium {
     box-shadow: 0 0 12px rgba(249,115,22,0.2);
   }
+}
+
+/* ─── Progress: Streak Yesterday Cell ─────────────── */
+.streak-yesterday-cell {
+  background: linear-gradient(to top, #9a3412, #c2410c, #ea580c, #f97316, #f59e0b, #fbbf24);
+  background-size: 100% 250%;
+  animation: streakFireGlow 2s ease-in-out infinite;
 }

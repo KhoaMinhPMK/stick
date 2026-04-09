@@ -76,7 +76,9 @@ export const ProgressPage: React.FC = () => {
       .map(d => getLocalDateString(new Date(d.day)))
   );
 
-  const days: { day: number; status: DayStatus }[] = Array.from({ length: daysInMonth }, (_, i) => {
+  const yesterdayStr = getLocalDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+
+  const days: { day: number; status: DayStatus; isStreakDay?: boolean }[] = Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1;
     const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
     const dateStr = getLocalDateString(date);
@@ -84,7 +86,7 @@ export const ProgressPage: React.FC = () => {
 
     if (dateStr === todayStr) return { day, status: 'today' as DayStatus };
     if (date > now) return { day, status: 'future' as DayStatus };
-    if (activeDates.has(dateStr)) return { day, status: 'completed' as DayStatus };
+    if (activeDates.has(dateStr)) return { day, status: 'completed' as DayStatus, isStreakDay: dateStr === yesterdayStr };
     return { day, status: 'missed' as DayStatus };
   });
 
@@ -192,7 +194,7 @@ export const ProgressPage: React.FC = () => {
                     <div key={`empty-${i}`} />
                   ))}
 
-                  {days.map(({ day, status }) => {
+                  {days.map(({ day, status, isStreakDay }) => {
                     if (status === 'completed') {
                       const dateStr = getLocalDateString(new Date(viewDate.getFullYear(), viewDate.getMonth(), day));
                       const xp = xpByDate.get(dateStr) || 0;
@@ -201,18 +203,24 @@ export const ProgressPage: React.FC = () => {
                         <div
                           key={day}
                           onClick={() => handleDayClick(day, status)}
-                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-tertiary-container flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform cursor-pointer overflow-hidden ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform cursor-pointer overflow-hidden ${isStreakDay ? 'streak-yesterday-cell' : 'bg-tertiary-container'} ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                         >
                           <span className="font-headline font-bold text-white text-xs md:text-base leading-none">{day}</span>
-                          {/* Mini bar chart */}
-                          <div className="w-full flex items-end justify-center" style={{ height: '45%' }}>
-                            <div className="w-full bg-white/20 rounded-sm h-full overflow-hidden flex items-end">
-                              <div
-                                className="w-full bg-white rounded-sm transition-all"
-                                style={{ height: `${barPct}%` }}
-                              />
+                          {isStreakDay ? (
+                            <span
+                              className="material-symbols-outlined text-white text-xl md:text-3xl drop-shadow"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >local_fire_department</span>
+                          ) : (
+                            <div className="w-full flex items-end justify-center" style={{ height: '45%' }}>
+                              <div className="w-full bg-white/20 rounded-sm h-full overflow-hidden flex items-end">
+                                <div
+                                  className="w-full bg-white rounded-sm transition-all"
+                                  style={{ height: `${barPct}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     }

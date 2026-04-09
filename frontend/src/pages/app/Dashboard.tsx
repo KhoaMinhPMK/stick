@@ -126,7 +126,7 @@ export const DashboardPage: React.FC = () => {
               {summary?.todayCompleted ? t('dashboard.hero_subtitle_done') : t('dashboard.hero_subtitle')}
             </p>
             {summary?.todayCompleted && summary?.todayJournalId ? (
-              <button onClick={() => (window.location.hash = `#feedback?journalId=${summary.todayJournalId}`)} className="sketch-border w-full md:w-auto bg-tertiary text-white px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 hover:bg-tertiary/80 transition-all active:scale-95 group">
+              <button onClick={() => (window.location.hash = `#feedback?journalId=${summary.todayJournalId}`)} className={`sketch-border w-full md:w-auto px-6 md:px-6 py-3 md:py-3.5 font-headline text-lg md:text-lg font-bold flex items-center justify-center gap-3 transition-all active:scale-95 group ${isPremium ? 'premium-galaxy-btn' : 'bg-tertiary text-white hover:bg-tertiary/80'}`}>
                 {t('dashboard.view_today_result')}
                 <span className="material-symbols-outlined group-hover:translate-x-2 transition-transform" data-icon="visibility">visibility</span>
               </button>
