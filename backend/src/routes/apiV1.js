@@ -2450,37 +2450,50 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
   let items = [];
 
   if (scope === 'all-time') {
-    // All-time: use User.totalXp (canonical cached value, includes admin adjustments)
-    const topUsers = await prisma.user.findMany({
-      where: { totalXp: { gt: 0 } },
-      orderBy: { totalXp: 'desc' },
+    // All-time: SUM(progressDaily.xpEarned) across all history — the single reliable source
+    // Admin XP adjustments also write to progressDaily, so both stay in sync
+    const userXpAll = await prisma.progressDaily.groupBy({
+      by: ['userId'],
+      _sum: { xpEarned: true },
+      orderBy: { _sum: { xpEarned: 'desc' } },
       take: 20,
-      select: { id: true, name: true, avatarUrl: true, isPremium: true, totalXp: true },
     });
 
-    items = topUsers.map((u, idx) => ({
+    const allUserIds = userXpAll.map(u => u.userId);
+    const allUsers = await prisma.user.findMany({
+      where: { id: { in: allUserIds } },
+      select: { id: true, name: true, avatarUrl: true, isPremium: true },
+    });
+    const allUserMap = {};
+    for (const u of allUsers) allUserMap[u.id] = u;
+
+    items = userXpAll.map((entry, idx) => ({
       rank: idx + 1,
-      userId: u.id,
-      name: u.name,
-      score: u.totalXp,
-      isUser: u.id === req.authUser.id,
-      avatarUrl: u.avatarUrl || null,
-      isPremium: Boolean(u.isPremium),
+      userId: entry.userId,
+      name: allUserMap[entry.userId]?.name || 'Unknown',
+      score: entry._sum.xpEarned || 0,
+      isUser: entry.userId === req.authUser.id,
+      avatarUrl: allUserMap[entry.userId]?.avatarUrl || null,
+      isPremium: Boolean(allUserMap[entry.userId]?.isPremium),
     }));
 
-    const userInList = items.some(i => i.isUser);
-    if (!userInList) {
-      const currentUser = await prisma.user.findUnique({
-        where: { id: req.authUser.id },
-        select: { totalXp: true },
+    const userInAllList = items.some(i => i.isUser);
+    if (!userInAllList) {
+      const userAllTotal = await prisma.progressDaily.aggregate({
+        where: { userId: req.authUser.id },
+        _sum: { xpEarned: true },
       });
-      const userXpTotal = currentUser?.totalXp || 0;
-      const usersAbove = await prisma.user.count({ where: { totalXp: { gt: userXpTotal } } });
+      const userAllXp = userAllTotal._sum.xpEarned || 0;
+      const usersAboveAll = await prisma.progressDaily.groupBy({
+        by: ['userId'],
+        _sum: { xpEarned: true },
+        having: { xpEarned: { _sum: { gt: userAllXp } } },
+      });
       items.push({
-        rank: usersAbove + 1,
+        rank: usersAboveAll.length + 1,
         userId: req.authUser.id,
         name: req.authUser.name || 'You',
-        score: userXpTotal,
+        score: userAllXp,
         isUser: true,
         avatarUrl: req.authUser.avatarUrl || null,
         isPremium: Boolean(req.authUser.isPremium),
@@ -3263,7 +3276,7 @@ router.post('/admin/users/:id/stats', requireAuth, requireAdmin, asyncHandler(as
 
   const updateData = {};
 
-  // XP adjustment: create a log entry + update totalXp
+  // XP adjustment: create a log entry + update totalXp + reflect in progressDaily for leaderboard sync
   if (typeof xpAdjustment === 'number' && xpAdjustment !== 0) {
     const clampedXp = Math.max(-99999, Math.min(99999, Math.round(xpAdjustment)));
     const newXp = Math.max(0, target.totalXp + clampedXp);
@@ -3276,6 +3289,16 @@ router.post('/admin/users/:id/stats', requireAuth, requireAdmin, asyncHandler(as
       },
     });
     updateData.totalXp = newXp;
+    // Also write to progressDaily so leaderboard (which uses SUM progressDaily) stays in sync
+    const vnDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const todayVn = new Date(vnDateStr + 'T00:00:00.000Z');
+    try {
+      await prisma.progressDaily.upsert({
+        where: { userId_day: { userId: req.params.id, day: todayVn } },
+        update: { xpEarned: { increment: clampedXp } },
+        create: { userId: req.params.id, day: todayVn, journalsCount: 0, wordsLearned: 0, minutesSpent: 0, xpEarned: Math.max(0, clampedXp) },
+      });
+    } catch (_) { /* non-critical, don't fail the adjustment */ }
   }
 
   // Streak override: update stored value + backfill ProgressDaily
