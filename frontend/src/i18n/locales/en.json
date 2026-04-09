@@ -297,7 +297,7 @@
                        "vocab":  "Words",
                        "progress":  "Progress",
                        "history":  "History",
-                       "library":  "Library",
+                       "library":  "Lessons",
                        "profile":  "Profile",
                        "settings":  "Settings"
                    },
@@ -690,8 +690,12 @@
                       "save":  "Save Preferences →"
                   },
     "library":  {
-                    "title":  "Library",
-                    "subtitle":  "Browse lessons, grammar guides, and reading materials.",
+                    "title":  "Lessons",
+                    "subtitle":  "Browse lessons by topic, grammar, and skills.",
+                    "vocab_shortcut_title":  "Vocabulary Notebook",
+                    "vocab_shortcut_desc":  "View and manage your saved word
+                    "vocab_shortcut_title":  "Vocabulary Notebook",
+                    "vocab_shortcut_desc":  "View and manage your saved words.",
                     "search_placeholder":  "Search lessons...",
                     "cat_all":  "All",
                     "cat_grammar":  "Grammar",

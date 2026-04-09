@@ -138,9 +138,9 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
           <div className="w-full md:w-1/3 flex justify-center items-center z-10 mt-6 md:mt-0">
-            <div className="relative w-48 h-48 md:w-56 md:h-56 border-[3px] md:border-[4px] border-black rounded-full bg-white overflow-hidden flex items-center justify-center sketch-card">
+            <div className={`relative w-48 h-48 md:w-56 md:h-56 border-[3px] md:border-[4px] border-black rounded-full bg-white overflow-hidden flex items-center justify-center sketch-card group ${isPremium ? 'streak-ring-premium' : ''}`}>
               <div className="flex flex-col items-center">
-                <span className="material-symbols-outlined text-5xl md:text-6xl text-black" data-icon="local_fire_department">local_fire_department</span>
+                <span className={`material-symbols-outlined text-5xl md:text-6xl ${isPremium ? 'streak-fire-premium' : 'text-black'}`} data-icon="local_fire_department">local_fire_department</span>
                 <span className="font-headline font-black text-3xl md:text-4xl mt-1">{summary?.currentStreak || 0}</span>
                 <span className="text-xs font-bold text-on-surface-variant">streak</span>
               </div>

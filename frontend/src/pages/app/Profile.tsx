@@ -4,6 +4,7 @@ import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, type ProgressSummary } from '../../services/api/endpoints';
 import { apiRequest, getStoredUser } from '../../services/api/client';
 import { logout } from '../../services/api/auth';
+import { usePremium } from '../../hooks/usePremium';
 
 interface UserProfile {
   id: string;
@@ -25,6 +26,7 @@ export const ProfilePage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const storedUser = getStoredUser();
   const isGuest = storedUser?.isGuest === true;
+  const isPremium = usePremium();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,13 +104,21 @@ export const ProfilePage: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-5 md:gap-8 items-center sm:items-start">
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <div className="w-24 h-24 md:w-32 md:h-32 sketch-border overflow-hidden bg-surface-container-high flex items-center justify-center">
+                  {summary?.isLeaderboardTop && (
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-20 text-2xl md:text-3xl select-none" style={{ filter: 'drop-shadow(0 2px 6px rgba(255,215,0,0.7))' }}>👑</div>
+                  )}
+                  <div className={`w-24 h-24 md:w-32 md:h-32 sketch-border overflow-hidden bg-surface-container-high flex items-center justify-center ${isPremium ? 'ring-2 ring-purple-400 ring-offset-2' : ''}`}>
                     {profile?.avatarUrl ? (
                       <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
                       <span className="material-symbols-outlined text-4xl md:text-5xl text-black/30">person</span>
                     )}
                   </div>
+                  {isPremium && (
+                    <div className="absolute -top-2 -right-2 w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 border-2 border-white flex items-center justify-center shadow-md z-10">
+                      <span className="text-white text-xs md:text-sm font-black">★</span>
+                    </div>
+                  )}
                   <button
                     onClick={() => (window.location.hash = '#edit-profile')}
                     className="absolute -bottom-1.5 -right-1.5 md:-bottom-2 md:-right-2 bg-primary text-surface p-1 md:p-2 rounded-full flex items-center justify-center border-2 border-surface z-10"

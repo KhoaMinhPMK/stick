@@ -18,7 +18,7 @@ model User {
   isGuest          Boolean   @default(false)
   bio              String?   @db.Text
   nativeLanguage   String?
-  avatarUrl        String?   @db.Text
+  avatarUrl        String?   @db.MediumText
   firebaseUid      String?   @unique
   firebaseProvider String?
   role             String    @default("user")  // "user" | "admin"

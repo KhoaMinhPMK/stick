@@ -1580,12 +1580,21 @@ router.post('/learning-sessions', requireAuth, asyncHandler(async (req, res) => 
     },
   });
 
-  // Track XP for practice completion
+  // Track XP for practice completion (cap: 3 XP-earning sessions per type per day)
   const xpMap = { grammar: 5, reading: 5, listening: 5, speaking: 5 };
   const xp = xpMap[type] || 0;
   if (xp > 0) {
-    await trackDailyProgress(req.authUser.id, { xp });
-    awardXp(req.authUser.id, xp, 'session', { description: `Practice: ${type}` });
+    const sessionDayStart = new Date();
+    sessionDayStart.setHours(0, 0, 0, 0);
+    const todaySessionCount = await prisma.learningSession.count({
+      where: { userId: req.authUser.id, type, createdAt: { gte: sessionDayStart } },
+    });
+    // The session is already created, so count includes current — threshold is > 3
+    const sessionEarnXp = todaySessionCount <= 3;
+    if (sessionEarnXp) {
+      await trackDailyProgress(req.authUser.id, { xp });
+      awardXp(req.authUser.id, xp, 'session', { description: `Practice: ${type}` });
+    }
   }
 
   res.status(201).json({ session });
@@ -1788,24 +1797,41 @@ router.post('/phrases', requireAuth, asyncHandler(async (req, res) => {
   if (!phrase) {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'phrase is required' });
   }
+
+  // Dedup: case-insensitive check for same user
+  const dupe = await prisma.savedPhrase.findFirst({
+    where: { userId: req.authUser.id, phrase: { equals: String(phrase).trim(), mode: 'insensitive' } },
+  });
+  if (dupe) {
+    return res.status(409).json({ code: 'DUPLICATE_PHRASE', message: 'Phrase already saved', phrase: dupe });
+  }
+
+  // Daily cap: max 15 phrases earn XP per day
+  const phraseDayStart = new Date();
+  phraseDayStart.setHours(0, 0, 0, 0);
+  const todayPhraseCount = await prisma.savedPhrase.count({
+    where: { userId: req.authUser.id, createdAt: { gte: phraseDayStart } },
+  });
+  const phraseEarnXp = todayPhraseCount < 15;
+
   const saved = await prisma.savedPhrase.create({
     data: {
       userId: req.authUser.id,
-      phrase: String(phrase),
+      phrase: String(phrase).trim(),
       meaning: meaning || null,
       example: example || null,
       category: category || 'general',
     },
   });
 
-  // Track daily progress: +2 XP
-  await trackDailyProgress(req.authUser.id, { xp: 2 });
-  awardXp(req.authUser.id, 2, 'phrase', { description: 'Saved a phrase' });
+  // Track daily progress: +2 XP (capped)
+  await trackDailyProgress(req.authUser.id, { xp: phraseEarnXp ? 2 : 0 });
+  if (phraseEarnXp) awardXp(req.authUser.id, 2, 'phrase', { description: 'Saved a phrase' });
 
   // Check achievements (phrase_collector)
   checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
-  res.status(201).json({ phrase: saved });
+  res.status(201).json({ phrase: saved, xpAwarded: phraseEarnXp ? 2 : 0 });
 }));
 
 router.delete('/phrases/:id', requireAuth, asyncHandler(async (req, res) => {
@@ -1837,10 +1863,40 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
   if (!word) {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'word is required' });
   }
+
+  const normalizedWord = String(word).trim();
+
+  // ── Dedup: reject duplicate words per user (case-insensitive) ──
+  const duplicate = await prisma.vocabNotebookItem.findFirst({
+    where: {
+      userId: req.authUser.id,
+      word: { equals: normalizedWord, mode: 'insensitive' },
+    },
+  });
+  if (duplicate) {
+    return res.status(409).json({
+      code: 'DUPLICATE_WORD',
+      message: 'Word already exists in your notebook',
+      item: duplicate,
+    });
+  }
+
+  // ── Daily XP cap: count words added today BEFORE creating ──
+  const VOCAB_XP_DAILY_CAP = 20; // max words that earn XP per day
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const wordsAddedToday = await prisma.vocabNotebookItem.count({
+    where: {
+      userId: req.authUser.id,
+      createdAt: { gte: todayStart },
+    },
+  });
+  const earnXp = wordsAddedToday < VOCAB_XP_DAILY_CAP;
+
   const item = await prisma.vocabNotebookItem.create({
     data: {
       userId: req.authUser.id,
-      word: String(word),
+      word: normalizedWord,
       meaning: meaning || null,
       example: example || null,
       tags: tags || null,
@@ -1848,14 +1904,16 @@ router.post('/vocab/notebook', requireAuth, asyncHandler(async (req, res) => {
     },
   });
 
-  // Track daily progress: +1 word, +3 XP
-  await trackDailyProgress(req.authUser.id, { words: 1, xp: 3 });
-  awardXp(req.authUser.id, 3, 'vocab', { description: 'Added word to notebook' });
+  // Track daily progress (+1 word always; +3 XP only within cap)
+  await trackDailyProgress(req.authUser.id, { words: 1, xp: earnXp ? 3 : 0 });
+  if (earnXp) {
+    awardXp(req.authUser.id, 3, 'vocab', { description: 'Added word to notebook' });
+  }
 
   // Check achievements (vocab milestones)
   checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
-  res.status(201).json({ item });
+  res.status(201).json({ item, xpAwarded: earnXp ? 3 : 0 });
 }));
 
 // ─── Vocab: Due for review (SRS) ─────────────────────
@@ -2116,8 +2174,12 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     : 0;
 
   // memberSince + cached totalXp — single user query instead of SUM(ProgressDaily)
-  const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true, totalXp: true } });
+  const user = await prisma.user.findUnique({ where: { id: req.authUser.id }, select: { createdAt: true, totalXp: true, isPremium: true, avatarUrl: true } });
   const totalXp = user?.totalXp ?? 0;
+
+  // Leaderboard rank — check if current user is #1
+  const topUser = await prisma.user.findFirst({ orderBy: { totalXp: 'desc' }, select: { id: true } });
+  const isLeaderboardTop = topUser?.id === req.authUser.id;
 
   // Today's journal check (Vietnam timezone) — unified day logic
   const vnToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -2162,6 +2224,9 @@ router.get('/progress/summary', requireAuth, asyncHandler(async (req, res) => {
     todayJournalId,
     dayNumber,
     streakFreezeCount,
+    isPremium: Boolean(user?.isPremium),
+    avatarUrl: user?.avatarUrl || null,
+    isLeaderboardTop,
   });
 }));
 
@@ -2336,7 +2401,21 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
     return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
   }
 
-  const { duration } = req.body || {};
+  // Idempotency: each lesson can only be completed once per user
+  const alreadyCompleted = await prisma.learningSession.findFirst({
+    where: { userId: req.authUser.id, type: 'lesson', metadata: { path: ['lessonId'], equals: req.params.id } },
+  });
+  if (alreadyCompleted) {
+    return res.status(200).json({ session: alreadyCompleted, alreadyCompleted: true, xpAwarded: 0 });
+  }
+
+  const { duration, timeSpent } = req.body || {};
+
+  // Minimum time gate: must spend at least 30s reading
+  if (!timeSpent || typeof timeSpent !== 'number' || timeSpent < 30) {
+    return res.status(400).json({ code: 'TOO_FAST', message: 'Please spend more time reading the lesson before completing.' });
+  }
+
   const session = await prisma.learningSession.create({
     data: {
       userId: req.authUser.id,
@@ -2349,18 +2428,19 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
     },
   });
 
-  // Update daily progress
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Update daily progress + ACTUALLY award XP to User.totalXp
+  const lessonDay = new Date();
+  lessonDay.setHours(0, 0, 0, 0);
   await prisma.progressDaily.upsert({
-    where: { userId_day: { userId: req.authUser.id, day: today } },
-    create: { userId: req.authUser.id, day: today, xpEarned: 15, minutesSpent: lesson.duration || 0 },
+    where: { userId_day: { userId: req.authUser.id, day: lessonDay } },
+    create: { userId: req.authUser.id, day: lessonDay, xpEarned: 15, minutesSpent: lesson.duration || 0 },
     update: { xpEarned: { increment: 15 }, minutesSpent: { increment: lesson.duration || 0 } },
   });
+  awardXp(req.authUser.id, 15, 'lesson', { description: `Completed lesson: ${lesson.title}` });
 
   await checkAndUnlockAchievements(req.authUser.id);
 
-  res.status(201).json({ session });
+  res.status(201).json({ session, alreadyCompleted: false, xpAwarded: 15 });
 }));
 
 // ─── Leaderboard ─────────────────────────────────────
@@ -2388,7 +2468,7 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
   const userIds = userXp.map(u => u.userId);
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, avatarUrl: true, isPremium: true },
   });
   const userMap = {};
   for (const u of users) userMap[u.id] = u;
@@ -2399,6 +2479,8 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
     name: userMap[entry.userId]?.name || 'Unknown',
     score: entry._sum.xpEarned || 0,
     isUser: entry.userId === req.authUser.id,
+    avatarUrl: userMap[entry.userId]?.avatarUrl || null,
+    isPremium: Boolean(userMap[entry.userId]?.isPremium),
   }));
 
   // If current user isn't in top 20, calculate their real rank
@@ -2425,6 +2507,8 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
       name: req.authUser.name || 'You',
       score: userXpTotal,
       isUser: true,
+      avatarUrl: req.authUser.avatarUrl || null,
+      isPremium: Boolean(req.authUser.isPremium),
     });
   }
 
@@ -3154,16 +3238,16 @@ router.post('/admin/users/:id/stats', requireAuth, requireAdmin, asyncHandler(as
   if (typeof setCurrentStreak === 'number' && setCurrentStreak >= 0) {
     updateData.currentStreak = Math.round(setCurrentStreak);
     if (setCurrentStreak > 0) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use Vietnam timezone to stay consistent with progress tracking
+      const vnTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const today = new Date(vnTodayStr + 'T00:00:00.000Z');
       for (let i = 0; i < Math.min(setCurrentStreak, 365); i++) {
         const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().slice(0, 10);
+        d.setUTCDate(d.getUTCDate() - i);
         await prisma.progressDaily.upsert({
-          where: { userId_dateStr: { userId: req.params.id, dateStr } },
-          update: { completed: true },
-          create: { userId: req.params.id, dateStr, completed: true, dayNumber: 1 },
+          where: { userId_day: { userId: req.params.id, day: d } },
+          update: {},
+          create: { userId: req.params.id, day: d, journalsCount: 0, wordsLearned: 0, minutesSpent: 0, xpEarned: 0 },
         });
       }
     }

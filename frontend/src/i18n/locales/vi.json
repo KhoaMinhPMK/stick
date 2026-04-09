@@ -297,7 +297,7 @@
                        "progress":  "Tiến độ",
                        "history":  "Lịch sử",
                        "vocab":  "Từ vựng",
-                       "library":  "Thư viện",
+                       "library":  "Bài học,
                        "profile":  "Hồ sơ",
                        "settings":  "Cài đặt"
                    },
@@ -690,8 +690,12 @@
                       "save":  "Lưu tùy chỉnh →"
                   },
     "library":  {
-                    "title":  "Thư viện",
-                    "subtitle":  "Duyệt bài học, ngữ pháp và tài liệu đọc.",
+                    "title":  "Bài học",
+                    "subtitle":  "Bài học theo chủ đề, ngữ pháp và kỹ năng.",
+                    "vocab_shortcut_title":  "Sổ từ vựng",
+                    "vocab_shortcut_desc":  "Xem và quản lý các từ bạn đã lưug.",
+                    "vocab_shortcut_title":  "Sổ từ vựng",
+                    "vocab_shortcut_desc":  "Xem và quản lý các từ bạn đã lưu.",
                     "search_placeholder":  "Tìm bài học...",
                     "cat_all":  "Tất cả",
                     "cat_grammar":  "Ngữ pháp",

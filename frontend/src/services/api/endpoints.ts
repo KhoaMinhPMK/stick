@@ -156,7 +156,7 @@ export async function getVocabNotebook(mastery?: string) {
 }
 
 export async function createVocabItem(data: { word: string; meaning?: string; example?: string; tags?: string; notes?: string }) {
-  return apiRequest<{ item: VocabItem }>('/vocab/notebook', {
+  return apiRequest<{ item: VocabItem; xpAwarded: number }>('/vocab/notebook', {
     method: 'POST',
     body: data,
   });
@@ -280,6 +280,9 @@ export interface ProgressSummary {
   todayJournalId: string | null;
   dayNumber: number;
   streakFreezeCount: number;
+  isPremium: boolean;
+  avatarUrl: string | null;
+  isLeaderboardTop: boolean;
 }
 
 export interface XpLogEntry {
@@ -307,7 +310,19 @@ export interface ProgressDailyItem {
 }
 
 export async function getProgressSummary() {
-  return apiRequest<ProgressSummary>('/progress/summary');
+  const summary = await apiRequest<ProgressSummary>('/progress/summary');
+  // Sync premium + avatar into localStorage so hooks read updated values
+  try {
+    const raw = localStorage.getItem('stick_user');
+    if (raw) {
+      const stored = JSON.parse(raw);
+      let changed = false;
+      if (stored.isPremium !== summary.isPremium) { stored.isPremium = summary.isPremium; changed = true; }
+      if (summary.avatarUrl !== undefined && stored.avatarUrl !== summary.avatarUrl) { stored.avatarUrl = summary.avatarUrl; changed = true; }
+      if (changed) localStorage.setItem('stick_user', JSON.stringify(stored));
+    }
+  } catch { /* best-effort sync */ }
+  return summary;
 }
 
 export async function getXpHistory(limit = 20) {
@@ -329,6 +344,8 @@ export interface LeaderboardEntry {
   name: string;
   score: number;
   isUser: boolean;
+  avatarUrl: string | null;
+  isPremium: boolean;
 }
 
 export async function getLeaderboard(scope: 'weekly' | 'all-time' = 'weekly') {
@@ -391,10 +408,10 @@ export async function getLessonDetail(id: string) {
 }
 
 // GAP-15: Lesson completion tracking
-export async function completeLessonProgress(lessonId: string, duration?: number) {
-  return apiRequest<{ session: LearningSession }>(`/library/lessons/${lessonId}/complete`, {
+export async function completeLessonProgress(lessonId: string, duration?: number, timeSpent?: number) {
+  return apiRequest<{ session: LearningSession; alreadyCompleted?: boolean; xpAwarded?: number }>(`/library/lessons/${lessonId}/complete`, {
     method: 'POST',
-    body: { duration },
+    body: { duration, timeSpent: timeSpent ?? duration ?? 60 },
   });
 }
 

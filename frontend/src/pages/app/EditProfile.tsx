@@ -45,6 +45,16 @@ export const EditProfilePage: React.FC = () => {
         method: 'PUT',
         body: { name, bio, nativeLanguage: nativeLang, avatarUrl: avatarPreview || '' }
       });
+      // Sync name + avatar into localStorage immediately so header reflects changes
+      try {
+        const raw = localStorage.getItem('stick_user');
+        if (raw) {
+          const stored = JSON.parse(raw);
+          stored.name = name;
+          stored.avatarUrl = avatarPreview || null;
+          localStorage.setItem('stick_user', JSON.stringify(stored));
+        }
+      } catch { /* best-effort */ }
       if (res.avatarTooLarge) {
         setSaveError(t('edit_profile.avatar_too_large', { defaultValue: 'Avatar quá lớn (>500KB). Thông tin khác đã được lưu.' }));
       } else {
@@ -100,7 +110,24 @@ export const EditProfilePage: React.FC = () => {
                 const file = e.target.files?.[0];
                 if (file) {
                   const reader = new FileReader();
-                  reader.onload = () => setAvatarPreview(reader.result as string);
+                  reader.onload = () => {
+                    const dataUrl = reader.result as string;
+                    // Compress to max 300x300, quality 0.75 to keep under TEXT column limit
+                    const img = new Image();
+                    img.onload = () => {
+                      const MAX = 300;
+                      let w = img.width, h = img.height;
+                      if (w > MAX || h > MAX) {
+                        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                        else { w = Math.round(w * MAX / h); h = MAX; }
+                      }
+                      const canvas = document.createElement('canvas');
+                      canvas.width = w; canvas.height = h;
+                      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+                      setAvatarPreview(canvas.toDataURL('image/jpeg', 0.75));
+                    };
+                    img.src = dataUrl;
+                  };
                   reader.readAsDataURL(file);
                 }
               }}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, type VocabItem } from '../../services/api/endpoints';
+import { ApiError } from '../../services/api/client';
 
 export const VocabNotebookPage: React.FC = () => {
   const { t } = useTranslation();
@@ -50,8 +51,12 @@ export const VocabNotebookPage: React.FC = () => {
       setNewExample('');
       setShowAdd(false);
     } catch (err) {
-      console.error('Failed to add word:', err);
-      setError(t('vocab_notebook.error_add'));
+      if (err instanceof ApiError && err.status === 409) {
+        setError(t('vocab_notebook.error_duplicate', { defaultValue: 'Từ này đã có trong sổ của bạn.' }));
+      } else {
+        console.error('Failed to add word:', err);
+        setError(t('vocab_notebook.error_add'));
+      }
     } finally {
       setAdding(false);
     }

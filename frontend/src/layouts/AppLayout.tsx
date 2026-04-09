@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getStoredUser } from '../services/api/client';
+import { getProgressSummary, type ProgressSummary } from '../services/api/endpoints';
+import { logout } from '../services/api/auth';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +13,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
   const { t, i18n } = useTranslation();
   const storedUser = getStoredUser();
   const isGuest = storedUser?.isGuest === true;
+  const [summary, setSummary] = useState<ProgressSummary | null>(null);
+
+  useEffect(() => {
+    getProgressSummary().then(setSummary).catch(() => {});
+  }, []);
 
   const navItems = [
     { id: '#app', icon: 'home', label: t('navigation.home') },
@@ -18,7 +25,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
     { id: '#vocab-notebook', icon: 'book_5', label: t('navigation.vocab') },
     { id: '#progress', icon: 'trending_up', label: t('navigation.progress') },
     { id: '#history', icon: 'history', label: t('navigation.history') },
-    { id: '#library', icon: 'menu_book', label: t('navigation.library') },
+    { id: '#library', icon: 'school', label: t('navigation.library') },
     { id: '#profile', icon: 'person', label: t('navigation.profile') },
   ];
 
@@ -101,8 +108,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
           </button>
           {/* Streak Badge */}
           <div onClick={() => (window.location.hash = '#progress')} className="flex items-center gap-1.5 md:gap-2 bg-secondary-container px-3 md:px-3 py-1.5 md:py-1.5 rounded-full border-2 border-black hover:scale-105 transition-transform cursor-pointer">
-            <span className="material-symbols-outlined text-orange-600 text-sm md:text-base animate-pulse" data-icon="local_fire_department" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
-            <span className="font-headline font-bold text-black text-xs md:text-sm">{t('dashboard.days_streak', { defaultValue: '12 Days' })}</span>
+            <span className="material-symbols-outlined text-orange-600 text-sm md:text-base" data-icon="local_fire_department" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
+            <span className="font-headline font-bold text-black text-xs md:text-sm">{summary?.currentStreak ?? 0}</span>
           </div>
 
           {isGuest && (
@@ -118,9 +125,27 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
 
           {/* User Avatar */}
           <div onClick={() => (window.location.hash = '#profile')} className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-black overflow-hidden hover:scale-105 transition-transform cursor-pointer bg-white">
-            {/* Fallback to simple icon since the stick figure user profile picture was specific */}
-             <span className="material-symbols-outlined text-black w-full h-full flex items-center justify-center text-xl md:text-2xl bg-surface-container" data-icon="person_outline">person_outline</span>
+            {storedUser?.avatarUrl ? (
+              <img src={storedUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="material-symbols-outlined text-black w-full h-full flex items-center justify-center text-xl md:text-2xl bg-surface-container" data-icon="person_outline">person_outline</span>
+            )}
           </div>
+
+          {/* Logout */}
+          {!isGuest && (
+            <button
+              onClick={async () => {
+                await logout();
+                window.location.hash = '#landing';
+                window.location.reload();
+              }}
+              className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-black flex items-center justify-center hover:bg-error-container hover:text-error hover:border-error transition-colors active:scale-95 bg-white"
+              title={t('settings.logout', { defaultValue: 'Log Out' })}
+            >
+              <span className="material-symbols-outlined text-sm md:text-base">logout</span>
+            </button>
+          )}
         </div>
       </header>
 

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { createVocabItem } from '../../services/api/endpoints';
+import { ApiError } from '../../services/api/client';
 import { trackSessionStart, trackSubmissionSent } from '../../services/analytics/coreLoop';
 import { usePremium } from '../../hooks/usePremium';
 
@@ -61,7 +62,13 @@ export const JournalWorkspacePage: React.FC = () => {
   const handleAddVocabToLibrary = async () => {
     try {
       for (const item of vocabulary) {
-        await createVocabItem({ word: item.word, meaning: item.meaning });
+        try {
+          await createVocabItem({ word: item.word, meaning: item.meaning });
+        } catch (err) {
+          // 409 = already in notebook — silently skip, not an error
+          if (err instanceof ApiError && err.status === 409) continue;
+          throw err;
+        }
       }
       setVocabSaved(true);
       setTimeout(() => setVocabSaved(false), 2500);

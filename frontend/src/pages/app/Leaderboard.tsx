@@ -96,21 +96,33 @@ export const LeaderboardPage: React.FC = () => {
                   const borderColor = actualRank === 1 ? '#FFD700' : actualRank === 2 ? '#C0C0C0' : '#CD7F32';
                   return (
                     <div key={entry.userId} className={`flex flex-col items-center flex-1 ${isGold ? 'max-w-[140px] z-10' : 'max-w-[120px]'}`}>
-                      <div className={`${isGold ? 'w-16 h-16 md:w-24 md:h-24 border-4' : 'w-12 h-12 md:w-16 md:h-16 border-2'} rounded-full bg-surface-container relative mb-4 ${isGold ? 'shadow-[0_0_20px_rgba(255,215,0,0.5)]' : ''}`}
-                        style={{ borderColor }}
-                      >
-                        {isGold && <span className="material-symbols-outlined text-[#FFD700] absolute -top-6 left-1/2 -translate-x-1/2 text-3xl">emoji_events</span>}
+                      {/* Avatar with crown for #1 */}
+                      <div className="relative mb-4">
+                        {isGold && (
+                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-10 text-2xl md:text-3xl select-none drop-shadow-md" style={{ filter: 'drop-shadow(0 2px 4px rgba(255,215,0,0.6))' }}>👑</div>
+                        )}
+                        <div
+                          className={`${isGold ? 'w-16 h-16 md:w-24 md:h-24 border-4' : 'w-12 h-12 md:w-16 md:h-16 border-2'} rounded-full overflow-hidden relative ${isGold ? 'shadow-[0_0_20px_rgba(255,215,0,0.5)]' : ''} ${entry.isPremium ? 'ring-2 ring-purple-400 ring-offset-2' : ''}`}
+                          style={{ borderColor }}
+                        >
+                          {entry.avatarUrl ? (
+                            <img src={entry.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-surface-container flex items-center justify-center text-xl md:text-2xl font-black text-stone-400">
+                              {entry.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        {/* Rank badge */}
                         <div className="absolute -bottom-2 md:-bottom-3 left-1/2 -translate-x-1/2 font-black text-xs md:text-sm w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full border border-surface"
                           style={{ backgroundColor: borderColor, color: actualRank === 1 ? '#5c4c00' : '#fff' }}
                         >
                           {actualRank}
                         </div>
-                        <div className="w-full h-full rounded-full flex items-center justify-center text-xl md:text-2xl font-black text-stone-400">
-                          {entry.name.charAt(0).toUpperCase()}
-                        </div>
                       </div>
                       <p className={`font-headline ${isGold ? 'font-black text-sm md:text-base' : 'font-bold text-xs md:text-sm'} text-center line-clamp-1 mb-1 ${entry.isUser ? 'text-primary' : ''}`}>
                         {entry.isUser ? 'You' : entry.name}
+                        {entry.isPremium && <span className="ml-1 text-amber-500 text-[10px]">★</span>}
                       </p>
                       <div className={`w-full ${podiumHeights[podiumIdx]} rounded-t-xl sketch-border border-b-0 flex flex-col items-center justify-start pt-4 ${podiumBg[podiumIdx]}`}
                         style={{ borderColor: isGold ? '#FFD700' : undefined }}
@@ -147,16 +159,25 @@ export const LeaderboardPage: React.FC = () => {
                   </div>
 
                   {/* Avatar circle */}
-                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center text-lg font-bold ${
-                    entry.isUser ? 'border-black bg-surface-container-highest' : 'border-stone-200 bg-surface-container'
+                  <div className={`relative w-10 h-10 md:w-12 md:h-12 rounded-full border-2 overflow-hidden shrink-0 ${
+                    entry.isPremium ? 'border-purple-400 ring-1 ring-purple-300' : entry.isUser ? 'border-black' : 'border-stone-200'
                   }`}>
-                    {(entry.isUser ? 'Y' : entry.name.charAt(0)).toUpperCase()}
+                    {entry.avatarUrl ? (
+                      <img src={entry.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className={`w-full h-full flex items-center justify-center text-lg font-bold ${
+                        entry.isUser ? 'bg-surface-container-highest' : 'bg-surface-container'
+                      }`}>
+                        {(entry.isUser ? 'Y' : entry.name.charAt(0)).toUpperCase()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Name */}
-                  <div className="flex-1">
-                    <p className={`font-headline font-bold text-sm md:text-base ${entry.isUser ? 'text-black' : 'text-stone-700'}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-headline font-bold text-sm md:text-base ${entry.isUser ? 'text-black' : 'text-stone-700'} truncate`}>
                       {entry.isUser ? `You${userStreak > 0 ? ` 🔥${userStreak}` : ''}` : entry.name}
+                      {entry.isPremium && <span className="ml-1.5 text-amber-500 text-xs">★</span>}
                     </p>
                   </div>
 

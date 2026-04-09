@@ -65,6 +65,21 @@ export const LibraryPage: React.FC = () => {
           <p className="text-on-surface-variant font-medium text-xs md:text-sm mt-1">{t('library.subtitle')}</p>
         </div>
 
+        {/* Vocab Notebook Shortcut */}
+        <div
+          onClick={() => (window.location.hash = '#vocab-notebook')}
+          className="flex items-center gap-4 mb-6 md:mb-8 p-4 md:p-5 sketch-border bg-secondary-container cursor-pointer hover:shadow-[4px_4px_0_0_#000] transition-all active:scale-[0.98] group"
+        >
+          <div className="w-11 h-11 md:w-14 md:h-14 bg-surface rounded-xl border-2 border-black flex items-center justify-center shrink-0 group-hover:-rotate-6 transition-transform">
+            <span className="material-symbols-outlined text-xl md:text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>book_5</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-headline font-extrabold text-base md:text-lg leading-tight">{t('library.vocab_shortcut_title')}</p>
+            <p className="text-on-surface-variant text-xs md:text-sm font-medium mt-0.5 truncate">{t('library.vocab_shortcut_desc')}</p>
+          </div>
+          <span className="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform shrink-0">chevron_right</span>
+        </div>
+
         {/* Search */}
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mb-6 md:mb-8">
           <div className="relative flex-1">

@@ -91,6 +91,21 @@ export const ProgressPage: React.FC = () => {
   const completedCount = days.filter(d => d.status === 'completed').length;
   const streak = summary?.currentStreak || 0;
   const bestStreak = summary?.bestStreak || 0;
+  const totalDaysAllTime = summary?.totalJournals || 0;
+
+  // Build XP-per-date map for bar chart heights in calendar cells
+  const xpByDate = React.useMemo(() => {
+    const m = new Map<string, number>();
+    dailyData.forEach(d => {
+      const key = getLocalDateString(new Date(d.day));
+      m.set(key, d.xpEarned);
+    });
+    return m;
+  }, [dailyData]);
+  const maxXpInPeriod = React.useMemo(
+    () => Math.max(10, ...dailyData.map(d => d.xpEarned)),
+    [dailyData]
+  );
 
   // Milestone uses all-time total journals for meaningful goal tracking
   const totalJournals = summary?.totalJournals || 0;
@@ -179,16 +194,25 @@ export const ProgressPage: React.FC = () => {
 
                   {days.map(({ day, status }) => {
                     if (status === 'completed') {
+                      const dateStr = getLocalDateString(new Date(viewDate.getFullYear(), viewDate.getMonth(), day));
+                      const xp = xpByDate.get(dateStr) || 0;
+                      const barPct = Math.max(20, Math.round((xp / maxXpInPeriod) * 100));
                       return (
                         <div
                           key={day}
                           onClick={() => handleDayClick(day, status)}
-                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-tertiary-container flex flex-col items-center justify-center gap-0.5 md:gap-1 hover:-rotate-1 transition-transform cursor-pointer ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-tertiary-container flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform cursor-pointer overflow-hidden ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                         >
-                          <span className="font-headline font-bold text-white text-xs md:text-base">{day}</span>
-                          <span className="material-symbols-outlined text-white text-lg md:text-2xl lg:text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            local_fire_department
-                          </span>
+                          <span className="font-headline font-bold text-white text-xs md:text-base leading-none">{day}</span>
+                          {/* Mini bar chart */}
+                          <div className="w-full flex items-end justify-center" style={{ height: '45%' }}>
+                            <div className="w-full bg-white/20 rounded-sm h-full overflow-hidden flex items-end">
+                              <div
+                                className="w-full bg-white rounded-sm transition-all"
+                                style={{ height: `${barPct}%` }}
+                              />
+                            </div>
+                          </div>
                         </div>
                       );
                     }
@@ -313,7 +337,7 @@ export const ProgressPage: React.FC = () => {
                     <div className="text-2xl md:text-4xl">📅</div>
                     <div>
                       <p className="text-[10px] md:text-xs font-black uppercase text-stone-600">{t('progress.total_days')}</p>
-                      <p className="font-headline font-bold text-lg md:text-2xl">{completedCount}</p>
+                      <p className="font-headline font-bold text-lg md:text-2xl">{totalDaysAllTime}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 md:gap-4 bg-surface/50 p-3 md:p-4 border-2 border-black rounded-lg">
