@@ -25,12 +25,15 @@ export const FeedbackResultPage: React.FC = () => {
   const [recSeconds, setRecSeconds] = useState(0);
   const [recError, setRecError] = useState('');
   const [recAudioUrl, setRecAudioUrl] = useState<string | null>(null);
+  const [scoringState, setScoringState] = useState<'idle' | 'scoring' | 'done' | 'error'>('idle');
+  const [wordScores, setWordScores] = useState<{ word: string; correct: boolean; comment?: string }[]>([]);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const recAudioRef = useRef<HTMLAudioElement | null>(null);
   const speakingSectionRef = useRef<HTMLDivElement | null>(null);
+  const enhancedTextRef = useRef<string>('');
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -99,6 +102,28 @@ export const FeedbackResultPage: React.FC = () => {
     };
   }, [recAudioUrl]);
 
+  const handlePronunciation = async (blob: Blob) => {
+    const targetText = enhancedTextRef.current;
+    if (!targetText) return;
+    setScoringState('scoring');
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      const res = await apiRequest('/pronunciation-check', {
+        method: 'POST',
+        body: JSON.stringify({ audio: base64, targetText }),
+      }) as { words: { word: string; correct: boolean; comment?: string }[]; accuracy: number };
+      setWordScores(res.words || []);
+      setScoringState('done');
+    } catch {
+      setScoringState('error');
+    }
+  };
+
   const startRecording = async () => {
     setRecError('');
     setRecordState('requesting');
@@ -119,6 +144,7 @@ export const FeedbackResultPage: React.FC = () => {
         setRecAudioUrl(URL.createObjectURL(blob));
         if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
         setRecordState('recorded');
+        handlePronunciation(blob);
       };
       mr.start();
       setRecordState('recording');
@@ -162,6 +188,8 @@ export const FeedbackResultPage: React.FC = () => {
     setRecSeconds(0);
     setRecError('');
     setRecordState('idle');
+    setScoringState('idle');
+    setWordScores([]);
   };
 
   const formatRecTime = (s: number) => {
@@ -214,6 +242,9 @@ export const FeedbackResultPage: React.FC = () => {
   const enhancedText = feedbackDto.enhancedText || journal.content;
   const encouragement = feedbackDto.encouragement || t('feedback_result.encouragement', { defaultValue: 'Keep up the great work!' });
   const score = journal.score || 0;
+
+  // Keep ref in sync so recording closure can access latest value
+  enhancedTextRef.current = enhancedText;
 
   const handlePlayEnhanced = () => {
     if (!enhancedText || !window.speechSynthesis) return;
@@ -450,10 +481,47 @@ export const FeedbackResultPage: React.FC = () => {
                 {t('speaking_practice.instruction', { defaultValue: 'Review your journal and try saying it in English.' })}
               </p>
 
-              {/* User original text */}
-              <div className="p-3 md:p-4 bg-surface-dim/30 rounded-lg border-2 border-dashed border-stone-400 mb-4">
-                <p className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-1">{t('feedback_result.you_wrote')}</p>
-                <p className="text-sm md:text-base italic text-on-surface-variant leading-relaxed whitespace-pre-wrap">"{journal.content}"</p>
+              {/* English text to read aloud */}
+              <div className="p-3 md:p-4 bg-white rounded-lg border-2 border-dashed border-stone-400 mb-4">
+                <p className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-1">Read aloud 🇬🇧</p>
+                {scoringState === 'done' && wordScores.length > 0 ? (
+                  <div className="flex flex-wrap gap-x-1 gap-y-0.5 text-sm md:text-base leading-relaxed">
+                    {wordScores.map((ws, i) => (
+                      <span
+                        key={i}
+                        title={!ws.correct && ws.comment ? ws.comment : undefined}
+                        className={`relative group cursor-default rounded px-0.5 font-medium underline decoration-2 ${
+                          ws.correct
+                            ? 'text-emerald-700 decoration-emerald-500'
+                            : 'text-red-600 decoration-red-400'
+                        }`}
+                      >
+                        {ws.word}
+                        {!ws.correct && ws.comment && (
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-stone-800 text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                            {ws.comment}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm md:text-base font-medium text-on-surface leading-relaxed whitespace-pre-wrap">{enhancedText}</p>
+                )}
+                {scoringState === 'done' && wordScores.length > 0 && (
+                  <p className="mt-2 text-[10px] text-stone-400">
+                    {wordScores.filter(w => w.correct).length}/{wordScores.length} words correct
+                  </p>
+                )}
+                {scoringState === 'scoring' && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] text-stone-400">
+                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                    Checking pronunciation…
+                  </div>
+                )}
+                {scoringState === 'error' && (
+                  <p className="mt-2 text-[10px] text-error">Could not check — keep practicing!</p>
+                )}
               </div>
 
               {/* Inline mic button + controls */}

@@ -580,6 +580,31 @@ Evaluate the usage.`,
   }
 }
 
+/**
+ * Transcribe audio using OpenAI Whisper (speech-to-text).
+ * @param {Buffer} buffer - raw audio bytes (webm/mp4/m4a/ogg etc.)
+ * @returns {Promise<string>} transcript text in English
+ */
+async function transcribeAudio(buffer) {
+  const os = require('os');
+  const path = require('path');
+  const crypto = require('crypto');
+  const fs = require('fs');
+  const tmpPath = path.join(os.tmpdir(), `stick_${crypto.randomUUID()}.webm`);
+  fs.writeFileSync(tmpPath, buffer);
+  try {
+    const response = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tmpPath),
+      model: 'whisper-1',
+      language: 'en',
+      response_format: 'text',
+    });
+    return typeof response === 'string' ? response : (response.text || '');
+  } finally {
+    try { fs.unlinkSync(tmpPath); } catch (_) {}
+  }
+}
+
 module.exports = {
   generateJournalFeedback,
   generateDailyChallenge,
@@ -588,4 +613,5 @@ module.exports = {
   generateLessonExercises,
   generateLessonContent,
   evaluateDailyChallenge,
+  transcribeAudio,
 };

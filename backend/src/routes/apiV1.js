@@ -8,7 +8,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken, admin: firebaseAdmin } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge } = require('../lib/openaiAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
@@ -3150,6 +3150,73 @@ router.post('/journals/:id/mood', requireAuth, asyncHandler(async (req, res) => 
   checkAndUnlockAchievements(req.authUser.id).catch(() => {});
 
   res.status(200).json({ message: 'Mood saved', mood });
+}));
+
+// ─── Pronunciation Check (Speaking Practice 6.2) ─────────────────────────────
+
+function _levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function _scoreWords(targetText, transcriptText) {
+  const norm = s => s.toLowerCase().replace(/[.,!?;:"'()\-]/g, '').trim();
+  const targetRaw = targetText.split(/\s+/).filter(Boolean);
+  const targetNorm = targetRaw.map(norm);
+  const spoken = transcriptText.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+
+  let ti = 0;
+  const words = targetRaw.map((rawWord, idx) => {
+    const target = targetNorm[idx];
+    const threshold = Math.max(1, Math.floor(target.length * 0.3));
+    let bestDist = Infinity, bestOffset = -1;
+    for (let k = 0; k < 3 && ti + k < spoken.length; k++) {
+      const d = _levenshtein(target, spoken[ti + k]);
+      if (d < bestDist) { bestDist = d; bestOffset = k; }
+    }
+    if (bestOffset >= 0 && bestDist <= threshold) {
+      ti += bestOffset + 1;
+      return { word: rawWord, correct: true };
+    }
+    const heardWord = bestOffset >= 0 ? spoken[ti + bestOffset] : null;
+    return { word: rawWord, correct: false, comment: heardWord ? `Heard: "${heardWord}"` : 'Not detected' };
+  });
+
+  const correctCount = words.filter(w => w.correct).length;
+  const accuracy = targetRaw.length > 0 ? Math.round((correctCount / targetRaw.length) * 100) : 0;
+  return { words, accuracy };
+}
+
+router.post('/pronunciation-check', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
+  const { audio, targetText } = req.body || {};
+  if (!audio || !targetText) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'audio and targetText are required' });
+  }
+  if (typeof audio !== 'string' || !audio.startsWith('data:')) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'audio must be a base64 data URL' });
+  }
+  if (typeof targetText !== 'string' || targetText.length > 2000) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid targetText' });
+  }
+
+  const base64Data = audio.replace(/^data:[^;]+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
+  if (buffer.length > 5 * 1024 * 1024) {
+    return res.status(400).json({ code: 'AUDIO_TOO_LARGE', message: 'Audio file exceeds 5 MB limit' });
+  }
+
+  const transcript = await transcribeAudio(buffer);
+  const { words, accuracy } = _scoreWords(targetText, transcript || '');
+  res.status(200).json({ transcript, words, accuracy });
 }));
 
 // ─── Progress Daily Detail ──────────────────────────

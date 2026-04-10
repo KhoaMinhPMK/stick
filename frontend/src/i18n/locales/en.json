@@ -517,6 +517,7 @@
                             "vocab_already_saved":  "Already in notebook",
                             "words_saved_notebook":  "{{count}} word(s) saved to your notebook",
                             "view_notebook":  "View Notebook",
+                            "complete":  "Complete",
                             "complete":  "Complete"
                         },
     "progress":  {
