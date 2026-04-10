@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getProgressSummary, getProgressDaily, getDueVocab, getSettings, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
+import { getProgressSummary, getProgressDaily, getDueVocab, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 import { consumeGuestMergedFlag } from '../../services/api/auth';
 import { usePremium } from '../../hooks/usePremium';
 import { PremiumDayPassBanner } from '../../components/PremiumDayPassBanner';
@@ -15,11 +15,9 @@ export const DashboardPage: React.FC = () => {
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
   const [dueVocabCount, setDueVocabCount] = useState(0);
-  const [dailyGoalMinutes, setDailyGoalMinutes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMergedBanner, setShowMergedBanner] = useState(() => consumeGuestMergedFlag());
-  const [showLimitToast, setShowLimitToast] = useState(false);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -33,18 +31,14 @@ export const DashboardPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [summaryRes, dailyRes, dueRes, settingsRes] = await Promise.all([
+      const [summaryRes, dailyRes, dueRes] = await Promise.all([
         getProgressSummary(),
         getProgressDaily(14),
         getDueVocab(1).catch(() => ({ items: [], total: 0 })),
-        getSettings().catch(() => null),
       ]);
       setSummary(summaryRes);
       setDailyData(dailyRes.items);
       setDueVocabCount(dueRes.total);
-      if (settingsRes?.settings?.dailyGoalMinutes) {
-        setDailyGoalMinutes(settingsRes.settings.dailyGoalMinutes);
-      }
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(t('dashboard.error_load'));
@@ -71,10 +65,6 @@ export const DashboardPage: React.FC = () => {
 
   // Build chart data from daily progress (last 7 days)
   const getLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const todayStr = getLocalDate(new Date());
-  const todayProgress = dailyData.find(p => getLocalDate(new Date(p.day)) === todayStr);
-  const todayMinutes = todayProgress?.minutesSpent ?? 0;
-  const goalPct = dailyGoalMinutes > 0 ? Math.min(100, Math.round((todayMinutes / dailyGoalMinutes) * 100)) : 0;
 
   const dayLabels = ['dashboard.mon', 'dashboard.tue', 'dashboard.wed', 'dashboard.thu', 'dashboard.fri', 'dashboard.sat', 'dashboard.sun'];
   const chartBars = (() => {
@@ -121,6 +111,7 @@ export const DashboardPage: React.FC = () => {
           <button onClick={() => { setError(null); fetchData(); }} className="text-sm font-headline font-bold text-error underline">{t('common.retry')}</button>
         </div>
       )}
+
       {/* Hero Section */}
       <section className="mb-8 md:mb-10">
         <div className="bg-surface-container-highest sketch-border-card p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-6 relative overflow-hidden">
@@ -152,7 +143,6 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
           <div className="w-full md:w-1/3 flex justify-center items-center gap-6 z-10 mt-6 md:mt-0">
-            {/* Streak Ring */}
             <div className={`relative w-40 h-40 md:w-48 md:h-48 border-[3px] md:border-[4px] border-black rounded-full bg-white overflow-hidden flex items-center justify-center sketch-card group ${isPremium ? 'streak-ring-premium' : ''}`}>
               <div className="flex flex-col items-center">
                 <span className={`material-symbols-outlined text-5xl md:text-6xl ${isPremium ? 'streak-fire-premium' : 'text-black'}`} data-icon="local_fire_department">local_fire_department</span>
@@ -161,7 +151,23 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-          {!loading && (
+          <div className="absolute bottom-[-10px] md:bottom-[-20px] right-[-10px] md:right-[-20px] opacity-5 select-none pointer-events-none">
+            <span className="material-symbols-outlined text-[10rem] md:text-[20rem]" data-icon="accessibility_new">accessibility_new</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Dashboard Grid (Bento Style) */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6">
+
+        {/* Stats Overview Card */}
+        <div className="md:col-span-8 bg-surface-container sketch-border-card p-5 md:p-6">
+          <h4 className="font-headline text-lg md:text-xl font-bold mb-4 md:mb-5">{t('dashboard.last_entry')}</h4>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <span className="material-symbols-outlined animate-spin text-2xl">progress_activity</span>
+            </div>
+          ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <div className="bg-surface-container-highest sketch-border p-3 md:p-4 text-center">
                 <span className="font-headline font-black text-2xl md:text-3xl">{summary?.totalJournals || 0}</span>
@@ -248,7 +254,6 @@ export const DashboardPage: React.FC = () => {
               )}
             </div>
           </div>
-          {/* Dynamic Chart Bars */}
           <div className="relative h-28 md:h-40 w-full flex items-end justify-between px-2 md:px-4">
             <div className="absolute inset-x-0 bottom-0 top-0 flex flex-col justify-between opacity-10 pointer-events-none">
               <div className="border-b-2 border-black w-full"></div>
@@ -280,23 +285,21 @@ export const DashboardPage: React.FC = () => {
             })}
           </div>
         </div>
-      </section>
+
+      </div>
 
       {/* Secondary Task Suggestions */}
       <section className="mt-10 md:mt-12">
         <h5 className="font-headline text-lg md:text-xl font-black mb-5 md:mb-6">{t('dashboard.suggested_for_you')}</h5>
-        <div className="flex gap-4 md:gap-6 justify-start md:justify-start lg:justify-between overflow-x-auto pb-6 pt-2 px-2 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', marginLeft: '-8px', marginRight: '-8px' }}>
-           <style suppressHydrationWarning>{`
-             div::-webkit-scrollbar { display: none; }
-           `}</style>
-          
-          
+        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-6 pt-2 px-2 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', marginLeft: '-8px', marginRight: '-8px' }}>
+          <style suppressHydrationWarning>{`div::-webkit-scrollbar { display: none; }`}</style>
+
           <div onClick={() => (window.location.hash = '#saved-phrases')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="format_quote">format_quote</span>
             <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.saved_phrases')}</h6>
             <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.phrases_collected', { count: summary?.totalPhrases || 0 })}</p>
           </div>
-          
+
           <div onClick={() => (window.location.hash = '#achievements')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="emoji_events">emoji_events</span>
             <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.achievements_title')}</h6>
