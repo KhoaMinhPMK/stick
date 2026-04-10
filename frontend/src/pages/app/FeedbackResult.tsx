@@ -617,6 +617,14 @@ export const FeedbackResultPage: React.FC = () => {
 
             {/* Actions */}
             <div className="flex flex-col gap-3 md:gap-4">
+              {/* Speaking Practice CTA */}
+              <button
+                onClick={() => { window.location.hash = `#speaking-practice?journalId=${id}`; }}
+                className="w-full py-3 md:py-4 sketch-border bg-tertiary-container font-headline font-black text-sm md:text-base flex items-center justify-center gap-2 md:gap-3 hover:bg-tertiary-container/80 transition-colors active:scale-95"
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
+                Luyện nói
+              </button>
               <button
                 onClick={() => { window.location.hash = `#completion?journalId=${id}`; }}
                 className="w-full py-4 md:py-6 sketch-border bg-primary text-white font-headline font-black text-base md:text-xl flex items-center justify-center gap-2 md:gap-3 hover:bg-stone-800 transition-colors active:scale-95"

@@ -1,0 +1,14 @@
+src/components/PremiumConversionModal.tsx(21,15): error TS2339: Property 'active' does not exist on type '{ grant: PremiumGrantInfo | null; }'.
+src/components/PremiumConversionModal.tsx(21,27): error TS2339: Property 'reason' does not exist on type '{ grant: PremiumGrantInfo | null; }'.
+src/components/PremiumConversionModal.tsx(22,20): error TS2345: Argument of type '{ grant: PremiumGrantInfo | null; }' is not assignable to parameter of type 'SetStateAction<PremiumGrantInfo | null>'.
+src/components/PremiumDayPassBanner.tsx(13,26): error TS2339: Property 'active' does not exist on type '{ grant: PremiumGrantInfo | null; }'.
+src/components/PremiumDayPassBanner.tsx(13,43): error TS2345: Argument of type '{ grant: PremiumGrantInfo | null; }' is not assignable to parameter of type 'SetStateAction<PremiumGrantInfo | null>'.
+src/components/PremiumDayPassBanner.tsx(19,27): error TS2339: Property 'expiresAt' does not exist on type 'PremiumGrantInfo'.
+src/components/PremiumDayPassBanner.tsx(20,45): error TS2339: Property 'expiresAt' does not exist on type 'PremiumGrantInfo'.
+src/pages/admin/AdminLessonEdit.tsx(4,15): error TS6196: 'AdminLessonDetailDTO' is declared but never used.
+src/pages/app/Completion.tsx(12,10): error TS6133: 'showConversionModal' is declared but its value is never read.
+src/pages/app/Dashboard.tsx(22,10): error TS6133: 'showLimitToast' is declared but its value is never read.
+src/pages/app/Dashboard.tsx(22,26): error TS6133: 'setShowLimitToast' is declared but its value is never read.
+src/pages/app/ListeningPractice.tsx(28,30): error TS2339: Property 'speechSpeed' does not exist on type 'UserSettings'.
+src/pages/app/Progress.tsx(5,1): error TS6133: 'apiRequest' is declared but its value is never read.
+src/pages/app/Progress.tsx(79,9): error TS6133: 'completedCount' is declared but its value is never read.

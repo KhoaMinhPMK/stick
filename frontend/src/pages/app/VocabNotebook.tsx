@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, type VocabItem } from '../../services/api/endpoints';
+import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, generateVocabQuiz, type VocabItem, type QuizQuestion } from '../../services/api/endpoints';
 import { ApiError } from '../../services/api/client';
+import { QuizModal, type QuizResult } from '../../components/quiz/QuizModal';
 
 export const VocabNotebookPage: React.FC = () => {
   const { t } = useTranslation();
@@ -16,6 +17,50 @@ export const VocabNotebookPage: React.FC = () => {
   const [newExample, setNewExample] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Quiz state
+  const [quizPhase, setQuizPhase] = useState<'idle' | 'loading' | 'active' | 'result'>('idle');
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+
+  const handleStartQuiz = async () => {
+    if (words.length < 3) {
+      setError('Cần ít nhất 3 từ trong sổ để tạo quiz!');
+      return;
+    }
+    setQuizPhase('loading');
+    try {
+      const res = await generateVocabQuiz(undefined, 5);
+      if (res.questions && res.questions.length > 0) {
+        setQuizQuestions(res.questions);
+        setQuizPhase('active');
+      } else {
+        setError('Không tạo được quiz. Thử lại sau nhé!');
+        setQuizPhase('idle');
+      }
+    } catch {
+      setError('Không tạo được quiz. Thử lại sau nhé!');
+      setQuizPhase('idle');
+    }
+  };
+
+  const handleQuizComplete = async (result: QuizResult) => {
+    setQuizResult(result);
+    setQuizPhase('result');
+
+    // Auto-update mastery for correctly answered vocab
+    for (const ans of result.answers) {
+      if (!ans.correct || !ans.vocabId) continue;
+      const word = words.find(w => w.id === ans.vocabId);
+      if (word && word.mastery !== 'mastered') {
+        const next = word.mastery === 'new' ? 'learning' : 'mastered';
+        try {
+          await updateVocabItem(ans.vocabId, { mastery: next });
+          setWords(prev => prev.map(w => w.id === ans.vocabId ? { ...w, mastery: next } : w));
+        } catch { /* silent */ }
+      }
+    }
+  };
 
   useEffect(() => {
     loadWords();
@@ -132,6 +177,62 @@ export const VocabNotebookPage: React.FC = () => {
             <p className="text-[10px] md:text-xs font-bold text-on-surface-variant uppercase">{t('vocab_notebook.mastered')}</p>
           </div>
         </div>
+
+        {/* Quiz CTA */}
+        {words.length >= 3 && (
+          <button
+            onClick={handleStartQuiz}
+            disabled={quizPhase === 'loading'}
+            className="w-full mb-6 md:mb-8 p-4 sketch-border bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary/20 hover:to-secondary/20 flex items-center gap-4 transition-all active:scale-[0.98] disabled:opacity-60"
+          >
+            {quizPhase === 'loading' ? (
+              <span className="material-symbols-outlined animate-spin text-2xl text-primary">psychology</span>
+            ) : (
+              <span className="material-symbols-outlined text-2xl text-primary">quiz</span>
+            )}
+            <div className="text-left flex-1">
+              <p className="font-headline font-bold text-sm">
+                {quizPhase === 'loading' ? 'Đang tạo quiz...' : 'Kiểm tra từ vựng'}
+              </p>
+              <p className="text-xs text-on-surface-variant">AI tạo quiz từ các từ trong sổ của bạn</p>
+            </div>
+            <span className="material-symbols-outlined text-stone-400">arrow_forward</span>
+          </button>
+        )}
+
+        {/* Quiz Result Summary */}
+        {quizPhase === 'result' && quizResult && (
+          <div className="mb-6 sketch-card p-5 bg-tertiary-container/20">
+            <div className="flex items-center gap-4 mb-3">
+              <div className={`px-4 py-2 rounded-xl text-center ${
+                quizResult.correct >= quizResult.total * 0.7
+                  ? 'bg-green-100 border border-green-300'
+                  : quizResult.correct >= quizResult.total * 0.5
+                    ? 'bg-amber-100 border border-amber-300'
+                    : 'bg-red-100 border border-red-300'
+              }`}>
+                <p className="font-headline font-black text-2xl">{quizResult.correct}/{quizResult.total}</p>
+                <p className="text-[10px] font-bold text-stone-500">câu đúng</p>
+              </div>
+              <div className="flex-1">
+                <p className="font-headline font-bold text-sm">
+                  {quizResult.correct >= quizResult.total * 0.7
+                    ? 'Giỏi lắm! 🎉'
+                    : quizResult.correct >= quizResult.total * 0.5
+                      ? 'Khá tốt! Tiếp tục ôn nhé'
+                      : 'Hãy ôn lại từ vựng nhé 💪'}
+                </p>
+                <p className="text-xs text-on-surface-variant mt-0.5">Mastery đã được cập nhật cho các từ đúng</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setQuizPhase('idle'); setQuizResult(null); }}
+              className="text-xs font-headline font-bold text-primary underline"
+            >
+              Đóng
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-2 flex-wrap mb-6 md:mb-8">
@@ -266,6 +367,17 @@ export const VocabNotebookPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Vocab Quiz Modal */}
+      {quizPhase === 'active' && quizQuestions.length > 0 && (
+        <QuizModal
+          title="Vocab Quiz"
+          subtitle="Kiểm tra từ vựng của bạn"
+          questions={quizQuestions}
+          onComplete={handleQuizComplete}
+          onClose={() => { setQuizPhase('idle'); setQuizQuestions([]); }}
+        />
       )}
     </AppLayout>
   );

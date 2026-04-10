@@ -628,6 +628,139 @@ async function textToSpeech(text, voice = 'nova') {
   return Buffer.from(await response.arrayBuffer());
 }
 
+/**
+ * Generate a quick quiz to test comprehension after a lesson.
+ * Uses the lesson's title, sections and vocab to create 3-5 questions.
+ */
+async function generateLessonQuiz({ title, sections = [], vocabulary = [], level = 'intermediate', count = 4 }) {
+  // Build a concise summary of the lesson content for the AI
+  const sectionSummaries = sections
+    .filter(s => s.content || s.title)
+    .slice(0, 6)
+    .map((s, i) => `${i + 1}. ${s.title || ''}: ${(s.content || '').slice(0, 300)}`)
+    .join('\n');
+  const vocabList = vocabulary
+    .slice(0, 10)
+    .map(v => `${v.word} — ${v.meaning || ''}`)
+    .join(', ');
+
+  const fallback = {
+    questions: [{
+      question: `What is the main topic of the lesson "${title}"?`,
+      options: [title, 'Something else', 'Not related', 'None of the above'],
+      correct: 0,
+      explanation: 'This question is a placeholder — the AI quiz could not be generated.',
+    }],
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_FAST_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You create short comprehension quizzes for a language learning app (STICK).
+The learner just finished a lesson. Generate ${count} MULTIPLE-CHOICE questions to check they actually understood.
+
+Lesson title: "${title}"
+Level: ${level}
+Lesson sections:
+${sectionSummaries}
+${vocabList ? `Key vocabulary: ${vocabList}` : ''}
+
+RULES:
+- Questions test UNDERSTANDING of lesson content, not memorization
+- Each question has exactly 4 options, 1 correct
+- Mix question types: meaning, usage, grammar application, vocabulary in context
+- Keep language simple and friendly — not exam-like
+- Vietnamese learners: brief Vietnamese hints in explanation are OK
+- "correct" is 0-based index of the right option
+
+Return ONLY valid JSON:
+{
+  "questions": [
+    { "question": "...", "options": ["A","B","C","D"], "correct": 0, "explanation": "..." }
+  ]
+}`,
+        },
+        { role: 'user', content: `Generate ${count} quiz questions for the lesson "${title}".` },
+      ],
+      temperature: 0.5,
+      max_tokens: 1500,
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return Array.isArray(parsed.questions) && parsed.questions.length > 0 ? parsed : fallback;
+  } catch (err) {
+    console.error('generateLessonQuiz error:', err.message);
+    return fallback;
+  }
+}
+
+/**
+ * Generate a vocab quiz from the user's notebook words.
+ * Creates contextual multiple-choice questions testing word meaning & usage.
+ */
+async function generateVocabQuiz({ words = [], level = 'intermediate', count = 5 }) {
+  // words: [{ word, meaning, example }]
+  const wordList = words.slice(0, 12).map(w =>
+    `• ${w.word} — ${w.meaning || '(no definition)'}${w.example ? ` e.g. "${w.example}"` : ''}`
+  ).join('\n');
+
+  const fallback = {
+    questions: words.slice(0, count).map(w => ({
+      word: w.word,
+      question: `What does "${w.word}" mean?`,
+      options: [w.meaning || 'correct meaning', 'wrong 1', 'wrong 2', 'wrong 3'],
+      correct: 0,
+      explanation: `"${w.word}" means: ${w.meaning || 'n/a'}`,
+    })),
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_FAST_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a vocabulary quiz creator for the STICK English learning app.
+The learner has these words in their notebook:
+${wordList}
+
+Generate ${Math.min(count, words.length)} quiz questions. Mix these formats:
+1. "What does ___ mean?" (choose correct definition)
+2. "Choose the word that best fits: [sentence with blank]" (choose correct word)
+3. "Which sentence uses ___ correctly?" (choose correct usage)
+
+RULES:
+- Each question must test ONE word from the list — include a "word" field
+- 4 options, 1 correct, "correct" is 0-based index
+- Options should be plausible — no joke answers
+- Explanations can include Vietnamese hints for clarity
+- Keep it friendly and encouraging, not exam-like
+- Vary the question types across the quiz
+
+Return ONLY valid JSON:
+{
+  "questions": [
+    { "word": "...", "question": "...", "options": ["A","B","C","D"], "correct": 0, "explanation": "..." }
+  ]
+}`,
+        },
+        { role: 'user', content: `Create a vocab quiz for ${Math.min(count, words.length)} words.` },
+      ],
+      temperature: 0.5,
+      max_tokens: 1500,
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return Array.isArray(parsed.questions) && parsed.questions.length > 0 ? parsed : fallback;
+  } catch (err) {
+    console.error('generateVocabQuiz error:', err.message);
+    return fallback;
+  }
+}
+
 module.exports = {
   generateJournalFeedback,
   generateDailyChallenge,
@@ -638,4 +771,6 @@ module.exports = {
   evaluateDailyChallenge,
   transcribeAudio,
   textToSpeech,
+  generateLessonQuiz,
+  generateVocabQuiz,
 };

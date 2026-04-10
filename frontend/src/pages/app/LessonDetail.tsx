@@ -5,10 +5,13 @@ import {
   getLessonDetail,
   completeLessonProgress,
   validateExercise,
+  generateLessonQuiz,
   type LessonDetail,
   type LessonContentSection,
   type LessonExerciseItem,
+  type QuizQuestion,
 } from '../../services/api/endpoints';
+import { QuizModal, type QuizResult } from '../../components/quiz/QuizModal';
 
 // ─── Types ───────────────────────────────────────────
 
@@ -50,6 +53,11 @@ export const LessonDetailPage: React.FC = () => {
   const startTimeRef = useRef(Date.now());
 
   const [saved, setSaved] = useState(false);
+
+  // Quiz state (AI-generated quiz after finishing all sections)
+  const [quizPhase, setQuizPhase] = useState<'none' | 'loading' | 'active' | 'done'>('none');
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
@@ -232,13 +240,31 @@ export const LessonDetailPage: React.FC = () => {
     }
   };
 
-  // Auto-complete when all sections done and all exercises done
+  // Auto-trigger quiz when all sections done and all exercises done
   // GUARD: sections.length > 0 prevents firing on initial mount when lesson hasn't loaded yet
   useEffect(() => {
-    if (sections.length > 0 && allSectionsDone && allExercisesDone && !completed && !completionSentRef.current) {
-      handleComplete();
+    if (sections.length > 0 && allSectionsDone && allExercisesDone && !completed && !completionSentRef.current && quizPhase === 'none') {
+      // Generate AI quiz for the lesson
+      if (!id) return;
+      setQuizPhase('loading');
+      generateLessonQuiz(id, 4)
+        .then(res => {
+          if (res.questions && res.questions.length > 0) {
+            setQuizQuestions(res.questions);
+            setQuizPhase('active');
+          } else {
+            // No quiz generated — skip to completion
+            setQuizPhase('done');
+            handleComplete();
+          }
+        })
+        .catch(() => {
+          // AI error — skip to completion, don't block the user
+          setQuizPhase('done');
+          handleComplete();
+        });
     }
-  }, [sections.length, allSectionsDone, allExercisesDone, completed, handleComplete]);
+  }, [sections.length, allSectionsDone, allExercisesDone, completed, quizPhase, id, handleComplete]);
 
   // ─── Render ────────────────────────────────────────
 
@@ -335,6 +361,7 @@ export const LessonDetailPage: React.FC = () => {
             lessonTitle={lesson.title}
             sections={sections}
             exerciseStates={exerciseStates}
+            quizResult={quizResult}
             onRetry={() => {
               setCompleted(false);
               setCompletionResult(null);
@@ -346,8 +373,20 @@ export const LessonDetailPage: React.FC = () => {
               setDoneSections(new Set());
               setCurrentStep(0);
               startTimeRef.current = Date.now();
+              setQuizPhase('none');
+              setQuizQuestions([]);
+              setQuizResult(null);
             }}
           />
+        )}
+
+        {/* Quiz Loading State */}
+        {quizPhase === 'loading' && !completed && (
+          <div className="sketch-card p-8 text-center mb-4">
+            <span className="material-symbols-outlined animate-spin text-4xl text-primary block mb-3">psychology</span>
+            <h3 className="font-headline font-bold text-lg mb-1">Đang tạo bài kiểm tra...</h3>
+            <p className="text-sm text-on-surface-variant">AI đang chuẩn bị vài câu hỏi nhanh để kiểm tra hiểu biết của bạn</p>
+          </div>
         )}
 
         {/* Sections (step-by-step) */}
@@ -500,6 +539,20 @@ export const LessonDetailPage: React.FC = () => {
         )}
 
       </div>
+
+      {/* AI Quiz Modal */}
+      {quizPhase === 'active' && quizQuestions.length > 0 && (
+        <QuizModal
+          title="Kiểm tra nhanh"
+          subtitle={`Kiểm tra hiểu biết sau bài "${lesson?.title || ''}"`}
+          questions={quizQuestions}
+          onComplete={(result) => {
+            setQuizResult(result);
+            setQuizPhase('done');
+            handleComplete();
+          }}
+        />
+      )}
     </AppLayout>
   );
 };
@@ -816,10 +869,11 @@ interface CompletionCardProps {
   lessonTitle: string;
   sections: LessonContentSection[];
   exerciseStates: Record<string, ExerciseState>;
+  quizResult?: QuizResult | null;
   onRetry: () => void;
 }
 
-const CompletionCard: React.FC<CompletionCardProps> = ({ result, lessonTitle, sections, exerciseStates, onRetry }) => {
+const CompletionCard: React.FC<CompletionCardProps> = ({ result, lessonTitle, sections, exerciseStates, quizResult, onRetry }) => {
   const { t } = useTranslation();
 
   // ─── Recap: extract vocab & grammar from lesson ────
@@ -913,6 +967,35 @@ const CompletionCard: React.FC<CompletionCardProps> = ({ result, lessonTitle, se
         {result.isReview && <p className="text-xs text-outline mb-2">Review mode (50% XP)</p>}
         {result.totalAttempts > 1 && <p className="text-xs text-outline mb-2">Best: {result.bestScore}% ({result.totalAttempts} attempts)</p>}
       </div>
+
+      {/* ── Quiz Result ── */}
+      {quizResult && (
+        <div className="mt-5 border-t-2 border-dashed border-black/20 pt-5 text-left">
+          <h4 className="font-headline font-black text-sm uppercase tracking-tight mb-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">quiz</span>
+            Kết quả kiểm tra
+          </h4>
+          <div className="flex items-center gap-4 mb-3">
+            <div className={`text-center px-4 py-2 rounded-xl ${
+              quizResult.correct >= quizResult.total * 0.7
+                ? 'bg-green-100 border border-green-300'
+                : quizResult.correct >= quizResult.total * 0.5
+                  ? 'bg-amber-100 border border-amber-300'
+                  : 'bg-red-100 border border-red-300'
+            }`}>
+              <p className="font-headline font-black text-xl">{quizResult.correct}/{quizResult.total}</p>
+              <p className="text-[10px] font-bold text-stone-500">câu đúng</p>
+            </div>
+            <p className="text-sm text-on-surface-variant">
+              {quizResult.correct >= quizResult.total * 0.7
+                ? 'Bạn đã nắm tốt bài học này! 🎉'
+                : quizResult.correct >= quizResult.total * 0.5
+                  ? 'Khá tốt, nhưng hãy ôn lại nhé!'
+                  : 'Bạn nên đọc lại bài học và thử lại nhé 💪'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── 7.1 Words you used today ── */}
       {hasRecap && (

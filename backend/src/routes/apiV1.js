@@ -9,7 +9,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken, admin: firebaseAdmin } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio, textToSpeech } = require('../lib/openaiAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio, textToSpeech, generateLessonQuiz, generateVocabQuiz } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
@@ -4944,6 +4944,95 @@ router.post('/cron/finalize-daily', asyncHandler(async (req, res) => {
   const finalizeResult = await finalizeDailyLeaderboard();
   const expireResult = await expirePremiumGrants();
   res.status(200).json({ finalize: finalizeResult, expire: expireResult });
+}));
+
+// ─── Lesson Quiz — AI-generated comprehension quiz ──
+router.post('/library/lessons/:id/quiz', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
+  const lesson = await prisma.lesson.findFirst({
+    where: { id: req.params.id, published: true },
+  });
+  if (!lesson) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: 'Lesson not found' });
+  }
+
+  let content;
+  try {
+    content = typeof lesson.content === 'string' ? JSON.parse(lesson.content) : lesson.content;
+  } catch {
+    return res.status(500).json({ code: 'CONTENT_ERROR', message: 'Could not parse lesson content' });
+  }
+
+  // Extract sections + vocabulary from lesson content
+  const sections = (content?.sections || []).map(s => ({
+    title: s.title || '',
+    content: s.content || s.text || '',
+  }));
+  const vocabulary = [];
+  if (content?.sections) {
+    for (const sec of content.sections) {
+      if (sec.vocabulary) vocabulary.push(...sec.vocabulary);
+    }
+  }
+
+  const onboarding = await prisma.onboardingState.findUnique({
+    where: { userId: req.authUser.id },
+  });
+  const level = onboarding?.level || 'intermediate';
+  const count = Math.min(parseInt(req.body?.count) || 4, 6);
+
+  const quiz = await generateLessonQuiz({
+    title: lesson.title,
+    sections,
+    vocabulary,
+    level,
+    count,
+  });
+
+  res.status(200).json(quiz);
+}));
+
+// ─── Vocab Quiz — AI-generated quiz from notebook words ──
+router.post('/vocab/quiz', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
+  const { wordIds, count: reqCount } = req.body || {};
+  const count = Math.min(parseInt(reqCount) || 5, 8);
+
+  // Fetch words: either specific IDs or random from notebook
+  let where = { userId: req.authUser.id };
+  if (Array.isArray(wordIds) && wordIds.length > 0) {
+    where.id = { in: wordIds };
+  }
+
+  const items = await prisma.vocabNotebookItem.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: Math.max(count * 2, 12), // extra pool so AI has variety
+    select: { id: true, word: true, meaning: true, example: true, mastery: true },
+  });
+
+  if (items.length === 0) {
+    return res.status(400).json({ code: 'NO_WORDS', message: 'Add words to your notebook first!' });
+  }
+
+  const onboarding = await prisma.onboardingState.findUnique({
+    where: { userId: req.authUser.id },
+  });
+  const level = onboarding?.level || 'intermediate';
+
+  const quiz = await generateVocabQuiz({
+    words: items.map(i => ({ word: i.word, meaning: i.meaning, example: i.example })),
+    level,
+    count,
+  });
+
+  // Attach item IDs to returned questions so FE can update mastery
+  if (quiz.questions) {
+    for (const q of quiz.questions) {
+      const matched = items.find(i => i.word.toLowerCase() === (q.word || '').toLowerCase());
+      if (matched) q.vocabId = matched.id;
+    }
+  }
+
+  res.status(200).json(quiz);
 }));
 
 // ─── API Error Handler ──────────────────────────────

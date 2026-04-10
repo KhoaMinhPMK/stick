@@ -175,6 +175,34 @@ export async function deleteVocabItem(id: string) {
   });
 }
 
+// ─── Quiz Types ──────────────────────────────────────
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+  word?: string;     // vocab quiz only
+  vocabId?: string;  // vocab quiz only
+}
+
+export interface QuizResponse {
+  questions: QuizQuestion[];
+}
+
+export async function generateLessonQuiz(lessonId: string, count = 4) {
+  return apiRequest<QuizResponse>(`/library/lessons/${lessonId}/quiz`, {
+    method: 'POST',
+    body: { count },
+  });
+}
+
+export async function generateVocabQuiz(wordIds?: string[], count = 5) {
+  return apiRequest<QuizResponse>('/vocab/quiz', {
+    method: 'POST',
+    body: { wordIds, count },
+  });
+}
+
 // ─── Feedback Vocab Import ────────────────────────────
 // Save AI-suggested vocab boosters from a journal into the vocab notebook.
 export interface FeedbackVocabItem {
