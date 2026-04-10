@@ -23,7 +23,7 @@ async function getDailyLeaderboard({ limit = 20, userId } = {}) {
   try {
     const rows = await prisma.$queryRawUnsafe(
       `SELECT a.\`userId\`, a.\`rankedScore\`, a.\`xpEarned\`, a.\`verifiedEventCount\`,
-              u.\`displayName\`, u.\`photoURL\`, u.\`accountTrustLevel\`, u.\`eligibleForRank\`
+              u.\`name\`, u.\`avatarUrl\`, u.\`accountTrustLevel\`, u.\`eligibleForRank\`
        FROM \`DailyUserAggregate\` a
        JOIN \`User\` u ON u.\`id\` = a.\`userId\`
        WHERE a.\`dayKey\` = ? AND u.\`eligibleForRank\` = 1
@@ -36,8 +36,8 @@ async function getDailyLeaderboard({ limit = 20, userId } = {}) {
     const board = rows.map((r, i) => ({
       rank: i + 1,
       userId: r.userId,
-      displayName: r.displayName,
-      photoURL: r.photoURL,
+      name: r.name,
+      avatarUrl: r.avatarUrl,
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       verifiedEventCount: Number(r.verifiedEventCount),
@@ -86,7 +86,7 @@ async function getWeeklyLeaderboard({ limit = 20, userId } = {}) {
   try {
     const rows = await prisma.$queryRawUnsafe(
       `SELECT a.\`userId\`, a.\`rankedScore\`, a.\`xpEarned\`, a.\`daysActive\`,
-              u.\`displayName\`, u.\`photoURL\`
+              u.\`name\`, u.\`avatarUrl\`
        FROM \`WeeklyUserAggregate\` a
        JOIN \`User\` u ON u.\`id\` = a.\`userId\`
        WHERE a.\`weekKey\` = ? AND u.\`eligibleForRank\` = 1
@@ -99,8 +99,8 @@ async function getWeeklyLeaderboard({ limit = 20, userId } = {}) {
     const board = rows.map((r, i) => ({
       rank: i + 1,
       userId: r.userId,
-      displayName: r.displayName,
-      photoURL: r.photoURL,
+      name: r.name,
+      avatarUrl: r.avatarUrl,
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       daysActive: Number(r.daysActive),
@@ -146,7 +146,7 @@ async function getWeeklyLeaderboard({ limit = 20, userId } = {}) {
 async function getSnapshot(period, periodKey, { limit = 20 } = {}) {
   try {
     const rows = await prisma.$queryRawUnsafe(
-      `SELECT s.*, u.\`displayName\`, u.\`photoURL\`
+      `SELECT s.*, u.\`name\`, u.\`avatarUrl\`
        FROM \`LeaderboardSnapshot\` s
        JOIN \`User\` u ON u.\`id\` = s.\`userId\`
        WHERE s.\`period\` = ? AND s.\`periodKey\` = ?
@@ -157,8 +157,8 @@ async function getSnapshot(period, periodKey, { limit = 20 } = {}) {
     return rows.map(r => ({
       rank: Number(r.rank),
       userId: r.userId,
-      displayName: r.displayName,
-      photoURL: r.photoURL,
+      name: r.name,
+      avatarUrl: r.avatarUrl,
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       grantedDayPass: Boolean(r.grantedDayPass),
