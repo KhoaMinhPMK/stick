@@ -5,11 +5,6 @@ import { getSettings, updateSettings, deleteAccount } from '../../services/api/e
 import { logout } from '../../services/api/auth';
 
 const speeds = ['Slow', 'Normal', 'Fast'];
-const themes = [
-  { label: 'Light', value: 'light', icon: 'light_mode' },
-  { label: 'Dark', value: 'dark', icon: 'dark_mode' },
-  { label: 'System', value: 'system', icon: 'brightness_auto' },
-];
 const languages = [
   { label: 'English (United Kingdom)', value: 'en-GB' },
   { label: 'English (United States)', value: 'en-US' },
@@ -21,7 +16,6 @@ export const SettingsPage: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedSpeed, setSelectedSpeed] = useState(1);
   const [selectedLang, setSelectedLang] = useState(0);
-  const [selectedTheme, setSelectedTheme] = useState('system');
   const [dailyGoal, setDailyGoal] = useState(15);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -39,7 +33,6 @@ export const SettingsPage: React.FC = () => {
         const { settings } = await getSettings();
         setSoundEnabled(settings.soundOn);
         setDailyGoal(settings.dailyGoalMinutes);
-        setSelectedTheme(settings.theme || 'system');
         // Match language
         const langIdx = languages.findIndex(l => l.value === settings.language);
         if (langIdx >= 0) setSelectedLang(langIdx);
@@ -60,12 +53,8 @@ export const SettingsPage: React.FC = () => {
         soundOn: soundEnabled,
         dailyGoalMinutes: dailyGoal,
         language: languages[selectedLang].value,
-        theme: selectedTheme,
+        theme: 'light',
       });
-      // Apply theme immediately
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const useDark = selectedTheme === 'dark' || (selectedTheme === 'system' && prefersDark);
-      document.documentElement.classList.toggle('dark', useDark);
       setShowSaved(true);
       setSaveError(null);
       setTimeout(() => setShowSaved(false), 2000);
@@ -172,32 +161,8 @@ export const SettingsPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Theme */}
-          <div className="md:col-span-5 sketch-card bg-surface p-5 md:p-8">
-            <div className="flex items-center gap-3 mb-4 md:mb-6">
-              <span className="material-symbols-outlined text-2xl md:text-3xl">palette</span>
-              <h3 className="font-headline font-bold text-xl md:text-2xl">{t('settings.theme_title', { defaultValue: 'Theme' })}</h3>
-            </div>
-            <div className="grid grid-cols-3 gap-2 md:gap-3">
-              {themes.map((th) => (
-                <button
-                  key={th.value}
-                  onClick={() => setSelectedTheme(th.value)}
-                  className={`flex flex-col items-center justify-center gap-1 py-3 md:py-4 rounded-xl transition-colors text-sm ${
-                    th.value === selectedTheme
-                      ? 'border-3 md:border-4 border-black bg-secondary-container font-bold shadow-[3px_3px_0_0_#000] md:shadow-[4px_4px_0_0_#000]'
-                      : 'border-2 border-black hover:bg-secondary-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-xl">{th.icon}</span>
-                  <span className="font-headline font-semibold text-xs md:text-sm">{th.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Language Selection */}
-          <div className="md:col-span-7 sketch-card bg-surface-container-low p-5 md:p-8">
+          <div className="md:col-span-12 sketch-card bg-surface-container-low p-5 md:p-8">
             <h3 className="font-headline font-bold text-xl md:text-2xl mb-4 md:mb-6">{t('settings.language_title')}</h3>
             <div className="space-y-2 md:space-y-4">
               {languages.map((lang, i) => (

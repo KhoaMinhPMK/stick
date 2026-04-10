@@ -6,7 +6,6 @@ import { parseFeedback } from '../../types/dto/ai-feedback';
 import { trackFeedbackView } from '../../services/analytics/coreLoop';
 import { importFeedbackVocab, ttsSpeak } from '../../services/api/endpoints';
 
-type RecordState = 'idle' | 'requesting' | 'recording' | 'recorded' | 'playing' | 'error';
 
 export const FeedbackResultPage: React.FC = () => {
   const { t } = useTranslation();
@@ -25,21 +24,6 @@ export const FeedbackResultPage: React.FC = () => {
   const [saveAllStatus, setSaveAllStatus] = useState<'idle' | 'saving' | 'done'>('idle');
   const [savedCount, setSavedCount] = useState(0);
   const feedbackTrackedRef = useRef(false);
-
-  // ── Speaking Practice (6.2) — inline recording ──
-  const [recordState, setRecordState] = useState<RecordState>('idle');
-  const [recSeconds, setRecSeconds] = useState(0);
-  const [recError, setRecError] = useState('');
-  const [recAudioUrl, setRecAudioUrl] = useState<string | null>(null);
-  const [scoringState, setScoringState] = useState<'idle' | 'scoring' | 'done' | 'error'>('idle');
-  const [wordScores, setWordScores] = useState<{ word: string; correct: boolean; comment?: string }[]>([]);
-  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const recAudioRef = useRef<HTMLAudioElement | null>(null);
-  const speakingSectionRef = useRef<HTMLDivElement | null>(null);
-  const enhancedTextRef = useRef<string>('');
 
   const id = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
@@ -100,113 +84,6 @@ export const FeedbackResultPage: React.FC = () => {
   }, [id, saveAllStatus]);
   // ────────────────────────────────────────────────────────────────────────
 
-  // ── Speaking Practice (6.2) — recording helpers ──
-  useEffect(() => {
-    return () => {
-      if (recTimerRef.current) clearInterval(recTimerRef.current);
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-      if (recAudioUrl) URL.revokeObjectURL(recAudioUrl);
-    };
-  }, [recAudioUrl]);
-
-  const handlePronunciation = async (blob: Blob) => {
-    const targetText = enhancedTextRef.current;
-    if (!targetText) return;
-    setScoringState('scoring');
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const res = await apiRequest('/pronunciation-check', {
-        method: 'POST',
-        body: { audio: base64, targetText },
-      }) as { words: { word: string; correct: boolean; comment?: string }[]; accuracy: number };
-      setWordScores(res.words || []);
-      setScoringState('done');
-    } catch {
-      setScoringState('error');
-    }
-  };
-
-  const startRecording = async () => {
-    setRecError('');
-    setRecordState('requesting');
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setRecError(t('speaking_practice.mic_not_supported', { defaultValue: 'Microphone not supported. You can skip this step.' }));
-      setRecordState('error');
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      chunksRef.current = [];
-      const mr = new MediaRecorder(stream);
-      mediaRecorderRef.current = mr;
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setRecAudioUrl(URL.createObjectURL(blob));
-        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-        setRecordState('recorded');
-        handlePronunciation(blob);
-      };
-      mr.start();
-      setRecordState('recording');
-      setRecSeconds(0);
-      recTimerRef.current = setInterval(() => setRecSeconds(prev => prev + 1), 1000);
-    } catch (err: any) {
-      const msg = err?.name === 'NotAllowedError'
-        ? t('speaking_practice.mic_denied', { defaultValue: 'Mic permission denied. You can skip this step.' })
-        : t('speaking_practice.mic_error', { defaultValue: 'Could not start recording.' });
-      setRecError(msg);
-      setRecordState('error');
-    }
-  };
-
-  const stopRecording = () => {
-    if (recTimerRef.current) clearInterval(recTimerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const handleRecPlayback = () => {
-    if (!recAudioUrl || !recAudioRef.current) return;
-    if (recordState === 'playing') {
-      recAudioRef.current.pause();
-      recAudioRef.current.currentTime = 0;
-      setRecordState('recorded');
-    } else {
-      recAudioRef.current.play();
-      setRecordState('playing');
-    }
-  };
-
-  const handleRecRetry = () => {
-    if (recTimerRef.current) clearInterval(recTimerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (recAudioUrl) URL.revokeObjectURL(recAudioUrl);
-    setRecAudioUrl(null);
-    setRecSeconds(0);
-    setRecError('');
-    setRecordState('idle');
-    setScoringState('idle');
-    setWordScores([]);
-  };
-
-  const formatRecTime = (s: number) => {
-    const mins = String(Math.floor(s / 60)).padStart(2, '0');
-    const secs = String(s % 60).padStart(2, '0');
-    return `${mins}:${secs}`;
-  };
-
-  const isRecording = recordState === 'recording';
-  const isRecorded = recordState === 'recorded' || recordState === 'playing';
   // ────────────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -250,9 +127,6 @@ export const FeedbackResultPage: React.FC = () => {
   const enhancedText = feedbackDto.enhancedText || journal.content;
   const encouragement = feedbackDto.encouragement || t('feedback_result.encouragement', { defaultValue: 'Keep up the great work!' });
   const score = journal.score || 0;
-
-  // Keep ref in sync so recording closure can access latest value
-  enhancedTextRef.current = enhancedText;
 
   const handlePlayEnhanced = async () => {
     if (!enhancedText) return;
@@ -502,12 +376,8 @@ export const FeedbackResultPage: React.FC = () => {
               </div>
             </div>
 
-            {/* ── 6.2 Speaking Practice — inline recording ── */}
-            <div ref={speakingSectionRef} className="sketch-card p-5 md:p-6 bg-tertiary-container/20 relative overflow-hidden">
-              {recAudioUrl && (
-                <audio ref={recAudioRef} src={recAudioUrl} onEnded={() => setRecordState('recorded')} className="hidden" />
-              )}
-
+            {/* ── Speaking Practice ── */}
+            <div className="sketch-card p-5 md:p-6 bg-tertiary-container/20">
               <div className="flex items-center gap-2 mb-3">
                 <span className="material-symbols-outlined text-tertiary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
                 <h4 className="font-headline font-bold text-sm md:text-base">
@@ -517,122 +387,17 @@ export const FeedbackResultPage: React.FC = () => {
               <p className="text-xs md:text-sm text-on-surface-variant mb-4">
                 {t('speaking_practice.instruction', { defaultValue: 'Review your journal and try saying it in English.' })}
               </p>
-
               <button
                 onClick={() => { window.location.hash = `#speaking-practice?journalId=${id}`; }}
-                className="w-full mb-4 py-3 sketch-border bg-tertiary-container font-headline font-black text-sm flex items-center justify-center gap-2 hover:bg-tertiary-container/80 transition-colors active:scale-95"
+                className="w-full py-3 sketch-border bg-tertiary-container font-headline font-black text-sm flex items-center justify-center gap-2 hover:bg-tertiary-container/80 transition-colors active:scale-95"
               >
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>open_in_new</span>
-                Mở tab luyện nói
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
+                Luyện nói
               </button>
-
-              {/* English text to read aloud */}
-              <div className="p-3 md:p-4 bg-white rounded-lg border-2 border-dashed border-stone-400 mb-4">
-                <p className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-1">Read aloud 🇬🇧</p>
-                {scoringState === 'done' && wordScores.length > 0 ? (
-                  <div className="flex flex-wrap gap-x-1 gap-y-0.5 text-sm md:text-base leading-relaxed">
-                    {wordScores.map((ws, i) => (
-                      <span
-                        key={i}
-                        title={!ws.correct && ws.comment ? ws.comment : undefined}
-                        className={`relative group cursor-default rounded px-0.5 font-medium underline decoration-2 ${
-                          ws.correct
-                            ? 'text-emerald-700 decoration-emerald-500'
-                            : 'text-red-600 decoration-red-400'
-                        }`}
-                      >
-                        {ws.word}
-                        {!ws.correct && ws.comment && (
-                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-stone-800 text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-                            {ws.comment}
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm md:text-base font-medium text-on-surface leading-relaxed whitespace-pre-wrap">{enhancedText}</p>
-                )}
-                {scoringState === 'done' && wordScores.length > 0 && (
-                  <p className="mt-2 text-[10px] text-stone-400">
-                    {wordScores.filter(w => w.correct).length}/{wordScores.length} words correct
-                  </p>
-                )}
-                {scoringState === 'scoring' && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[10px] text-stone-400">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                    Checking pronunciation…
-                  </div>
-                )}
-                {scoringState === 'error' && (
-                  <p className="mt-2 text-[10px] text-error">Could not check — keep practicing!</p>
-                )}
-              </div>
-
-              {/* Inline mic button + controls */}
-              <div className="flex items-center gap-3">
-                {/* Mic / Stop button */}
-                <button
-                  onClick={() => isRecording ? stopRecording() : isRecorded ? handleRecRetry() : startRecording()}
-                  disabled={recordState === 'requesting'}
-                  className={`relative w-14 h-14 md:w-16 md:h-16 rounded-full border-[3px] border-primary flex items-center justify-center transition-all active:scale-90 disabled:opacity-50 shrink-0 ${
-                    isRecording ? 'bg-error-container/40 animate-pulse' : 'bg-surface hover:bg-primary/10'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-2xl md:text-3xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {recordState === 'requesting' ? 'pending' : isRecording ? 'stop' : isRecorded ? 'replay' : 'mic'}
-                  </span>
-                  {/* Waveform animation */}
-                  {isRecording && (
-                    <div className="absolute -bottom-1 flex gap-[2px] items-end h-3">
-                      <div className="w-[2px] bg-primary rounded-full h-1.5 animate-bounce"></div>
-                      <div className="w-[2px] bg-primary rounded-full h-3 animate-bounce [animation-delay:0.1s]"></div>
-                      <div className="w-[2px] bg-primary rounded-full h-2 animate-bounce [animation-delay:0.2s]"></div>
-                      <div className="w-[2px] bg-primary rounded-full h-3 animate-bounce [animation-delay:0.3s]"></div>
-                      <div className="w-[2px] bg-primary rounded-full h-1.5 animate-bounce [animation-delay:0.4s]"></div>
-                    </div>
-                  )}
-                </button>
-
-                <div className="flex-1 min-w-0">
-                  {/* Recording timer */}
-                  {isRecording && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
-                      <span className="font-mono text-sm font-bold text-error">{formatRecTime(recSeconds)}</span>
-                    </div>
-                  )}
-                  {/* Recorded — play/retry */}
-                  {isRecorded && (
-                    <div className="flex items-center gap-2">
-                      <button onClick={handleRecPlayback} className="flex items-center gap-1 px-3 py-1.5 sketch-border bg-surface hover:bg-secondary-container text-xs font-bold transition-colors">
-                        <span className="material-symbols-outlined text-sm">{recordState === 'playing' ? 'pause' : 'play_arrow'}</span>
-                        {recordState === 'playing' ? t('speaking_practice.pause', { defaultValue: 'Pause' }) : t('speaking_practice.listen_back', { defaultValue: 'Listen' })}
-                      </button>
-                    </div>
-                  )}
-                  {/* Idle hint */}
-                  {recordState === 'idle' && (
-                    <p className="text-xs text-stone-400 italic">{t('speaking_practice.tap_to_record', { defaultValue: 'Tap mic to record' })}</p>
-                  )}
-                  {/* Error */}
-                  {recordState === 'error' && (
-                    <p className="text-xs text-error font-medium">{recError}</p>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Actions */}
             <div className="flex flex-col gap-3 md:gap-4">
-              {/* Speaking Practice CTA */}
-              <button
-                onClick={() => { window.location.hash = `#speaking-practice?journalId=${id}`; }}
-                className="w-full py-3 md:py-4 sketch-border bg-tertiary-container font-headline font-black text-sm md:text-base flex items-center justify-center gap-2 md:gap-3 hover:bg-tertiary-container/80 transition-colors active:scale-95"
-              >
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
-                Qua tab luyện nói
-              </button>
               <button
                 onClick={() => { window.location.hash = `#completion?journalId=${id}`; }}
                 className="w-full py-4 md:py-6 sketch-border bg-primary text-white font-headline font-black text-base md:text-xl flex items-center justify-center gap-2 md:gap-3 hover:bg-stone-800 transition-colors active:scale-95"

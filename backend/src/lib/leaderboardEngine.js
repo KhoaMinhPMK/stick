@@ -23,7 +23,7 @@ async function getDailyLeaderboard({ limit = 20, userId } = {}) {
   try {
     const rows = await prisma.$queryRawUnsafe(
       `SELECT a.\`userId\`, a.\`rankedScore\`, a.\`xpEarned\`, a.\`verifiedEventCount\`,
-              u.\`name\`, u.\`avatarUrl\`, u.\`accountTrustLevel\`, u.\`eligibleForRank\`
+              u.\`name\`, u.\`avatarUrl\`, u.\`accountTrustLevel\`, u.\`eligibleForRank\`, u.\`isPremium\`
        FROM \`DailyUserAggregate\` a
        JOIN \`User\` u ON u.\`id\` = a.\`userId\`
        WHERE a.\`dayKey\` = ? AND u.\`eligibleForRank\` = 1
@@ -41,6 +41,7 @@ async function getDailyLeaderboard({ limit = 20, userId } = {}) {
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       verifiedEventCount: Number(r.verifiedEventCount),
+      isPremium: Boolean(r.isPremium),
       isUser: userId ? r.userId === userId : false,
     }));
 
@@ -87,7 +88,7 @@ async function getWeeklyLeaderboard({ limit = 20, userId } = {}) {
   try {
     const rows = await prisma.$queryRawUnsafe(
       `SELECT a.\`userId\`, a.\`rankedScore\`, a.\`xpEarned\`, a.\`daysActive\`,
-              u.\`name\`, u.\`avatarUrl\`
+              u.\`name\`, u.\`avatarUrl\`, u.\`isPremium\`
        FROM \`WeeklyUserAggregate\` a
        JOIN \`User\` u ON u.\`id\` = a.\`userId\`
        WHERE a.\`weekKey\` = ? AND u.\`eligibleForRank\` = 1
@@ -105,6 +106,7 @@ async function getWeeklyLeaderboard({ limit = 20, userId } = {}) {
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       daysActive: Number(r.daysActive),
+      isPremium: Boolean(r.isPremium),
       isUser: userId ? r.userId === userId : false,
     }));
 

@@ -182,31 +182,17 @@ export const ProgressPage: React.FC = () => {
 
                   {days.map(({ day, status, isStreakDay }) => {
                     if (status === 'completed') {
-                      const dateStr = getLocalDateString(new Date(viewDate.getFullYear(), viewDate.getMonth(), day));
-                      const xp = xpByDate.get(dateStr) || 0;
-                      const barPct = Math.max(20, Math.round((xp / maxXpInPeriod) * 100));
                       return (
                         <div
                           key={day}
                           onClick={() => handleDayClick(day, status)}
-                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform cursor-pointer overflow-hidden ${isStreakDay ? 'streak-yesterday-cell' : 'bg-tertiary-container'} ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform cursor-pointer overflow-hidden bg-tertiary-container ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                         >
                           <span className="font-headline font-bold text-white text-xs md:text-base leading-none">{day}</span>
-                          {isStreakDay ? (
-                            <span
-                              className="material-symbols-outlined text-white text-xl md:text-3xl drop-shadow"
-                              style={{ fontVariationSettings: "'FILL' 1" }}
-                            >local_fire_department</span>
-                          ) : (
-                            <div className="w-full flex items-end justify-center" style={{ height: '45%' }}>
-                              <div className="w-full bg-white/20 rounded-sm h-full overflow-hidden flex items-end">
-                                <div
-                                  className="w-full bg-white rounded-sm transition-all"
-                                  style={{ height: `${barPct}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
+                          <span
+                            className="material-symbols-outlined text-white text-xl md:text-3xl drop-shadow"
+                            style={{ fontVariationSettings: "'FILL' 1" }}
+                          >local_fire_department</span>
                         </div>
                       );
                     }
@@ -222,14 +208,23 @@ export const ProgressPage: React.FC = () => {
                       );
                     }
                     if (status === 'today') {
+                      const todayDateStr = getLocalDateString(now);
+                      const isTodayDone = activeDates.has(todayDateStr);
                       return (
                         <div
                           key={day}
                           onClick={() => handleDayClick(day, status)}
-                          className="aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl bg-secondary-container flex flex-col items-center justify-center gap-0.5 md:gap-1 ring-2 md:ring-4 ring-primary ring-offset-2 md:ring-offset-4 ring-offset-surface cursor-pointer"
+                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 ring-2 md:ring-4 ring-primary ring-offset-2 md:ring-offset-4 ring-offset-surface cursor-pointer ${isTodayDone ? 'bg-tertiary-container' : 'bg-secondary-container'}`}
                         >
-                          <span className="font-headline font-bold text-black text-xs md:text-base">{day}</span>
-                          <span className="text-[8px] md:text-xs font-black uppercase">{t('progress.today')}</span>
+                          <span className={`font-headline font-bold text-xs md:text-base leading-none ${isTodayDone ? 'text-white' : 'text-black'}`}>{day}</span>
+                          {isTodayDone ? (
+                            <span
+                              className="material-symbols-outlined text-white text-xl md:text-3xl drop-shadow"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >local_fire_department</span>
+                          ) : (
+                            <span className="text-[8px] md:text-xs font-black uppercase text-black">{t('progress.today')}</span>
+                          )}
                         </div>
                       );
                     }

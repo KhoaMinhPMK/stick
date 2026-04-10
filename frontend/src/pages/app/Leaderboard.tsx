@@ -100,7 +100,7 @@ export const LeaderboardPage: React.FC = () => {
                 You're <span className="text-primary">{rankLabel(userPosition.rank)}</span> {activeTab === 'daily' ? 'today' : 'this week'}!
               </p>
               <p className="text-xs text-on-surface-variant mt-0.5">
-                {userPosition.rankedScore.toLocaleString()} XP earned
+                {userPosition.rankedScore.toLocaleString()} điểm xếp hạng {activeTab === 'daily' ? 'hôm nay' : 'tuần này'}
               </p>
             </div>
             <span className="material-symbols-outlined text-primary text-3xl">emoji_events</span>
@@ -165,6 +165,7 @@ export const LeaderboardPage: React.FC = () => {
                       </div>
                       <p className={`font-headline ${isGold ? 'font-black text-sm md:text-base' : 'font-bold text-xs md:text-sm'} text-center line-clamp-1 mb-1 ${entry.isUser ? 'text-primary' : ''}`}>
                         {entry.isUser ? 'You' : entry.name}
+                        {entry.isPremium && <span className="material-symbols-outlined text-[11px] text-amber-500 ml-0.5 align-middle" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>}
                       </p>
                       <div className={`w-full ${podiumHeights[podiumIdx]} rounded-t-xl sketch-border border-b-0 flex flex-col items-center justify-start pt-4 ${podiumBg[podiumIdx]}`}
                         style={{ borderColor: isGold ? '#FFD700' : undefined }}
@@ -200,6 +201,8 @@ export const LeaderboardPage: React.FC = () => {
                   className={`flex items-center gap-3 p-3 md:p-4 rounded-2xl border-2 transition-all ${
                     entry.isUser
                       ? 'border-primary bg-primary-container/10 shadow-[3px_3px_0_0_#000]'
+                      : entry.isPremium
+                      ? 'border-amber-300 bg-amber-50/30'
                       : 'border-stone-200 bg-white hover:border-stone-300'
                   }`}
                 >
@@ -226,10 +229,13 @@ export const LeaderboardPage: React.FC = () => {
                   </div>
 
                   {/* Name */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     <p className={`font-headline font-bold text-sm ${entry.isUser ? 'text-black' : 'text-stone-700'} truncate`}>
                       {entry.isUser ? 'You' : entry.name}
                     </p>
+                    {entry.isPremium && (
+                      <span className="material-symbols-outlined text-[13px] text-amber-500 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    )}
                   </div>
 
                   {/* XP score — simple */}
