@@ -518,6 +518,14 @@ export const FeedbackResultPage: React.FC = () => {
                 {t('speaking_practice.instruction', { defaultValue: 'Review your journal and try saying it in English.' })}
               </p>
 
+              <button
+                onClick={() => { window.location.hash = `#speaking-practice?journalId=${id}`; }}
+                className="w-full mb-4 py-3 sketch-border bg-tertiary-container font-headline font-black text-sm flex items-center justify-center gap-2 hover:bg-tertiary-container/80 transition-colors active:scale-95"
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>open_in_new</span>
+                Mở tab luyện nói
+              </button>
+
               {/* English text to read aloud */}
               <div className="p-3 md:p-4 bg-white rounded-lg border-2 border-dashed border-stone-400 mb-4">
                 <p className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-1">Read aloud 🇬🇧</p>
@@ -623,7 +631,7 @@ export const FeedbackResultPage: React.FC = () => {
                 className="w-full py-3 md:py-4 sketch-border bg-tertiary-container font-headline font-black text-sm md:text-base flex items-center justify-center gap-2 md:gap-3 hover:bg-tertiary-container/80 transition-colors active:scale-95"
               >
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
-                Luyện nói
+                Qua tab luyện nói
               </button>
               <button
                 onClick={() => { window.location.hash = `#completion?journalId=${id}`; }}
