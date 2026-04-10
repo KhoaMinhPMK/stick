@@ -416,6 +416,7 @@ export interface RankedBoardEntry {
   name: string;
   avatarUrl: string | null;
   rankedScore: number;
+  xpEarned: number;
   isPremium: boolean;
   hasDayPass: boolean;
   isUser: boolean;
@@ -427,6 +428,7 @@ export interface RankedLeaderboardResponse {
   userPosition: {
     rank: number;
     rankedScore: number;
+    xpEarned: number;
   } | null;
 }
 

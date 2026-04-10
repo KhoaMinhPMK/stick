@@ -16,7 +16,7 @@ export const LeaderboardPage: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Scope>('weekly');
   const [ranking, setRanking] = useState<RankedBoardEntry[]>([]);
-  const [userPosition, setUserPosition] = useState<{ rank: number; rankedScore: number } | null>(null);
+  const [userPosition, setUserPosition] = useState<{ rank: number; rankedScore: number; xpEarned: number } | null>(null);
   const [rewardsSummary, setRewardsSummary] = useState<RewardsSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -100,7 +100,7 @@ export const LeaderboardPage: React.FC = () => {
                 You're <span className="text-primary">{rankLabel(userPosition.rank)}</span> {activeTab === 'daily' ? 'today' : 'this week'}!
               </p>
               <p className="text-xs text-on-surface-variant mt-0.5">
-                {userPosition.rankedScore.toLocaleString()} điểm xếp hạng {activeTab === 'daily' ? 'hôm nay' : 'tuần này'}
+                {userPosition.xpEarned.toLocaleString()} XP {activeTab === 'daily' ? 'hôm nay' : 'tuần này'}
               </p>
             </div>
             <span className="material-symbols-outlined text-primary text-3xl">emoji_events</span>
@@ -173,7 +173,7 @@ export const LeaderboardPage: React.FC = () => {
                         <span className={`font-black ${isGold ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'}`}
                           style={{ color: isGold ? '#B38F00' : undefined }}
                         >
-                          {entry.rankedScore.toLocaleString()}
+                          {entry.xpEarned.toLocaleString()}
                         </span>
                         <span className="text-[10px] md:text-xs font-bold text-stone-500 mt-1">XP</span>
                       </div>
@@ -240,7 +240,7 @@ export const LeaderboardPage: React.FC = () => {
 
                   {/* XP score — simple */}
                   <div className="text-right">
-                    <p className="font-headline font-black text-base">{entry.rankedScore.toLocaleString()} <span className="text-xs font-bold text-stone-400">XP</span></p>
+                    <p className="font-headline font-black text-base">{entry.xpEarned.toLocaleString()} <span className="text-xs font-bold text-stone-400">XP</span></p>
                   </div>
                 </div>
               ))}
