@@ -2849,13 +2849,6 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
   const vnDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
   const today = new Date(vnDateStr + 'T00:00:00.000Z');
 
-  // Daily XP cap check (100 XP/day — lowered from 200 per audit)
-  const dailyProgress = await prisma.progressDaily.findUnique({
-    where: { userId_day: { userId: req.authUser.id, day: today } },
-  });
-  const dailyXpSoFar = dailyProgress ? dailyProgress.xpEarned : 0;
-  const DAILY_XP_CAP = 100;
-
   // Check if this is a review attempt
   const previousProgress = await prisma.userLessonProgress.findUnique({
     where: { userId_lessonId: { userId: req.authUser.id, lessonId: lesson.id } },
@@ -2886,14 +2879,14 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
   } else if (isReview) {
     baseXp = Math.round(baseXp * 0.5);
   }
-  // Bonus XP for high scores
-  if (baseXp > 0) {
+  // Bonus XP for high scores (reading-only lessons always score 100 — skip bonus to avoid inflation)
+  if (baseXp > 0 && !isReadingOnly) {
     if (finalScore >= 90) baseXp = Math.round(baseXp * 1.2);
     else if (finalScore >= 70) baseXp = Math.round(baseXp * 1.1);
   }
 
-  // Apply daily cap
-  const xpEarned = Math.min(baseXp, Math.max(0, DAILY_XP_CAP - dailyXpSoFar));
+  // xpEarned = intended XP; actual XP granted is determined by grantReward (single cap authority)
+  const xpEarned = baseXp;
 
   const effectiveComboMax = typeof maxCombo === 'number' ? maxCombo : (typeof comboMax === 'number' ? comboMax : 0);
 
@@ -2956,15 +2949,10 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
     },
   });
 
-  // Update daily progress + award XP
+  // ─── RewardEngine: lesson_complete / lesson_review ───
+  // grantReward is the single XP cap authority; progressDaily is updated with actual xpGranted
   if (xpEarned > 0) {
-    await prisma.progressDaily.upsert({
-      where: { userId_day: { userId: req.authUser.id, day: today } },
-      create: { userId: req.authUser.id, day: today, xpEarned, minutesSpent: lesson.duration || 0 },
-      update: { xpEarned: { increment: xpEarned }, minutesSpent: { increment: lesson.duration || 0 } },
-    });
-
-    // ─── RewardEngine: lesson_complete / lesson_review ───
+    let actualXpGranted = 0;
     try {
       const evtType = isReview ? 'lesson_review' : 'lesson_complete';
       const rankBase = isReview
@@ -2975,7 +2963,7 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
       if (finalScore >= (await getGameConfig('rank_quality_threshold', 90))) {
         rankAmount += await getGameConfig('rank_lesson_high_score_bonus', 3);
       }
-      await grantReward({
+      const grResult = await grantReward({
         userId: req.authUser.id,
         eventType: evtType,
         sourceType: 'lesson',
@@ -2989,9 +2977,27 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
           metadata: { lessonId: lesson.id, score: finalScore, isReview, starRating },
         },
       });
+      actualXpGranted = grResult?.xpGranted ?? 0;
     } catch (rewardErr) {
-      // Fallback: legacy awardXp
+      // Fallback: legacy awardXp on hard error
       await awardXp(req.authUser.id, xpEarned, 'lesson', { description: `${isReview ? 'Reviewed' : 'Completed'} lesson: ${lesson.title}` });
+      actualXpGranted = xpEarned;
+    }
+
+    // Update daily progress with the amount actually granted (keeps ProgressDaily in sync with User.totalXp)
+    if (actualXpGranted > 0) {
+      await prisma.progressDaily.upsert({
+        where: { userId_day: { userId: req.authUser.id, day: today } },
+        create: { userId: req.authUser.id, day: today, xpEarned: actualXpGranted, minutesSpent: lesson.duration || 0 },
+        update: { xpEarned: { increment: actualXpGranted }, minutesSpent: { increment: lesson.duration || 0 } },
+      });
+    } else {
+      // Still track time even when XP cap is hit
+      await prisma.progressDaily.upsert({
+        where: { userId_day: { userId: req.authUser.id, day: today } },
+        create: { userId: req.authUser.id, day: today, xpEarned: 0, minutesSpent: lesson.duration || 0 },
+        update: { minutesSpent: { increment: lesson.duration || 0 } },
+      });
     }
   }
 

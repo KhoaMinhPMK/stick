@@ -90,8 +90,8 @@ async function grantReward({
     `rank_${bucket}_daily_cap`,
   ]);
 
-  const xpGlobalCap = caps['xp_global_daily_cap'] ?? 100;
-  const xpBucketCap = caps[`xp_${bucket}_daily_cap`] ?? 50;
+  const xpGlobalCap = caps['xp_global_daily_cap'] ?? 300;
+  const xpBucketCap = caps[`xp_${bucket}_daily_cap`] ?? 200;
   const rankGlobalCap = caps['rank_global_daily_cap'] ?? 60;
   const rankBucketCap = caps[`rank_${bucket}_daily_cap`] ?? 30;
 
