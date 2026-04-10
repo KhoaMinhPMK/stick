@@ -7,6 +7,10 @@ import type { AppConfigDTO } from '../../types/dto/admin.dto';
 const CONFIG_META: Record<string, { label: string; description: string; type: 'text' | 'number' | 'boolean' | 'textarea' }> = {
   maintenance_mode: { label: 'Maintenance Mode', description: 'Block all user API requests (returns 503). Admin panel remains accessible.', type: 'boolean' },
   min_journal_chars: { label: 'Min Journal Length', description: 'Minimum characters required for a journal entry (0 = no limit)', type: 'number' },
+  ai_model: { label: 'AI Model (info only)', description: 'Current AI model in use. Note: the active model is hardcoded in the backend as gpt-4.1. Editing this key has no effect on the actual model used.', type: 'text' },
+  ai_temperature: { label: 'AI Temperature (info only)', description: 'Stored for reference — not currently read by the backend. Temperature is hardcoded per endpoint.', type: 'number' },
+  ai_max_tokens: { label: 'AI Max Tokens (info only)', description: 'Stored for reference — not currently read by the backend. Max tokens are set per endpoint.', type: 'number' },
+  ai_system_prompt: { label: 'AI System Prompt (info only)', description: 'Stored for reference — the backend uses its own built-in system prompt, not this value.', type: 'textarea' },
 };
 
 export const AdminSettingsPage: React.FC = () => {

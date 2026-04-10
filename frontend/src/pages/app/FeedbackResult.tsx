@@ -4,7 +4,7 @@ import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { parseFeedback } from '../../types/dto/ai-feedback';
 import { trackFeedbackView } from '../../services/analytics/coreLoop';
-import { importFeedbackVocab } from '../../services/api/endpoints';
+import { importFeedbackVocab, ttsSpeak } from '../../services/api/endpoints';
 
 type RecordState = 'idle' | 'requesting' | 'recording' | 'recorded' | 'playing' | 'error';
 
@@ -14,6 +14,8 @@ export const FeedbackResultPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isPlayingEnhanced, setIsPlayingEnhanced] = useState(false);
+  const [ttsLoadingEnhanced, setTtsLoadingEnhanced] = useState(false);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [savedWordIndices, setSavedWordIndices] = useState<Set<number>>(new Set());
   const [savingWordIndex, setSavingWordIndex] = useState<number | null>(null);
   const [saveAllStatus, setSaveAllStatus] = useState<'idle' | 'saving' | 'done'>('idle');
@@ -42,7 +44,8 @@ export const FeedbackResultPage: React.FC = () => {
   useEffect(() => {
     async function load() {
       if (!id) {
-        setLoading(false);
+        // No journalId in URL — redirect to history so user can pick a journal
+        window.location.hash = '#progress';
         return;
       }
       try {
@@ -224,9 +227,10 @@ export const FeedbackResultPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined text-gray-400 text-6xl mb-4">error_outline</span>
           <p className="font-headline font-bold text-xl">{t('feedback_result.not_found', { defaultValue: 'Result not found' })}</p>
-          <button onClick={() => window.location.hash = '#journal'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group">
+          <p className="text-sm text-on-surface-variant mt-1">{t('feedback_result.not_found_hint', { defaultValue: 'Choose a journal from your history to view its feedback.' })}</p>
+          <button onClick={() => window.location.hash = '#progress'} className="mt-4 flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors group">
             <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
-            <span className="font-headline font-bold text-sm">{t('common.go_back')}</span>
+            <span className="font-headline font-bold text-sm">{t('feedback_result.go_to_history', { defaultValue: 'Go to History' })}</span>
           </button>
         </div>
       </AppLayout>
@@ -246,21 +250,29 @@ export const FeedbackResultPage: React.FC = () => {
   // Keep ref in sync so recording closure can access latest value
   enhancedTextRef.current = enhancedText;
 
-  const handlePlayEnhanced = () => {
-    if (!enhancedText || !window.speechSynthesis) return;
-    // Toggle: if already playing, stop instead of restarting
+  const handlePlayEnhanced = async () => {
+    if (!enhancedText) return;
+    // Toggle: stop if already playing
     if (isPlayingEnhanced) {
-      window.speechSynthesis.cancel();
+      ttsAudioRef.current?.pause();
+      ttsAudioRef.current = null;
       setIsPlayingEnhanced(false);
       return;
     }
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(enhancedText);
-    utt.lang = 'en-US';
-    utt.onstart = () => setIsPlayingEnhanced(true);
-    utt.onend = () => setIsPlayingEnhanced(false);
-    utt.onerror = () => setIsPlayingEnhanced(false);
-    window.speechSynthesis.speak(utt);
+    setTtsLoadingEnhanced(true);
+    try {
+      const base64 = await ttsSpeak(enhancedText);
+      const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+      ttsAudioRef.current = audio;
+      audio.onended = () => { setIsPlayingEnhanced(false); ttsAudioRef.current = null; };
+      audio.onerror = () => { setIsPlayingEnhanced(false); ttsAudioRef.current = null; };
+      await audio.play();
+      setIsPlayingEnhanced(true);
+    } catch {
+      setIsPlayingEnhanced(false);
+    } finally {
+      setTtsLoadingEnhanced(false);
+    }
   };
 
   return (
@@ -298,9 +310,9 @@ export const FeedbackResultPage: React.FC = () => {
                       <span className="material-symbols-outlined text-tertiary text-lg md:text-2xl">magic_button</span>
                       <h3 className="font-headline font-bold text-base md:text-xl uppercase tracking-tighter">{t('feedback_result.natural_version')}</h3>
                     </div>
-                    <button onClick={handlePlayEnhanced} className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 sketch-border bg-surface hover:bg-secondary-container transition-all group self-start disabled:opacity-50" disabled={!window.speechSynthesis}>
-                      <span className="material-symbols-outlined text-lg md:text-xl group-active:scale-90 transition-transform">{isPlayingEnhanced ? 'stop_circle' : 'volume_up'}</span>
-                      <span className="font-label font-bold text-sm">{isPlayingEnhanced ? t('feedback_result.playing', { defaultValue: 'Playing...' }) : t('feedback_result.listen')}</span>
+                    <button onClick={handlePlayEnhanced} className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 sketch-border bg-surface hover:bg-secondary-container transition-all group self-start disabled:opacity-50" disabled={ttsLoadingEnhanced}>
+                      <span className={`material-symbols-outlined text-lg md:text-xl group-active:scale-90 transition-transform ${ttsLoadingEnhanced ? 'animate-spin' : ''}`}>{ttsLoadingEnhanced ? 'progress_activity' : isPlayingEnhanced ? 'stop_circle' : 'volume_up'}</span>
+                      <span className="font-label font-bold text-sm">{ttsLoadingEnhanced ? t('feedback_result.loading', { defaultValue: 'Loading...' }) : isPlayingEnhanced ? t('feedback_result.playing', { defaultValue: 'Playing...' }) : t('feedback_result.listen')}</span>
                     </button>
                   </div>
                   <div className="p-5 md:p-8 bg-white sketch-card shadow-[4px_4px_0_0_#000] md:shadow-[10px_10px_0_0_#000] text-lg md:text-2xl font-medium leading-relaxed whitespace-pre-wrap">

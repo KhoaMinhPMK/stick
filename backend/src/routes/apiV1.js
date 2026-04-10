@@ -8,7 +8,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken, admin: firebaseAdmin } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio } = require('../lib/openaiAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio, textToSpeech } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
@@ -1621,10 +1621,6 @@ router.post('/journals/:id/import-vocab', requireAuth, asyncHandler(async (req, 
     return res.status(403).json({ code: 'FORBIDDEN', message: 'Journal not found' });
   }
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-
   let saved = 0;
   for (const item of items.slice(0, 10)) {
     if (!item.word || typeof item.word !== 'string') continue;
@@ -1641,19 +1637,20 @@ router.post('/journals/:id/import-vocab', requireAuth, asyncHandler(async (req, 
     if (existing) continue;
 
     // Use raw INSERT so the new fromAI + sourceJournalId columns are always populated
+    // nextReviewAt = NULL means "due immediately" — words saved from AI feedback are
+    // ready to review right away so they show in the dashboard due count.
     const newId = require('crypto').randomUUID();
     await prisma.$queryRawUnsafe(
       `INSERT INTO \`VocabNotebookItem\`
          (id, userId, word, meaning, example, sourceJournalId, fromAI,
           mastery, nextReviewAt, reviewInterval, easeFactor, reviewCount, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, 1, 'new', ?, 1, 2.5, 0, NOW(3), NOW(3))`,
+       VALUES (?, ?, ?, ?, ?, ?, 1, 'new', NULL, 0, 2.5, 0, NOW(3), NOW(3))`,
       newId,
       req.authUser.id,
       item.word.trim(),
       item.meaning ? String(item.meaning).slice(0, 500) : null,
       item.example ? String(item.example).slice(0, 1000) : null,
-      journalId,
-      tomorrow
+      journalId
     );
     // Sync: update lexicon when user saves a word
     lexiconOnUserSaved(req.authUser.id, item.word.trim(), newId);
@@ -3217,6 +3214,21 @@ router.post('/pronunciation-check', requireAuth, aiRateLimiter, asyncHandler(asy
   const transcript = await transcribeAudio(buffer);
   const { words, accuracy } = _scoreWords(targetText, transcript || '');
   res.status(200).json({ transcript, words, accuracy });
+}));
+
+// ─── TTS: Text-to-Speech via OpenAI ─────────────────
+router.post('/tts', requireAuth, aiRateLimiter, asyncHandler(async (req, res) => {
+  const { text, voice } = req.body || {};
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'text is required' });
+  }
+  if (text.length > 1000) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'text must be 1000 characters or less' });
+  }
+  const allowedVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+  const safeVoice = allowedVoices.includes(voice) ? voice : 'nova';
+  const buffer = await textToSpeech(text, safeVoice);
+  res.status(200).json({ audio: buffer.toString('base64') });
 }));
 
 // ─── Progress Daily Detail ──────────────────────────

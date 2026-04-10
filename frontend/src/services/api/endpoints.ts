@@ -209,6 +209,16 @@ export async function reviewVocabItem(id: string, quality: number) {
   });
 }
 
+// ─── TTS ─────────────────────────────────────────────
+/** Returns base64-encoded MP3 audio from the OpenAI TTS API. */
+export async function ttsSpeak(text: string, voice = 'nova'): Promise<string> {
+  const res = await apiRequest<{ audio: string }>('/tts', {
+    method: 'POST',
+    body: { text, voice },
+  });
+  return res.audio;
+}
+
 // ─── Journal Bookmark ─────────────────────────────────
 export async function bookmarkJournal(id: string, isBookmarked: boolean) {
   return apiRequest<{ journal: { id: string; isBookmarked: boolean } }>(`/journals/${id}/bookmark`, {

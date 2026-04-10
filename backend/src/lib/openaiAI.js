@@ -605,6 +605,22 @@ async function transcribeAudio(buffer) {
   }
 }
 
+/**
+ * Convert text to speech using OpenAI TTS API.
+ * Returns a Buffer containing MP3 audio.
+ * @param {string} text - Text to speak (max 4096 chars)
+ * @param {string} [voice='nova'] - OpenAI voice: alloy, echo, fable, onyx, nova, shimmer
+ */
+async function textToSpeech(text, voice = 'nova') {
+  const response = await openai.audio.speech.create({
+    model: 'tts-1',
+    voice,
+    input: text,
+    response_format: 'mp3',
+  });
+  return Buffer.from(await response.arrayBuffer());
+}
+
 module.exports = {
   generateJournalFeedback,
   generateDailyChallenge,
@@ -614,4 +630,5 @@ module.exports = {
   generateLessonContent,
   evaluateDailyChallenge,
   transcribeAudio,
+  textToSpeech,
 };

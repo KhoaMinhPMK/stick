@@ -234,7 +234,15 @@ export const DashboardPage: React.FC = () => {
             </div>
             <span className="font-bold text-base md:text-base font-headline">{Math.min(100, (summary?.totalJournals || 0) * 20)}%</span>
           </div>
-          <button onClick={() => (window.location.hash = '#speaking-intro')} className="w-full border-2 border-black py-2 md:py-2.5 rounded-xl font-headline font-bold hover:bg-secondary-container transition-colors sketch-border-subtle active:scale-95 text-sm md:text-base">
+          <button
+            onClick={() => {
+              if (summary?.todayJournalId) {
+                window.location.hash = `#feedback-result?journalId=${summary.todayJournalId}`;
+              } else {
+                window.location.hash = '#progress';
+              }
+            }}
+            className="w-full border-2 border-black py-2 md:py-2.5 rounded-xl font-headline font-bold hover:bg-secondary-container transition-colors sketch-border-subtle active:scale-95 text-sm md:text-base">
             {t('dashboard.continue_practice')}
           </button>
         </div>

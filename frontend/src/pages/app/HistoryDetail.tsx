@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
 import { apiRequest } from '../../services/api/client';
 import { parseFeedback } from '../../types/dto/ai-feedback';
-import { importFeedbackVocab } from '../../services/api/endpoints';
+import { importFeedbackVocab, ttsSpeak } from '../../services/api/endpoints';
 
 export const HistoryDetailPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [journal, setJournal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [ttsLoadingAudio, setTtsLoadingAudio] = useState(false);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [savedWordIndices, setSavedWordIndices] = useState<Set<number>>(new Set());
   const [savingWordIndex, setSavingWordIndex] = useState<number | null>(null);
 
@@ -48,6 +50,30 @@ export const HistoryDetailPage: React.FC = () => {
       setSavingWordIndex(null);
     }
   }, [id, savedWordIndices, savingWordIndex]);
+
+  const handlePlayAudio = useCallback(async (text: string) => {
+    if (!text) return;
+    if (isPlayingAudio) {
+      ttsAudioRef.current?.pause();
+      ttsAudioRef.current = null;
+      setIsPlayingAudio(false);
+      return;
+    }
+    setTtsLoadingAudio(true);
+    try {
+      const base64 = await ttsSpeak(text);
+      const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+      ttsAudioRef.current = audio;
+      audio.onended = () => { setIsPlayingAudio(false); ttsAudioRef.current = null; };
+      audio.onerror = () => { setIsPlayingAudio(false); ttsAudioRef.current = null; };
+      await audio.play();
+      setIsPlayingAudio(true);
+    } catch {
+      setIsPlayingAudio(false);
+    } finally {
+      setTtsLoadingAudio(false);
+    }
+  }, [isPlayingAudio]);
 
   if (loading) {
     return (
@@ -132,25 +158,12 @@ export const HistoryDetailPage: React.FC = () => {
                 </p>
                 <div className="mt-4 md:mt-8 flex justify-between items-center">
                   <button
-                    onClick={() => {
-                      if (!enhancedText || !window.speechSynthesis) return;
-                      if (isPlayingAudio) {
-                        window.speechSynthesis.cancel();
-                        setIsPlayingAudio(false);
-                        return;
-                      }
-                      window.speechSynthesis.cancel();
-                      const utt = new SpeechSynthesisUtterance(enhancedText);
-                      utt.lang = 'en-US';
-                      utt.onend = () => setIsPlayingAudio(false);
-                      utt.onerror = () => setIsPlayingAudio(false);
-                      setIsPlayingAudio(true);
-                      window.speechSynthesis.speak(utt);
-                    }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-black transition-all cursor-pointer ${isPlayingAudio ? 'bg-error-container text-error' : 'bg-white hover:bg-secondary-container hover:scale-105'}`}
+                    onClick={() => handlePlayAudio(enhancedText)}
+                    disabled={ttsLoadingAudio}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-black transition-all cursor-pointer disabled:opacity-50 ${isPlayingAudio ? 'bg-error-container text-error' : 'bg-white hover:bg-secondary-container hover:scale-105'}`}
                   >
-                    <span className="material-symbols-outlined text-lg md:text-xl">{isPlayingAudio ? 'stop_circle' : 'volume_up'}</span>
-                    <span className="text-xs font-bold">{isPlayingAudio ? t('history_detail.stop') : t('history_detail.listen')}</span>
+                    <span className={`material-symbols-outlined text-lg md:text-xl ${ttsLoadingAudio ? 'animate-spin' : ''}`}>{ttsLoadingAudio ? 'progress_activity' : isPlayingAudio ? 'stop_circle' : 'volume_up'}</span>
+                    <span className="text-xs font-bold">{ttsLoadingAudio ? t('history_detail.loading', { defaultValue: 'Loading...' }) : isPlayingAudio ? t('history_detail.stop') : t('history_detail.listen')}</span>
                   </button>
                   <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest opacity-40">{t('history_detail.ai_polish')}</span>
                 </div>
