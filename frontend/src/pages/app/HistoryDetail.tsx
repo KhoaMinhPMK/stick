@@ -11,6 +11,10 @@ export const HistoryDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [ttsLoadingAudio, setTtsLoadingAudio] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
+    const saved = localStorage.getItem('tts_speed');
+    return saved ? parseFloat(saved) : 1;
+  });
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [savedWordIndices, setSavedWordIndices] = useState<Set<number>>(new Set());
   const [savingWordIndex, setSavingWordIndex] = useState<number | null>(null);
@@ -63,6 +67,7 @@ export const HistoryDetailPage: React.FC = () => {
     try {
       const base64 = await ttsSpeak(text);
       const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+      audio.playbackRate = playbackSpeed;
       ttsAudioRef.current = audio;
       audio.onended = () => { setIsPlayingAudio(false); ttsAudioRef.current = null; };
       audio.onerror = () => { setIsPlayingAudio(false); ttsAudioRef.current = null; };
@@ -73,7 +78,13 @@ export const HistoryDetailPage: React.FC = () => {
     } finally {
       setTtsLoadingAudio(false);
     }
-  }, [isPlayingAudio]);
+  }, [isPlayingAudio, playbackSpeed]);
+
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    localStorage.setItem('tts_speed', String(speed));
+    if (ttsAudioRef.current) ttsAudioRef.current.playbackRate = speed;
+  };
 
   if (loading) {
     return (
@@ -156,15 +167,29 @@ export const HistoryDetailPage: React.FC = () => {
                 <p className="text-sm md:text-base leading-relaxed text-black font-bold mt-2 whitespace-pre-wrap">
                   {enhancedText}
                 </p>
-                <div className="mt-4 md:mt-8 flex justify-between items-center">
-                  <button
-                    onClick={() => handlePlayAudio(enhancedText)}
-                    disabled={ttsLoadingAudio}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-black transition-all cursor-pointer disabled:opacity-50 ${isPlayingAudio ? 'bg-error-container text-error' : 'bg-white hover:bg-secondary-container hover:scale-105'}`}
-                  >
-                    <span className={`material-symbols-outlined text-lg md:text-xl ${ttsLoadingAudio ? 'animate-spin' : ''}`}>{ttsLoadingAudio ? 'progress_activity' : isPlayingAudio ? 'stop_circle' : 'volume_up'}</span>
-                    <span className="text-xs font-bold">{ttsLoadingAudio ? t('history_detail.loading', { defaultValue: 'Loading...' }) : isPlayingAudio ? t('history_detail.stop') : t('history_detail.listen')}</span>
-                  </button>
+                <div className="mt-4 md:mt-8 flex flex-wrap justify-between items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => handlePlayAudio(enhancedText)}
+                      disabled={ttsLoadingAudio}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-black transition-all cursor-pointer disabled:opacity-50 ${isPlayingAudio ? 'bg-error-container text-error' : 'bg-white hover:bg-secondary-container hover:scale-105'}`}
+                    >
+                      <span className={`material-symbols-outlined text-lg md:text-xl ${ttsLoadingAudio ? 'animate-spin' : ''}`}>{ttsLoadingAudio ? 'progress_activity' : isPlayingAudio ? 'stop_circle' : 'volume_up'}</span>
+                      <span className="text-xs font-bold">{ttsLoadingAudio ? t('history_detail.loading', { defaultValue: 'Loading...' }) : isPlayingAudio ? t('history_detail.stop') : t('history_detail.listen')}</span>
+                    </button>
+                    {/* Playback speed */}
+                    <div className="flex items-center gap-1" aria-label="Playback speed">
+                      {([0.75, 1, 1.25, 1.5, 2] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => handleSpeedChange(s)}
+                          className={`px-1.5 py-0.5 text-[11px] font-bold border rounded transition-colors ${playbackSpeed === s ? 'bg-primary text-on-primary border-primary' : 'bg-white border-stone-400 text-on-surface-variant hover:border-primary'}`}
+                        >
+                          {s}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest opacity-40">{t('history_detail.ai_polish')}</span>
                 </div>
               </div>

@@ -15,6 +15,10 @@ export const FeedbackResultPage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isPlayingEnhanced, setIsPlayingEnhanced] = useState(false);
   const [ttsLoadingEnhanced, setTtsLoadingEnhanced] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
+    const saved = localStorage.getItem('tts_speed');
+    return saved ? parseFloat(saved) : 1;
+  });
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [savedWordIndices, setSavedWordIndices] = useState<Set<number>>(new Set());
   const [savingWordIndex, setSavingWordIndex] = useState<number | null>(null);
@@ -263,6 +267,7 @@ export const FeedbackResultPage: React.FC = () => {
     try {
       const base64 = await ttsSpeak(enhancedText);
       const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+      audio.playbackRate = playbackSpeed;
       ttsAudioRef.current = audio;
       audio.onended = () => { setIsPlayingEnhanced(false); ttsAudioRef.current = null; };
       audio.onerror = () => { setIsPlayingEnhanced(false); ttsAudioRef.current = null; };
@@ -273,6 +278,12 @@ export const FeedbackResultPage: React.FC = () => {
     } finally {
       setTtsLoadingEnhanced(false);
     }
+  };
+
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    localStorage.setItem('tts_speed', String(speed));
+    if (ttsAudioRef.current) ttsAudioRef.current.playbackRate = speed;
   };
 
   return (
@@ -310,10 +321,24 @@ export const FeedbackResultPage: React.FC = () => {
                       <span className="material-symbols-outlined text-tertiary text-lg md:text-2xl">magic_button</span>
                       <h3 className="font-headline font-bold text-base md:text-xl uppercase tracking-tighter">{t('feedback_result.natural_version')}</h3>
                     </div>
-                    <button onClick={handlePlayEnhanced} className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 sketch-border bg-surface hover:bg-secondary-container transition-all group self-start disabled:opacity-50" disabled={ttsLoadingEnhanced}>
-                      <span className={`material-symbols-outlined text-lg md:text-xl group-active:scale-90 transition-transform ${ttsLoadingEnhanced ? 'animate-spin' : ''}`}>{ttsLoadingEnhanced ? 'progress_activity' : isPlayingEnhanced ? 'stop_circle' : 'volume_up'}</span>
-                      <span className="font-label font-bold text-sm">{ttsLoadingEnhanced ? t('feedback_result.loading', { defaultValue: 'Loading...' }) : isPlayingEnhanced ? t('feedback_result.playing', { defaultValue: 'Playing...' }) : t('feedback_result.listen')}</span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 self-start">
+                      <button onClick={handlePlayEnhanced} className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 sketch-border bg-surface hover:bg-secondary-container transition-all group disabled:opacity-50" disabled={ttsLoadingEnhanced}>
+                        <span className={`material-symbols-outlined text-lg md:text-xl group-active:scale-90 transition-transform ${ttsLoadingEnhanced ? 'animate-spin' : ''}`}>{ttsLoadingEnhanced ? 'progress_activity' : isPlayingEnhanced ? 'stop_circle' : 'volume_up'}</span>
+                        <span className="font-label font-bold text-sm">{ttsLoadingEnhanced ? t('feedback_result.loading', { defaultValue: 'Loading...' }) : isPlayingEnhanced ? t('feedback_result.playing', { defaultValue: 'Playing...' }) : t('feedback_result.listen')}</span>
+                      </button>
+                      {/* Playback speed */}
+                      <div className="flex items-center gap-1" aria-label="Playback speed">
+                        {([0.75, 1, 1.25, 1.5, 2] as const).map(s => (
+                          <button
+                            key={s}
+                            onClick={() => handleSpeedChange(s)}
+                            className={`px-1.5 py-0.5 text-[11px] font-bold border transition-colors ${playbackSpeed === s ? 'bg-primary text-on-primary border-primary' : 'bg-surface border-stone-400 text-on-surface-variant hover:border-primary'}`}
+                          >
+                            {s}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   <div className="p-5 md:p-8 bg-white sketch-card shadow-[4px_4px_0_0_#000] md:shadow-[10px_10px_0_0_#000] text-lg md:text-2xl font-medium leading-relaxed whitespace-pre-wrap">
                     "{enhancedText}"

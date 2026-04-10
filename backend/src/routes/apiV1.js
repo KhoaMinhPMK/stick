@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { prisma } = require('../lib/db');
 const {
   hashPassword,
@@ -3227,8 +3228,23 @@ router.post('/tts', requireAuth, aiRateLimiter, asyncHandler(async (req, res) =>
   }
   const allowedVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
   const safeVoice = allowedVoices.includes(voice) ? voice : 'nova';
+
+  // ── Cache check ──────────────────────────────────────
+  const textHash = crypto.createHash('sha256').update(text + '|' + safeVoice).digest('hex');
+  try {
+    const cached = await prisma.ttsCache.findFirst({ where: { textHash, voice: safeVoice } });
+    if (cached) {
+      return res.status(200).json({ audio: cached.audioBase64, fromCache: true });
+    }
+  } catch { /* table may not exist yet on first deploy — fall through */ }
+
   const buffer = await textToSpeech(text, safeVoice);
-  res.status(200).json({ audio: buffer.toString('base64') });
+  const audioBase64 = buffer.toString('base64');
+
+  // ── Persist to cache (non-blocking) ─────────────────
+  prisma.ttsCache.create({ data: { textHash, voice: safeVoice, audioBase64 } }).catch(() => {});
+
+  res.status(200).json({ audio: audioBase64, fromCache: false });
 }));
 
 // ─── Progress Daily Detail ──────────────────────────

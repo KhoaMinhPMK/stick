@@ -513,6 +513,18 @@ model StreakFreeze {
   @@index([userId, usedAt])
 }
 
+// ─── TTS Cache ───────────────────────────────────────
+model TtsCache {
+  id          String   @id @default(uuid())
+  textHash    String
+  voice       String   @default("nova")
+  audioBase64 String   @db.MediumText
+  createdAt   DateTime @default(now())
+
+  @@unique([textHash, voice])
+  @@index([textHash])
+}
+
 // ─── XP Log ──────────────────────────────────────────
 model UserXpLog {
   id          String   @id @default(uuid())

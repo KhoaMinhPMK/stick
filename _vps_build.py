@@ -13,9 +13,19 @@ Set-Location 'C:/inetpub/wwwroot/stick'
 git pull origin main 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
 "[GIT DONE] Exit: $LASTEXITCODE $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
 
+# Stop backend so prisma can replace locked dll
+"[PM2 STOP] $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+pm2 stop stick-api-prod 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
+
+# Regenerate Prisma client
+"[PRISMA GENERATE] $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+Set-Location 'C:/inetpub/wwwroot/stick/backend'
+& ./node_modules/.bin/prisma.cmd generate 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
+"[PRISMA DONE] Exit: $LASTEXITCODE $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+
 # Restart backend
-"[PM2 RESTART] $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
-pm2 restart stick-api-prod 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
+"[PM2 START] $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
+pm2 start stick-api-prod 2>&1 | Out-File C:/stick_build.log -Append -Encoding utf8
 "[PM2 DONE] Exit: $LASTEXITCODE $(Get-Date)" | Out-File C:/stick_build.log -Append -Encoding utf8
 
 # Build frontend
