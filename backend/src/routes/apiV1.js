@@ -1486,6 +1486,20 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
     'ORDER BY `count` DESC LIMIT 4'
   );
 
+  // ── Read AI config from AppConfig DB ──────────────────
+  const [cfgModel, cfgTemp, cfgMaxTok, cfgStyle] = await Promise.all([
+    getConfigValue('ai_model', 'gpt-4.1'),
+    getConfigValue('ai_temperature', '0.3'),
+    getConfigValue('ai_max_tokens', '2500'),
+    getConfigValue('ai_tutor_style', null),
+  ]);
+  const aiConfig = {
+    model: cfgModel,
+    temperature: parseFloat(cfgTemp) || 0.3,
+    maxTokens: parseInt(cfgMaxTok) || 2500,
+    tutorStyle: cfgStyle || null,
+  };
+
   const startTime = Date.now();
   let feedback;
   try {
@@ -1498,6 +1512,7 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
       errorPatterns: topErrors,
       lexiconContext,
       isPremium: Boolean(req.authUser.isPremium),
+      config: aiConfig,
     });
 
     // Log successful AI call
@@ -3211,8 +3226,17 @@ router.post('/pronunciation-check', requireAuth, aiRateLimiter, asyncHandler(asy
   if (buffer.length > 5 * 1024 * 1024) {
     return res.status(400).json({ code: 'AUDIO_TOO_LARGE', message: 'Audio file exceeds 5 MB limit' });
   }
+  if (buffer.length < 100) {
+    return res.status(400).json({ code: 'AUDIO_TOO_SHORT', message: 'Audio recording is too short or empty' });
+  }
 
-  const transcript = await transcribeAudio(buffer);
+  let transcript;
+  try {
+    transcript = await transcribeAudio(buffer);
+  } catch (err) {
+    console.error('[pronunciation-check] transcription error:', err.message || err);
+    return res.status(502).json({ code: 'TRANSCRIPTION_FAILED', message: 'Speech-to-text service failed. Please try again.' });
+  }
   const { words, accuracy } = _scoreWords(targetText, transcript || '');
   res.status(200).json({ transcript, words, accuracy });
 }));

@@ -6,10 +6,9 @@ const openai = new OpenAI({
   maxRetries: 2,
 });
 
-// gpt-4.1: best language understanding + generation (outperforms o4-mini for text tasks)
-const CHAT_MODEL = 'gpt-4.1';
-// gpt-4.1-mini: cost-efficient for simpler generative tasks
-const FAST_MODEL = 'gpt-4.1-mini';
+// Defaults — overridden by AppConfig values read in the route layer
+const DEFAULT_CHAT_MODEL = 'gpt-4.1';
+const DEFAULT_FAST_MODEL = 'gpt-4.1-mini';
 
 /**
  * Generate AI feedback for a journal entry.
@@ -24,7 +23,12 @@ async function generateJournalFeedback({
   errorPatterns = [],
   lexiconContext = null,
   isPremium = false,
+  config = {},
 }) {
+  // Config from AppConfig DB (passed by route layer)
+  const cfgModel = config.model || DEFAULT_CHAT_MODEL;
+  const cfgTemp  = config.temperature ?? 0.3;
+  const cfgMax   = config.maxTokens || (isPremium ? 4000 : 2500);
   const learnerGoal = goal || 'build a daily English habit';
 
   const patternHint =
@@ -54,7 +58,10 @@ async function generateJournalFeedback({
     lexiconBlock = `\nWords or phrases already saved in the learner's notebook: ${knownWordsList}.`;
   }
 
-  const systemPrompt = `You are a warm, encouraging English tutor for the STICK app — a daily micro-learning tool that helps Vietnamese learners think in English.
+  const tutorPersonality = config.tutorStyle
+    || 'You are a warm, encouraging English tutor for the STICK app — a daily micro-learning tool that helps Vietnamese learners think in English.';
+
+  const systemPrompt = `${tutorPersonality}
 
 Student proficiency level: ${level}
 Student learning goal: ${learnerGoal}${lexiconBlock}${patternHint}
@@ -111,13 +118,13 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 
   try {
     const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+      model: cfgModel,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Journal entry (original language: ${language}):\n\n${content}` },
       ],
-      temperature: 0.3,
-      max_tokens: isPremium ? 4000 : 2500,
+      temperature: cfgTemp,
+      max_tokens: cfgMax,
       response_format: { type: 'json_object' },
     });
 
@@ -182,7 +189,7 @@ async function generateDailyChallenge(dateStr) {
   try {
     const seed = dateStr.replace(/-/g, '');
     const response = await openai.chat.completions.create({
-      model: FAST_MODEL,
+      model: DEFAULT_FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -228,7 +235,7 @@ async function generateGrammarQuiz(level = 'intermediate', count = 5) {
 
   try {
     const response = await openai.chat.completions.create({
-      model: FAST_MODEL,
+      model: DEFAULT_FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -278,7 +285,7 @@ async function generateReadingContent(topic, level = 'intermediate') {
 
   try {
     const response = await openai.chat.completions.create({
-      model: FAST_MODEL,
+      model: DEFAULT_FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -344,7 +351,7 @@ async function generateLessonExercises(opts = {}) {
 
   try {
     const response = await openai.chat.completions.create({
-      model: FAST_MODEL,
+      model: DEFAULT_FAST_MODEL,
       messages: [
         {
           role: 'system',
@@ -442,7 +449,7 @@ async function generateLessonContent(opts = {}) {
 
   try {
     const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+      model: DEFAULT_CHAT_MODEL,
       messages: [
         {
           role: 'system',
@@ -544,7 +551,7 @@ async function evaluateDailyChallenge({ sentence, phrase, meaning }) {
   };
   try {
     const response = await openai.chat.completions.create({
-      model: FAST_MODEL,
+      model: DEFAULT_FAST_MODEL,
       messages: [
         {
           role: 'system',
