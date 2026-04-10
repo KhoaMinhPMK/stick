@@ -26,6 +26,8 @@ lerna-debug.log*
 .cache/
 tmp/
 temp/
+tmp_*.json
+frontend/build_out.txt
 
 # Yarn (Berry)
 .yarn/*
