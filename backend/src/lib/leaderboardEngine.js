@@ -41,6 +41,7 @@ async function getDailyLeaderboard({ limit = 20, userId } = {}) {
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       verifiedEventCount: Number(r.verifiedEventCount),
+      isUser: userId ? r.userId === userId : false,
     }));
 
     let userPosition = null;
@@ -104,6 +105,7 @@ async function getWeeklyLeaderboard({ limit = 20, userId } = {}) {
       rankedScore: Number(r.rankedScore),
       xpEarned: Number(r.xpEarned),
       daysActive: Number(r.daysActive),
+      isUser: userId ? r.userId === userId : false,
     }));
 
     let userPosition = null;
