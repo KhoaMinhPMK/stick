@@ -37,6 +37,11 @@ model User {
   premiumSince     DateTime?
   premiumUntil     DateTime?  // null = lifetime while isPremium=true
 
+  // Rank / Trust
+  eligibleForRank  Boolean   @default(true)
+  totalRankedScore Int       @default(0)
+  accountTrustLevel String   @default("normal")  // "normal" | "trusted" | "flagged" | "banned"
+
   sessions         Session[]
   onboarding       OnboardingState?
   journals         Journal[]
@@ -56,6 +61,14 @@ model User {
   exerciseAttempts ExerciseAttempt[]
   lessonProgress   UserLessonProgress[]
   pathProgress     UserPathProgress[]
+  rewardLedger     RewardLedger[]
+  rankLedger       RankLedger[]
+  dailyAggregates  DailyUserAggregate[]
+  weeklyAggregates WeeklyUserAggregate[]
+  leaderboardSnapshots LeaderboardSnapshot[]
+  premiumGrants    PremiumGrant[]
+  abuseFlags       AbuseFlag[]
+  popupEvents      PremiumPopupEvent[]
 }
 
 // ─── Auth ────────────────────────────────────────────
@@ -538,4 +551,185 @@ model UserXpLog {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─── Reward Ledger ───────────────────────────────────
+model RewardLedger {
+  id              String   @id @default(uuid())
+  userId          String
+  eventType       String   @db.VarChar(60)
+  sourceType      String   @db.VarChar(40)
+  sourceId        String?
+  amount          Int      @default(0)
+  bucket          String   @db.VarChar(30)   // "journal" | "lesson" | "review" | "practice"
+  dayKey          DateTime @db.Date
+  idempotencyKey  String   @unique @db.VarChar(120)
+  integrityStatus String   @default("clear") @db.VarChar(20)  // "clear" | "suspicious" | "voided"
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dayKey])
+  @@index([userId, bucket, dayKey])
+  @@index([integrityStatus])
+}
+
+// ─── Rank Ledger ─────────────────────────────────────
+model RankLedger {
+  id                      String   @id @default(uuid())
+  userId                  String
+  eventType               String   @db.VarChar(60)
+  sourceType              String   @db.VarChar(40)
+  sourceId                String?
+  rankedPoints            Int      @default(0)
+  dayKey                  DateTime @db.Date
+  idempotencyKey          String   @unique @db.VarChar(120)
+  integrityStatus         String   @default("clear") @db.VarChar(20)
+  qualityScore            Decimal? @db.Decimal(5, 2)
+  verifiedLearningMinutes Decimal  @default(0) @db.Decimal(8, 2)
+  createdAt               DateTime @default(now())
+
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dayKey])
+  @@index([dayKey, rankedPoints(sort: Desc)])
+  @@index([integrityStatus])
+}
+
+// ─── Daily User Aggregate ────────────────────────────
+model DailyUserAggregate {
+  id                      String   @id @default(uuid())
+  userId                  String
+  dayKey                  DateTime @db.Date
+  xpEarned                Int      @default(0)
+  rankedScore             Int      @default(0)
+  journalXp               Int      @default(0)
+  lessonXp                Int      @default(0)
+  reviewXp                Int      @default(0)
+  practiceXp              Int      @default(0)
+  journalRanked           Int      @default(0)
+  lessonRanked            Int      @default(0)
+  reviewRanked            Int      @default(0)
+  practiceRanked          Int      @default(0)
+  verifiedLearningMinutes Decimal  @default(0) @db.Decimal(8, 2)
+  verifiedEventCount      Int      @default(0)
+  integrityState          String   @default("clear") @db.VarChar(20)
+  updatedAt               DateTime @updatedAt
+
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayKey])
+  @@index([dayKey, rankedScore(sort: Desc)])
+  @@index([userId])
+}
+
+// ─── Weekly User Aggregate ───────────────────────────
+model WeeklyUserAggregate {
+  id                      String   @id @default(uuid())
+  userId                  String
+  weekKey                 String   @db.VarChar(10)  // e.g. "2026-W15"
+  xpEarned                Int      @default(0)
+  rankedScore             Int      @default(0)
+  verifiedLearningMinutes Decimal  @default(0) @db.Decimal(8, 2)
+  verifiedEventCount      Int      @default(0)
+  daysActive              Int      @default(0)
+  updatedAt               DateTime @updatedAt
+
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekKey])
+  @@index([weekKey, rankedScore(sort: Desc)])
+}
+
+// ─── Leaderboard Snapshot ────────────────────────────
+model LeaderboardSnapshot {
+  id             String   @id @default(uuid())
+  period         String   @db.VarChar(10)   // "daily" | "weekly"
+  periodKey      String   @db.VarChar(20)   // "2026-04-09" or "2026-W15"
+  userId         String
+  rank           Int
+  rankedScore    Int      @default(0)
+  xpEarned       Int      @default(0)
+  tieBreakData   Json?
+  grantedDayPass Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([period, periodKey, userId])
+  @@index([period, periodKey, rank])
+}
+
+// ─── Premium Grant ───────────────────────────────────
+model PremiumGrant {
+  id            String    @id @default(uuid())
+  userId        String
+  grantType     String    @db.VarChar(30)   // "paid" | "day_pass_top3" | "admin" | "trial"
+  startsAt      DateTime
+  endsAt        DateTime?
+  sourceDayKey  DateTime? @db.Date
+  sourceRank    Int?
+  status        String    @default("active") @db.VarChar(20)  // "active" | "expired" | "revoked"
+  reason        String?   @db.VarChar(200)
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([grantType, status])
+  @@index([endsAt])
+}
+
+// ─── Abuse Flag ──────────────────────────────────────
+model AbuseFlag {
+  id         String    @id @default(uuid())
+  userId     String
+  scope      String    @db.VarChar(20)   // "event" | "day" | "account"
+  severity   String    @db.VarChar(20)   // "low" | "medium" | "high" | "critical"
+  code       String    @db.VarChar(60)
+  sourceId   String?
+  dayKey     DateTime? @db.Date
+  details    Json?
+  status     String    @default("open") @db.VarChar(20)  // "open" | "reviewed" | "dismissed" | "confirmed"
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, severity])
+  @@index([status])
+  @@index([code])
+}
+
+// ─── Game Config ─────────────────────────────────────
+model GameConfig {
+  key         String   @id @db.VarChar(100)
+  value       String   @db.Text
+  type        String   @default("number") @db.VarChar(20)
+  category    String   @default("general") @db.VarChar(40)
+  label       String?  @db.VarChar(120)
+  description String?  @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
+  @@index([category])
+}
+
+// ─── Premium Popup Event ─────────────────────────────
+model PremiumPopupEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  triggerType String   @db.VarChar(60)
+  action      String   @default("shown") @db.VarChar(30)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, triggerType])
+  @@index([triggerType, action])
 }

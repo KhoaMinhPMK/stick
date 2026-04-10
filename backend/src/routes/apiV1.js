@@ -13,6 +13,12 @@ const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, ge
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
+// ─── Game Engines ────────────────────────────────────
+const { grantReward, todayKey: rewardTodayKey } = require('../lib/rewardEngine');
+const { getGameConfig, getGameConfigs, clearGameConfigCache } = require('../lib/gameConfig');
+const { getDailyLeaderboard, getWeeklyLeaderboard, getSnapshot, finalizeDailyLeaderboard, expirePremiumGrants } = require('../lib/leaderboardEngine');
+const { checkJournalIntegrity, checkPracticeIntegrity, getOpenFlags, reviewFlag } = require('../lib/abuseEngine');
+
 // Rate limiter for AI routes (expensive Groq calls)
 let rateLimit;
 try {
@@ -1553,11 +1559,32 @@ router.post('/ai/feedback/text', requireAuth, aiRateLimiter, asyncHandler(async 
       const bonusXp = Math.round((feedback.overallScore || 0) / 5);
       const totalJournalXp = baseJournalXp + bonusXp;
       await trackDailyProgress(req.authUser.id, { xp: totalJournalXp });
-      if (totalJournalXp > 0) {
-        await awardXp(req.authUser.id, totalJournalXp, 'journal_feedback', {
-          description: `Journal + feedback score ${feedback.overallScore || 0}/100`,
-          journalId,
+
+      // ─── RewardEngine: journal_verified ───
+      try {
+        // Abuse check (non-blocking — flagged but still grants XP for now)
+        checkJournalIntegrity({ userId: req.authUser.id, content, journalId }).catch(() => {});
+        await grantReward({
+          userId: req.authUser.id,
+          eventType: 'journal_verified',
+          sourceType: 'journal',
+          sourceId: journalId,
+          bucket: 'journal',
+          xpAmount: totalJournalXp,
+          rankedAmount: await getGameConfig('rank_journal_verified', 8),
+          options: {
+            qualityScore: feedback.overallScore || 0,
+            metadata: { score: feedback.overallScore, wordCount: content?.split(/\s+/).length || 0 },
+          },
         });
+      } catch (rewardErr) {
+        // Fallback: legacy awardXp if RewardEngine tables don't exist yet
+        if (totalJournalXp > 0) {
+          await awardXp(req.authUser.id, totalJournalXp, 'journal_feedback', {
+            description: `Journal + feedback score ${feedback.overallScore || 0}/100`,
+            journalId,
+          });
+        }
       }
 
       // Create a LearningSession record for history
@@ -1720,7 +1747,26 @@ router.post('/learning-sessions', requireAuth, asyncHandler(async (req, res) => 
     const sessionEarnXp = todaySessionCount <= 3;
     if (sessionEarnXp) {
       await trackDailyProgress(req.authUser.id, { xp });
-      await awardXp(req.authUser.id, xp, 'session', { description: `Practice: ${type}` });
+
+      // ─── RewardEngine: practice_session ───
+      try {
+        await grantReward({
+          userId: req.authUser.id,
+          eventType: `practice_${type}`,
+          sourceType: 'practice',
+          sourceId: session.id,
+          bucket: 'practice',
+          xpAmount: xp,
+          rankedAmount: await getGameConfig('rank_practice_session', 4),
+          options: {
+            learningMinutes: typeof duration === 'number' ? duration / 60 : 0,
+            metadata: { type, score },
+          },
+        });
+      } catch (rewardErr) {
+        // Fallback: legacy awardXp
+        await awardXp(req.authUser.id, xp, 'session', { description: `Practice: ${type}` });
+      }
     }
   }
 
@@ -2108,29 +2154,46 @@ router.post('/vocab/notebook/:id/review', requireAuth, asyncHandler(async (req, 
   // +4 XP for first successful recall, +2 XP for subsequent due reviews
   let reviewXp = 0;
   if (quality >= 3) {
-    // Daily cap for review XP: max 30 XP/day from reviews
-    const reviewVnDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const reviewDayStart = new Date(reviewVnDate + 'T00:00:00+07:00');
-    const reviewDayEnd = new Date(reviewVnDate + 'T23:59:59.999+07:00');
-    const todayReviewXpLogs = await prisma.userXpLog.findMany({
-      where: {
-        userId: req.authUser.id,
-        source: 'vocab_review',
-        createdAt: { gte: reviewDayStart, lte: reviewDayEnd },
-      },
-      select: { amount: true },
-    });
-    const todayReviewXp = todayReviewXpLogs.reduce((s, l) => s + l.amount, 0);
-    const REVIEW_XP_DAILY_CAP = 30;
+    reviewXp = reviewCount === 1 ? 4 : 2;
 
-    if (todayReviewXp < REVIEW_XP_DAILY_CAP) {
-      reviewXp = reviewCount === 1 ? 4 : 2; // first recall vs subsequent
-      reviewXp = Math.min(reviewXp, REVIEW_XP_DAILY_CAP - todayReviewXp);
+    // ─── RewardEngine: vocab_recall ───
+    try {
+      const rankAmount = reviewCount === 1
+        ? await getGameConfig('rank_vocab_first_recall', 3)
+        : await getGameConfig('rank_vocab_due_recall', 1);
+      const result = await grantReward({
+        userId: req.authUser.id,
+        eventType: reviewCount === 1 ? 'vocab_first_recall' : 'vocab_due_recall',
+        sourceType: 'vocab',
+        sourceId: req.params.id,
+        bucket: 'review',
+        xpAmount: reviewXp,
+        rankedAmount: rankAmount,
+        options: { metadata: { word: existing.word, quality, reviewCount } },
+      });
+      reviewXp = result.xpGranted; // actual amount after cap
       if (reviewXp > 0) {
         await trackDailyProgress(req.authUser.id, { xp: reviewXp });
-        await awardXp(req.authUser.id, reviewXp, 'vocab_review', {
-          description: `Recalled: ${existing.word}`,
-        });
+      }
+    } catch (rewardErr) {
+      // Fallback: legacy path
+      const reviewVnDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const reviewDayStart = new Date(reviewVnDate + 'T00:00:00+07:00');
+      const reviewDayEnd = new Date(reviewVnDate + 'T23:59:59.999+07:00');
+      const todayReviewXpLogs = await prisma.userXpLog.findMany({
+        where: { userId: req.authUser.id, source: 'vocab_review', createdAt: { gte: reviewDayStart, lte: reviewDayEnd } },
+        select: { amount: true },
+      });
+      const todayReviewXp = todayReviewXpLogs.reduce((s, l) => s + l.amount, 0);
+      const REVIEW_XP_DAILY_CAP = 30;
+      if (todayReviewXp < REVIEW_XP_DAILY_CAP) {
+        reviewXp = Math.min(reviewXp, REVIEW_XP_DAILY_CAP - todayReviewXp);
+        if (reviewXp > 0) {
+          await trackDailyProgress(req.authUser.id, { xp: reviewXp });
+          await awardXp(req.authUser.id, reviewXp, 'vocab_review', { description: `Recalled: ${existing.word}` });
+        }
+      } else {
+        reviewXp = 0;
       }
     }
   }
@@ -2897,7 +2960,36 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
       create: { userId: req.authUser.id, day: today, xpEarned, minutesSpent: lesson.duration || 0 },
       update: { xpEarned: { increment: xpEarned }, minutesSpent: { increment: lesson.duration || 0 } },
     });
-    await awardXp(req.authUser.id, xpEarned, 'lesson', { description: `${isReview ? 'Reviewed' : 'Completed'} lesson: ${lesson.title}` });
+
+    // ─── RewardEngine: lesson_complete / lesson_review ───
+    try {
+      const evtType = isReview ? 'lesson_review' : 'lesson_complete';
+      const rankBase = isReview
+        ? await getGameConfig('rank_lesson_review', 5)
+        : await getGameConfig('rank_lesson_first_complete', 12);
+      let rankAmount = rankBase;
+      // High score bonus for ranked
+      if (finalScore >= (await getGameConfig('rank_quality_threshold', 90))) {
+        rankAmount += await getGameConfig('rank_lesson_high_score_bonus', 3);
+      }
+      await grantReward({
+        userId: req.authUser.id,
+        eventType: evtType,
+        sourceType: 'lesson',
+        sourceId: lesson.id,
+        bucket: 'lesson',
+        xpAmount: xpEarned,
+        rankedAmount: rankAmount,
+        options: {
+          qualityScore: finalScore,
+          learningMinutes: effectiveDuration ? effectiveDuration / 60 : 0,
+          metadata: { lessonId: lesson.id, score: finalScore, isReview, starRating },
+        },
+      });
+    } catch (rewardErr) {
+      // Fallback: legacy awardXp
+      await awardXp(req.authUser.id, xpEarned, 'lesson', { description: `${isReview ? 'Reviewed' : 'Completed'} lesson: ${lesson.title}` });
+    }
   }
 
   // Auto-add vocabulary from lesson to user's notebook
@@ -3131,6 +3223,49 @@ router.get('/leaderboard', requireAuth, asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({ items, scope });
+}));
+
+// ─── Ranked Leaderboard (new engine) ─────────────────
+router.get('/leaderboard/ranked', requireAuth, asyncHandler(async (req, res) => {
+  const scope = req.query.scope || 'daily'; // 'daily' | 'weekly'
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+
+  if (scope === 'weekly') {
+    const { board, userPosition } = await getWeeklyLeaderboard({ limit, userId: req.authUser.id });
+    return res.status(200).json({ scope, board, userPosition });
+  }
+
+  const { board, userPosition } = await getDailyLeaderboard({ limit, userId: req.authUser.id });
+  res.status(200).json({ scope, board, userPosition });
+}));
+
+// ─── Leaderboard Snapshot (historical) ───────────────
+router.get('/leaderboard/snapshot', requireAuth, asyncHandler(async (req, res) => {
+  const period = req.query.period || 'daily'; // 'daily' | 'weekly'
+  const periodKey = req.query.periodKey; // "2026-04-09" or "2026-W15"
+  if (!periodKey) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'periodKey is required' });
+  }
+  const snapshot = await getSnapshot(period, periodKey, { limit: 20 });
+  res.status(200).json({ period, periodKey, snapshot });
+}));
+
+// ─── User's daily/weekly reward summary ──────────────
+router.get('/rewards/summary', requireAuth, asyncHandler(async (req, res) => {
+  const { getDailyAggregate, getWeeklyAggregate } = require('../lib/rewardEngine');
+  const daily = await getDailyAggregate(req.authUser.id);
+  const weekly = await getWeeklyAggregate(req.authUser.id);
+
+  // Load caps for frontend display
+  const caps = await getGameConfigs([
+    'xp_global_daily_cap',
+    'xp_journal_daily_cap',
+    'xp_lesson_daily_cap',
+    'xp_review_daily_cap',
+    'xp_practice_daily_cap',
+  ]);
+
+  res.status(200).json({ daily, weekly, caps });
 }));
 
 // ─── Journal Mood ────────────────────────────────────
@@ -4597,6 +4732,197 @@ router.delete('/me', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // ─── Error Handler ───────────────────────────────────
+// ─── Admin: Game Config (Monetization/Leaderboard/AntiCheat) ─────────
+router.get('/admin/game-config', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const category = req.query.category;
+  let query = "SELECT * FROM `GameConfig`";
+  const params = [];
+  if (category) {
+    query += " WHERE `category` = ?";
+    params.push(category);
+  }
+  query += " ORDER BY `category`, `key`";
+  const rows = await prisma.$queryRawUnsafe(query, ...params);
+  const items = rows.map(r => ({
+    key: r.key,
+    value: r.value,
+    type: r.type,
+    category: r.category,
+    label: r.label,
+    description: r.description,
+    updatedAt: r.updatedAt,
+    updatedBy: r.updatedBy,
+  }));
+  const categories = [...new Set(items.map(i => i.category))].sort();
+  res.status(200).json({ items, categories });
+}));
+
+router.put('/admin/game-config/:key', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { value } = req.body;
+  if (value === undefined || value === null) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'value is required' });
+  }
+  const key = req.params.key;
+  await prisma.$executeRawUnsafe(
+    "UPDATE `GameConfig` SET `value` = ?, `updatedBy` = ? WHERE `key` = ?",
+    String(value), req.authUser.id, key
+  );
+  clearGameConfigCache();
+  res.status(200).json({ ok: true, key, value: String(value) });
+}));
+
+router.put('/admin/game-config', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { updates } = req.body; // Array of {key, value}
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'updates array is required' });
+  }
+  for (const { key, value } of updates) {
+    if (key && value !== undefined) {
+      await prisma.$executeRawUnsafe(
+        "UPDATE `GameConfig` SET `value` = ?, `updatedBy` = ? WHERE `key` = ?",
+        String(value), req.authUser.id, key
+      );
+    }
+  }
+  clearGameConfigCache();
+  res.status(200).json({ ok: true, updated: updates.length });
+}));
+
+// ─── Admin: Abuse Flags ──────────────────────────────
+router.get('/admin/abuse-flags', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const severity = req.query.severity;
+  const status = req.query.status || 'open';
+  let query = "SELECT f.*, u.`displayName`, u.`email` FROM `AbuseFlag` f JOIN `User` u ON u.`id` = f.`userId` WHERE 1=1";
+  const params = [];
+  if (status) {
+    query += " AND f.`status` = ?";
+    params.push(status);
+  }
+  if (severity) {
+    query += " AND f.`severity` = ?";
+    params.push(severity);
+  }
+  query += " ORDER BY f.`createdAt` DESC LIMIT 100";
+  const rows = await prisma.$queryRawUnsafe(query, ...params);
+  const items = rows.map(r => {
+    const out = {};
+    for (const [k, v] of Object.entries(r)) {
+      out[k] = typeof v === 'bigint' ? Number(v) : v;
+    }
+    return out;
+  });
+  res.status(200).json({ items, total: items.length });
+}));
+
+router.put('/admin/abuse-flags/:id/review', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { status } = req.body; // "reviewed" | "dismissed" | "confirmed"
+  if (!['reviewed', 'dismissed', 'confirmed'].includes(status)) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'status must be reviewed, dismissed, or confirmed' });
+  }
+  const result = await reviewFlag(req.params.id, { status, reviewedBy: req.authUser.id });
+  res.status(200).json(result);
+}));
+
+// ─── Admin: Leaderboard Finalization ─────────────────
+router.post('/admin/leaderboard/finalize', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { dayKey } = req.body || {};
+  const result = await finalizeDailyLeaderboard(dayKey || undefined);
+  res.status(200).json(result);
+}));
+
+router.post('/admin/leaderboard/expire-grants', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const result = await expirePremiumGrants();
+  res.status(200).json(result);
+}));
+
+// ─── Admin: User Trust Level ─────────────────────────
+router.put('/admin/users/:id/trust', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { accountTrustLevel, eligibleForRank } = req.body;
+  const data = {};
+  if (accountTrustLevel && ['normal', 'trusted', 'flagged', 'banned'].includes(accountTrustLevel)) {
+    data.accountTrustLevel = accountTrustLevel;
+  }
+  if (typeof eligibleForRank === 'boolean') {
+    data.eligibleForRank = eligibleForRank;
+  }
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'No valid fields to update' });
+  }
+  // Use raw query since columns may not be in Prisma client yet
+  const setClauses = [];
+  const params = [];
+  if (data.accountTrustLevel) { setClauses.push('`accountTrustLevel` = ?'); params.push(data.accountTrustLevel); }
+  if (data.eligibleForRank !== undefined) { setClauses.push('`eligibleForRank` = ?'); params.push(data.eligibleForRank ? 1 : 0); }
+  params.push(req.params.id);
+  await prisma.$executeRawUnsafe(
+    `UPDATE \`User\` SET ${setClauses.join(', ')} WHERE \`id\` = ?`,
+    ...params
+  );
+  res.status(200).json({ ok: true });
+}));
+
+// ─── Admin: Premium Grant (manual) ───────────────────
+router.post('/admin/users/:id/premium-grant', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { grantType, daysOrNull, reason } = req.body;
+  const userId = req.params.id;
+  const type = grantType || 'admin';
+  const startsAt = new Date();
+  let endsAt = null;
+  if (daysOrNull && typeof daysOrNull === 'number') {
+    endsAt = new Date(startsAt.getTime() + daysOrNull * 86400000);
+  }
+  const id = require('crypto').randomUUID();
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO \`PremiumGrant\`
+      (\`id\`, \`userId\`, \`grantType\`, \`startsAt\`, \`endsAt\`, \`status\`, \`reason\`, \`createdAt\`)
+     VALUES (?, ?, ?, ?, ?, 'active', ?, NOW(3))`,
+    id, userId, type, startsAt, endsAt, reason || `Manual grant by admin`
+  );
+  // Update user isPremium
+  await prisma.$executeRawUnsafe(
+    "UPDATE `User` SET `isPremium` = 1, `premiumUntil` = ? WHERE `id` = ?",
+    endsAt, userId
+  );
+  res.status(201).json({ ok: true, grantId: id, endsAt });
+}));
+
+// ─── Admin: Reward Ledger (audit) ────────────────────
+router.get('/admin/reward-ledger', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const userId = req.query.userId;
+  const dayKey = req.query.dayKey;
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  let query = "SELECT * FROM `RewardLedger` WHERE 1=1";
+  const params = [];
+  if (userId) { query += " AND `userId` = ?"; params.push(userId); }
+  if (dayKey) { query += " AND `dayKey` = ?"; params.push(dayKey); }
+  query += " ORDER BY `createdAt` DESC LIMIT ?";
+  params.push(limit);
+  const rows = await prisma.$queryRawUnsafe(query, ...params);
+  const items = rows.map(r => {
+    const out = {};
+    for (const [k, v] of Object.entries(r)) {
+      out[k] = typeof v === 'bigint' ? Number(v) : v;
+    }
+    return out;
+  });
+  res.status(200).json({ items, total: items.length });
+}));
+
+// ─── Cron endpoint: auto-finalization ────────────────
+// Called by cron job or PM2 schedule — protected by secret header
+router.post('/cron/finalize-daily', asyncHandler(async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET || 'stick-cron-secret-2026';
+  const authHeader = req.headers['x-cron-secret'];
+  if (authHeader !== cronSecret) {
+    return res.status(403).json({ code: 'FORBIDDEN', message: 'Invalid cron secret' });
+  }
+  // Run finalization + expire grants
+  const finalizeResult = await finalizeDailyLeaderboard();
+  const expireResult = await expirePremiumGrants();
+  res.status(200).json({ finalize: finalizeResult, expire: expireResult });
+}));
+
+// ─── API Error Handler ──────────────────────────────
 router.use((err, _req, res, _next) => {
   console.error('API Error:', err);
   res.status(500).json({
