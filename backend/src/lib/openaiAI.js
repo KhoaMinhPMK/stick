@@ -8,7 +8,7 @@ const openai = new OpenAI({
 
 // Defaults — overridden by AppConfig values read in the route layer
 const DEFAULT_CHAT_MODEL = 'gpt-4.1';
-const DEFAULT_FAST_MODEL = 'gpt-4.1-mini';
+const DEFAULT_FAST_MODEL = 'gpt-4.1';
 
 /**
  * Generate AI feedback for a journal entry.
@@ -27,8 +27,8 @@ async function generateJournalFeedback({
 }) {
   // Config from AppConfig DB (passed by route layer)
   const cfgModel = config.model || DEFAULT_CHAT_MODEL;
-  const cfgTemp  = config.temperature ?? 0.3;
-  const cfgMax   = config.maxTokens || (isPremium ? 4000 : 2500);
+  const cfgTemp  = config.temperature ?? 0.25;
+  const cfgMax   = config.maxTokens || (isPremium ? 6000 : 4000);
   const learnerGoal = goal || 'build a daily English habit';
 
   const patternHint =
@@ -66,6 +66,34 @@ async function generateJournalFeedback({
 Student proficiency level: ${level}
 Student learning goal: ${learnerGoal}${lexiconBlock}${patternHint}
 
+ANALYSIS PROTOCOL — follow every step in order:
+
+STEP 1 — LANGUAGE DETECTION & INTENT MAPPING
+Identify the language(s) used (Vietnamese, English, mixed). Map every clause or phrase to its communicative intent. Note where the learner attempted English but switched to Vietnamese due to a gap.
+
+STEP 2 — DEEP ERROR ANALYSIS
+For each error: classify it (grammar / lexical / collocation / register / punctuation), assess severity (minor / moderate / blocking), and trace it to the underlying gap (e.g. "L1 transfer from Vietnamese", "missing article system knowledge", "false friend"). Only surface the most impactful errors (max ${isPremium ? 6 : 4}).
+
+STEP 3 — MEANING GAP EXCAVATION
+For every place the learner used Vietnamese or an awkward English workaround, identify: (a) what they were trying to express, (b) what natural English expression fills that gap, (c) whether the learner already has a relevant item in LANGUAGE MEMORY.
+
+STEP 4 — ENHANCED TEXT CONSTRUCTION
+Produce "enhancedText": a natural, conversational English version that preserves tone, stance, and cultural specifics. For Vietnamese cultural terms ("bánh mì", "Tết", etc.) keep them verbatim.
+
+STEP 5 — LEARNING CANDIDATE SELECTION
+Apply strict filtering: only include expressions the learner demonstrably needs (from Step 3 gaps). Rank by: (1) reinforcement value, (2) frequency of real-world use, (3) CEFR appropriateness for this learner. No filler vocabulary.
+
+STEP 6 — PATTERN EXTRACTION
+Identify 0–2 reusable sentence structures that directly match this entry's communicative goals. Show exactly how the learner could have deployed each pattern.
+
+STEP 7 — SCORING RUBRIC (0–100)
+Evaluate on four axes and compute a weighted total:
+  • Communicative effort & attempt (30%) — penalize only complete avoidance of English
+  • English usage accuracy (30%) — grammar, vocabulary, collocation
+  • Clarity & coherence (20%) — ideas are understandable even if imperfect
+  • Naturalness & register (20%) — closeness to authentic native usage
+Full-Vietnamese entries: cap at 40 reflecting effort credit.
+
 CRITICAL RULES:
 1. The student may write in Vietnamese, English, or a mix. This is NORMAL — never penalize it. Produce a FULLY ENGLISH "enhancedText" that preserves the student's original meaning and tone.
 2. "enhancedText" must be natural, conversational English — not formal or academic.
@@ -84,7 +112,7 @@ CRITICAL RULES:
 11. The "meaning" field should be short and learner-facing: explain the meaning AND when to use it in this exact context.
 12. Include 0–2 "sentencePatterns" that are reusable and directly match the learner's message topic.
 13. "encouragement" must be warm and personal — reference something specific the student wrote.
-14. Score 0–100: effort (30%), English usage (30%), clarity (20%), grammar (20%). Full-Vietnamese entry still earns 20–40 for effort + clarity.
+14. Score using the 4-axis rubric from STEP 7.
 
 Return ONLY a valid JSON object — no markdown fences, no extra text:
 {
@@ -604,7 +632,9 @@ async function transcribeAudio(buffer) {
       file: fs.createReadStream(tmpPath),
       model: 'whisper-1',
       language: 'en',
+      prompt: 'This is an English language learning recording. The speaker may be Vietnamese. Transcribe accurately including incomplete sentences.',
       response_format: 'text',
+      temperature: 0,
     });
     return typeof response === 'string' ? response : (response.text || '');
   } finally {
@@ -620,10 +650,11 @@ async function transcribeAudio(buffer) {
  */
 async function textToSpeech(text, voice = 'nova') {
   const response = await openai.audio.speech.create({
-    model: 'tts-1',
+    model: 'tts-1-hd',
     voice,
     input: text,
     response_format: 'mp3',
+    speed: 0.95,
   });
   return Buffer.from(await response.arrayBuffer());
 }
@@ -703,12 +734,13 @@ Return ONLY valid JSON:
  */
 async function generateVocabQuiz({ words = [], level = 'intermediate', count = 5 }) {
   // words: [{ word, meaning, example }]
-  const wordList = words.slice(0, 12).map(w =>
+  const wordList = words.map(w =>
     `• ${w.word} — ${w.meaning || '(no definition)'}${w.example ? ` e.g. "${w.example}"` : ''}`
   ).join('\n');
 
+  const targetCount = Math.min(count, words.length);
   const fallback = {
-    questions: words.slice(0, count).map(w => ({
+    questions: words.slice(0, targetCount).map(w => ({
       word: w.word,
       question: `What does "${w.word}" mean?`,
       options: [w.meaning || 'correct meaning', 'wrong 1', 'wrong 2', 'wrong 3'],
@@ -719,26 +751,30 @@ async function generateVocabQuiz({ words = [], level = 'intermediate', count = 5
 
   try {
     const response = await openai.chat.completions.create({
-      model: DEFAULT_FAST_MODEL,
+      model: DEFAULT_CHAT_MODEL,
       messages: [
         {
           role: 'system',
-          content: `You are a vocabulary quiz creator for the STICK English learning app.
-The learner has these words in their notebook:
+          content: `You are an expert vocabulary quiz designer for the STICK English learning app serving Vietnamese learners.
+The learner's notebook contains these words:
 ${wordList}
 
-Generate ${Math.min(count, words.length)} quiz questions. Mix these formats:
-1. "What does ___ mean?" (choose correct definition)
-2. "Choose the word that best fits: [sentence with blank]" (choose correct word)
-3. "Which sentence uses ___ correctly?" (choose correct usage)
+Generate exactly ${targetCount} quiz questions. Each question MUST target a DIFFERENT word — cover as many distinct words as possible from the list above, never repeat the same word twice.
+
+For each question, choose the most pedagogically effective format based on the word:
+1. "What does ___ mean?" — choose the correct definition from 4 options
+2. Context gap-fill — a natural sentence with a blank, choose the word that fits best
+3. Usage discrimination — four sentences, one uses the word naturally, three contain subtle errors
+4. Synonym/antonym reasoning — higher-order critical thinking question
 
 RULES:
-- Each question must test ONE word from the list — include a "word" field
+- Each question targets ONE word — include a "word" field with that exact word
 - 4 options, 1 correct, "correct" is 0-based index
-- Options should be plausible — no joke answers
-- Explanations can include Vietnamese hints for clarity
-- Keep it friendly and encouraging, not exam-like
-- Vary the question types across the quiz
+- Distractors must be plausible — drawn from semantically related concepts, NOT random noise
+- Explanations must justify WHY the correct answer is right AND why the main distractor is wrong
+- Vietnamese glosses in explanations are encouraged for clarity
+- Vary formats: no more than 2 questions of the same type
+- Questions progress from straightforward to nuanced
 
 Return ONLY valid JSON:
 {
@@ -747,10 +783,10 @@ Return ONLY valid JSON:
   ]
 }`,
         },
-        { role: 'user', content: `Create a vocab quiz for ${Math.min(count, words.length)} words.` },
+        { role: 'user', content: `Create ${targetCount} vocab quiz questions, one per unique word from the list.` },
       ],
-      temperature: 0.5,
-      max_tokens: 1500,
+      temperature: 0.4,
+      max_tokens: 2500,
       response_format: { type: 'json_object' },
     });
     const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');

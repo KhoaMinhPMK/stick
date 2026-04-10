@@ -2796,8 +2796,11 @@ router.post('/library/lessons/:id/complete', requireAuth, asyncHandler(async (re
   // TODO: re-enable after pilot with sensible threshold based on real data
 
   // P0-F: Server-authoritative scoring — recompute from exercise attempts
+  // Only consider attempts from the current session (last 6 hours) to avoid
+  // cross-session contamination when a lesson is retaken
+  const sessionCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000);
   const exerciseAttempts = await prisma.exerciseAttempt.findMany({
-    where: { userId: req.authUser.id, lessonId: lesson.id },
+    where: { userId: req.authUser.id, lessonId: lesson.id, createdAt: { gte: sessionCutoff } },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -4996,18 +4999,20 @@ router.post('/vocab/quiz', requireAuth, aiRateLimiter, asyncHandler(async (req, 
   const { wordIds, count: reqCount } = req.body || {};
   const count = Math.min(parseInt(reqCount) || 5, 8);
 
-  // Fetch words: either specific IDs or random from notebook
+  // Fetch words: either specific IDs or random from full notebook
   let where = { userId: req.authUser.id };
   if (Array.isArray(wordIds) && wordIds.length > 0) {
     where.id = { in: wordIds };
   }
 
-  const items = await prisma.vocabNotebookItem.findMany({
+  const allItems = await prisma.vocabNotebookItem.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
-    take: Math.max(count * 2, 12), // extra pool so AI has variety
     select: { id: true, word: true, meaning: true, example: true, mastery: true },
   });
+
+  // Shuffle entire notebook so every word gets a fair chance across sessions
+  const shuffled = allItems.sort(() => Math.random() - 0.5);
+  const items = shuffled.slice(0, Math.max(count * 4, 20));
 
   if (items.length === 0) {
     return res.status(400).json({ code: 'NO_WORDS', message: 'Add words to your notebook first!' });

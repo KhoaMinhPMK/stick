@@ -160,39 +160,8 @@ export const DashboardPage: React.FC = () => {
                 <span className="text-xs font-bold text-on-surface-variant">streak</span>
               </div>
             </div>
-            {/* Daily Goal Ring */}
-            {dailyGoalMinutes > 0 && (
-              <div className="flex flex-col items-center gap-1">
-                <div className="relative w-20 h-20">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-                    <circle cx="40" cy="40" r="32" strokeWidth="6" fill="transparent" className="text-surface-container stroke-current" />
-                    <circle cx="40" cy="40" r="32" strokeWidth="6" fill="transparent" strokeDasharray="201" strokeDashoffset={201 - (201 * goalPct) / 100} strokeLinecap="round" className="text-tertiary stroke-current transition-all duration-700" />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="font-headline font-black text-lg leading-none">{goalPct}%</span>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-on-surface-variant text-center leading-tight">{todayMinutes}/{dailyGoalMinutes}<br />min</span>
-              </div>
-            )}
           </div>
-          <div className="absolute bottom-[-10px] md:bottom-[-20px] right-[-10px] md:right-[-20px] opacity-5 select-none pointer-events-none">
-            <span className="material-symbols-outlined text-[10rem] md:text-[20rem]" data-icon="accessibility_new">accessibility_new</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Dashboard Grid (Bento Style) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6">
-        
-        {/* Stats Overview Card */}
-        <div className="md:col-span-8 bg-surface-container sketch-border-card p-5 md:p-6">
-          <h4 className="font-headline text-lg md:text-xl font-bold mb-4 md:mb-5">{t('dashboard.last_entry')}</h4>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <span className="material-symbols-outlined animate-spin text-2xl">progress_activity</span>
-            </div>
-          ) : (
+          {!loading && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <div className="bg-surface-container-highest sketch-border p-3 md:p-4 text-center">
                 <span className="font-headline font-black text-2xl md:text-3xl">{summary?.totalJournals || 0}</span>
@@ -311,7 +280,7 @@ export const DashboardPage: React.FC = () => {
             })}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Secondary Task Suggestions */}
       <section className="mt-10 md:mt-12">
@@ -321,11 +290,6 @@ export const DashboardPage: React.FC = () => {
              div::-webkit-scrollbar { display: none; }
            `}</style>
           
-          <div onClick={() => (window.location.hash = '#library')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
-            <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="auto_stories">auto_stories</span>
-            <h6 className="font-headline font-bold text-base md:text-lg mb-1 md:mb-1.5">{t('dashboard.reading_story')}</h6>
-            <p className="text-xs md:text-sm text-on-surface-variant">{t('dashboard.explore_library')}</p>
-          </div>
           
           <div onClick={() => (window.location.hash = '#saved-phrases')} className="min-w-[240px] md:min-w-[260px] bg-surface-container-low border-[3px] border-black rounded-[20px] p-5 md:p-5 hover:-translate-y-1 transition-transform cursor-pointer group snap-start sketch-card flex-1 active:scale-95">
             <span className="material-symbols-outlined text-3xl md:text-3xl mb-3 md:mb-3 text-black" data-icon="format_quote">format_quote</span>
@@ -341,20 +305,6 @@ export const DashboardPage: React.FC = () => {
         </div>
       </section>
 
-      {/* FAB */}
-      {summary?.todayCompleted && summary?.todayJournalId ? (
-        <button onClick={() => {
-          window.location.hash = `#feedback-result?journalId=${summary.todayJournalId}`;
-        }} className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle ${isPremium ? 'premium-galaxy-btn border-purple-400' : 'bg-tertiary text-white border-white'}`}>
-          <span className="material-symbols-outlined text-2xl md:text-3xl">rate_review</span>
-        </button>
-      ) : (
-        <button onClick={() => {
-          window.location.hash = '#journal-workspace';
-        }} className={`fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shadow-xl border-[3px] md:border-4 hover:scale-110 active:scale-95 transition-all z-50 sketch-border-subtle ${isPremium ? 'premium-galaxy-btn border-purple-400' : 'bg-black text-white border-white'}`}>
-          <span className="material-symbols-outlined text-2xl md:text-3xl">add</span>
-        </button>
-      )}
     </AppLayout>
   );
 };
