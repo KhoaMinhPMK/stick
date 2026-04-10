@@ -122,7 +122,7 @@ export const FeedbackResultPage: React.FC = () => {
       });
       const res = await apiRequest('/pronunciation-check', {
         method: 'POST',
-        body: JSON.stringify({ audio: base64, targetText }),
+        body: { audio: base64, targetText },
       }) as { words: { word: string; correct: boolean; comment?: string }[]; accuracy: number };
       setWordScores(res.words || []);
       setScoringState('done');

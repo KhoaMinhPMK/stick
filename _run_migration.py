@@ -3,25 +3,20 @@ import sys
 sys.path.insert(0, 'e:/project/stick')
 from _vps_cmd import run_cmd, sftp_write
 
-# Upload migration SQL
-sql = open('e:/project/stick/backend/prisma/migrations/20260410_tts_cache.sql').read()
-sftp_write('C:/stick_migrate_tts.sql', sql)
+# Upload config fix SQL
+sql = open('e:/project/stick/backend/prisma/migrations/20260410_fix_admin_config_values.sql').read()
+sftp_write('C:/stick_migrate_config.sql', sql)
 
 # Execute migration
-sql_inline = (
-    "CREATE TABLE IF NOT EXISTS `TtsCache` ("
-    "`id` VARCHAR(36) NOT NULL,"
-    "`textHash` VARCHAR(64) NOT NULL,"
-    "`voice` VARCHAR(20) NOT NULL DEFAULT 'nova',"
-    "`audioBase64` MEDIUMTEXT NOT NULL,"
-    "`createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),"
-    "PRIMARY KEY (`id`),"
-    "UNIQUE KEY `TtsCache_textHash_voice_key` (`textHash`,`voice`),"
-    "KEY `TtsCache_textHash_idx` (`textHash`)"
-    ") DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-)
-code = run_cmd(
-    f'mysql -u stick_user "-pStickApp2026!" stick_db -e "{sql_inline}"', timeout=30
-)
-print(f"Migration exit: {code}")
+sql_statements = [
+    "UPDATE `AppConfig` SET `value`='gpt-4.1', `updatedAt`=NOW() WHERE `key`='ai_model';",
+    "UPDATE `AppConfig` SET `value`='2500', `updatedAt`=NOW() WHERE `key`='ai_max_tokens';",
+    "UPDATE `AppConfig` SET `key`='ai_tutor_style', `value`='You are a warm, encouraging English tutor for the STICK app.', `updatedAt`=NOW() WHERE `key`='ai_system_prompt';",
+    "UPDATE `AppConfig` SET `value`='0.3', `updatedAt`=NOW() WHERE `key`='ai_temperature';",
+]
+for stmt in sql_statements:
+    code = run_cmd(
+        f'mysql -u stick_user "-pStickApp2026!" stick_db -e "{stmt}"', timeout=30
+    )
+    print(f"Statement exit: {code} | {stmt[:60]}...")
 
