@@ -4792,7 +4792,7 @@ router.put('/admin/game-config', requireAuth, requireAdmin, asyncHandler(async (
 router.get('/admin/abuse-flags', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const severity = req.query.severity;
   const status = req.query.status || 'open';
-  let query = "SELECT f.*, u.`displayName`, u.`email` FROM `AbuseFlag` f JOIN `User` u ON u.`id` = f.`userId` WHERE 1=1";
+  let query = "SELECT f.*, u.`name`, u.`email` FROM `AbuseFlag` f JOIN `User` u ON u.`id` = f.`userId` WHERE 1=1";
   const params = [];
   if (status) {
     query += " AND f.`status` = ?";
