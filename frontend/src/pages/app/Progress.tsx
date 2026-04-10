@@ -28,21 +28,7 @@ export const ProgressPage: React.FC = () => {
         ]);
         setSummary(sumRes);
 
-        // If no daily data exists, trigger a one-time backfill from journals/vocab/phrases
-        if (dailyRes.items.length === 0) {
-          try {
-            await apiRequest('/progress/backfill', { method: 'POST' });
-            // Reload after backfill
-            const refreshed = await getProgressDaily(90);
-            setDailyData(refreshed.items);
-          } catch (backfillErr) {
-            console.error('Backfill failed:', backfillErr);
-            setError(t('progress.backfill_error'));
-            setDailyData([]);
-          }
-        } else {
-          setDailyData(dailyRes.items);
-        }
+        setDailyData(dailyRes.items);
       } catch (err) {
         console.error('Failed to load progress:', err);
         setError(t('progress.error_load'));
