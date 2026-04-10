@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
+// BigInt serialization fix
+BigInt.prototype.toJSON = function() { return this.toString(); };
 async function run() {
   const weeks = await p.$queryRawUnsafe(
     'SELECT weekKey, COUNT(*) as cnt, SUM(rankedScore) as totalRanked FROM WeeklyUserAggregate GROUP BY weekKey ORDER BY weekKey DESC'
