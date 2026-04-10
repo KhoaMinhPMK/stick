@@ -316,3 +316,113 @@ export function updateLearningPath(id: string, data: Partial<AdminLearningPathDT
 export function deleteLearningPath(id: string) {
   return adminRequest<{ message: string }>(`/admin/learning-paths/${id}`, { method: 'DELETE' });
 }
+
+// ─── Game Config ──────────────────────
+export interface GameConfigItem {
+  key: string;
+  value: string;
+  type: string;
+  category: string;
+  label: string;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export function getGameConfigs(category?: string) {
+  const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+  return adminRequest<{ items: GameConfigItem[]; categories: string[] }>(`/admin/game-config${qs}`);
+}
+
+export function updateGameConfig(key: string, value: string) {
+  return adminRequest<{ ok: boolean; key: string; value: string }>(`/admin/game-config/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: { value },
+  });
+}
+
+export function bulkUpdateGameConfig(updates: { key: string; value: string }[]) {
+  return adminRequest<{ ok: boolean; updated: number }>('/admin/game-config', {
+    method: 'PUT',
+    body: { updates },
+  });
+}
+
+// ─── Abuse Flags ──────────────────────
+export interface AbuseFlagItem {
+  id: string;
+  userId: string;
+  name: string;
+  email: string | null;
+  scope: string;
+  severity: string;
+  code: string;
+  sourceId: string | null;
+  dayKey: string;
+  details: string | null;
+  status: string;
+  reviewedBy: string | null;
+  createdAt: string;
+}
+
+export function getAbuseFlags(status = 'open', severity?: string) {
+  const qs = new URLSearchParams({ status });
+  if (severity) qs.set('severity', severity);
+  return adminRequest<{ items: AbuseFlagItem[]; total: number }>(`/admin/abuse-flags?${qs}`);
+}
+
+export function reviewAbuseFlag(id: string, status: 'reviewed' | 'dismissed' | 'confirmed') {
+  return adminRequest<{ ok: boolean }>(`/admin/abuse-flags/${id}/review`, {
+    method: 'PUT',
+    body: { status },
+  });
+}
+
+// ─── Leaderboard Admin ────────────────
+export function adminFinalizeLeaderboard(dayKey?: string) {
+  return adminRequest<{ status: string; periodKey: string; snapshotId?: string; grantedCount?: number }>(
+    '/admin/leaderboard/finalize',
+    { method: 'POST', body: dayKey ? { dayKey } : {} },
+  );
+}
+
+export function adminExpireGrants() {
+  return adminRequest<{ expired: number }>('/admin/leaderboard/expire-grants', { method: 'POST' });
+}
+
+// ─── User Trust & Premium ─────────────
+export function setUserTrust(userId: string, data: { accountTrustLevel?: string; eligibleForRank?: boolean }) {
+  return adminRequest<{ ok: boolean }>(`/admin/users/${userId}/trust`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export function adminGrantPremium(userId: string, data: { grantType?: string; daysOrNull?: number | null; reason?: string }) {
+  return adminRequest<{ ok: boolean; grantId: string; endsAt: string | null }>(
+    `/admin/users/${userId}/premium-grant`,
+    { method: 'POST', body: data },
+  );
+}
+
+// ─── Reward Ledger ────────────────────
+export interface RewardLedgerItem {
+  id: string;
+  userId: string;
+  eventType: string;
+  sourceType: string;
+  sourceId: string | null;
+  amount: number;
+  bucket: string;
+  dayKey: string;
+  integrityStatus: string;
+  createdAt: string;
+}
+
+export function getRewardLedger(params: { userId?: string; dayKey?: string; limit?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (params.userId) qs.set('userId', params.userId);
+  if (params.dayKey) qs.set('dayKey', params.dayKey);
+  if (params.limit) qs.set('limit', String(params.limit));
+  return adminRequest<{ items: RewardLedgerItem[]; total: number }>(`/admin/reward-ledger?${qs}`);
+}

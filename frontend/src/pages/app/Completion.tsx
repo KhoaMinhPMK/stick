@@ -4,10 +4,12 @@ import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, postJournalMood, type ProgressSummary } from '../../services/api/endpoints';
 import { trackCompletionView } from '../../services/analytics/coreLoop';
 import { usePremium } from '../../hooks/usePremium';
+import { PremiumConversionModal } from '../../components/PremiumConversionModal';
 
 export const CompletionPage: React.FC = () => {
   const { t } = useTranslation();
   const isPremium = usePremium();
+  const [showConversionModal, setShowConversionModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [moodSaved, setMoodSaved] = useState(false);
   const [moodError, setMoodError] = useState<string | null>(null);
@@ -226,6 +228,7 @@ export const CompletionPage: React.FC = () => {
           <path d="M110 120C120 100 140 80 130 60" stroke="black" strokeLinecap="round" strokeWidth="6"></path>
         </svg>
       </div>
+      {!isPremium && <PremiumConversionModal onDismiss={() => setShowConversionModal(false)} />}
     </AppLayout>
   );
 };

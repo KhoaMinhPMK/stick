@@ -1,27 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getLeaderboard, getProgressSummary, type LeaderboardEntry } from '../../services/api/endpoints';
+import { getRankedLeaderboard, getRewardsSummary, type RankedBoardEntry, type RewardsSummaryResponse } from '../../services/api/endpoints';
+
+type Scope = 'daily' | 'weekly';
 
 export const LeaderboardPage: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'weekly' | 'all-time'>('weekly');
-  const [ranking, setRanking] = useState<LeaderboardEntry[]>([]);
+  const [activeTab, setActiveTab] = useState<Scope>('daily');
+  const [ranking, setRanking] = useState<RankedBoardEntry[]>([]);
+  const [userPosition, setUserPosition] = useState<{ rank: number; rankedScore: number } | null>(null);
+  const [rewardsSummary, setRewardsSummary] = useState<RewardsSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userStreak, setUserStreak] = useState(0);
 
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
-        const [lbRes, sumRes] = await Promise.all([
-          getLeaderboard(activeTab),
-          getProgressSummary(),
+        const [lbRes, rwRes] = await Promise.all([
+          getRankedLeaderboard(activeTab),
+          getRewardsSummary(),
         ]);
-        setRanking(lbRes.items);
-        setUserStreak(sumRes.currentStreak);
+        setRanking(lbRes.board);
+        setUserPosition(lbRes.userPosition);
+        setRewardsSummary(rwRes);
       } catch (err) {
-        console.error('Failed to load leaderboard:', err);
+        console.error('Failed to load ranked leaderboard:', err);
       } finally {
         setLoading(false);
       }
@@ -36,16 +40,21 @@ export const LeaderboardPage: React.FC = () => {
   // Podium order: [2nd, 1st, 3rd]
   const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
 
-
   const podiumHeights = ['h-24 md:h-32', 'h-32 md:h-48', 'h-20 md:h-24'];
   const podiumBg = ['bg-stone-200', 'bg-[#FFF5CC]', 'bg-orange-100'];
+
+  // Caps for progress display
+  const dailyCaps = rewardsSummary?.caps || {};
+  const dailyAgg = rewardsSummary?.daily;
+  const userRankedToday = dailyAgg?.rankedScore || 0;
+  const globalRankCap = 60; // configurable via GameConfig
 
   return (
     <AppLayout activePath="#progress">
       <div className="max-w-4xl mx-auto py-8">
         
-        {/* Header Element */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-6">
           <div className="flex items-center gap-4 w-full md:w-auto">
              <button onClick={() => window.location.hash = '#progress'} className="p-2 hover:bg-surface-container rounded-full transition-colors hidden md:block">
                 <span className="material-symbols-outlined">arrow_back</span>
@@ -57,23 +66,46 @@ export const LeaderboardPage: React.FC = () => {
           
           <div className="flex items-center bg-surface-container p-1 rounded-full w-full md:w-auto">
              <button 
+               onClick={() => setActiveTab('daily')}
+               className={`flex-1 md:w-32 py-2 rounded-full font-headline font-bold text-sm transition-all ${
+                 activeTab === 'daily' ? 'bg-black text-white shadow-md' : 'text-stone-600 hover:text-black hover:bg-black/5'
+               }`}
+             >
+               Today
+             </button>
+             <button 
                onClick={() => setActiveTab('weekly')}
                className={`flex-1 md:w-32 py-2 rounded-full font-headline font-bold text-sm transition-all ${
                  activeTab === 'weekly' ? 'bg-black text-white shadow-md' : 'text-stone-600 hover:text-black hover:bg-black/5'
                }`}
              >
-               Weekly
-             </button>
-             <button 
-               onClick={() => setActiveTab('all-time')}
-               className={`flex-1 md:w-32 py-2 rounded-full font-headline font-bold text-sm transition-all ${
-                 activeTab === 'all-time' ? 'bg-black text-white shadow-md' : 'text-stone-600 hover:text-black hover:bg-black/5'
-               }`}
-             >
-               All Time
+               This Week
              </button>
           </div>
         </div>
+
+        {/* Info banner — only verified learning counts */}
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-secondary-container/30 rounded-xl mb-6 text-xs text-on-surface-variant">
+          <span className="material-symbols-outlined text-[16px]">verified</span>
+          <span>Only verified learning activities count toward ranking. Saving vocab or drafts does not affect rank.</span>
+        </div>
+
+        {/* User's today rank bar */}
+        {userPosition && activeTab === 'daily' && (
+          <div className="flex items-center gap-4 px-4 py-3 bg-primary-container/20 border-2 border-primary rounded-2xl mb-6">
+            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-black text-sm">
+              #{userPosition.rank}
+            </div>
+            <div className="flex-1">
+              <p className="font-headline font-bold text-sm">Your rank today</p>
+              <p className="text-xs text-on-surface-variant">{userRankedToday} / {globalRankCap} ranked pts earned today</p>
+            </div>
+            <div className="text-right">
+              <p className="font-headline font-black text-lg">{userPosition.rankedScore}</p>
+              <p className="text-[10px] font-bold text-on-surface-variant uppercase">Ranked</p>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -82,8 +114,8 @@ export const LeaderboardPage: React.FC = () => {
         ) : ranking.length === 0 ? (
           <div className="text-center py-20">
             <span className="material-symbols-outlined text-6xl text-stone-300 mb-4">leaderboard</span>
-            <h3 className="font-headline font-bold text-xl mb-2">No data yet</h3>
-            <p className="text-stone-400">Start writing journals and learning words to appear on the leaderboard!</p>
+            <h3 className="font-headline font-bold text-xl mb-2">No ranked data yet</h3>
+            <p className="text-stone-400">Start writing journals and completing lessons to appear on the ranked leaderboard!</p>
           </div>
         ) : (
           <>
@@ -100,7 +132,6 @@ export const LeaderboardPage: React.FC = () => {
                       <div className="relative mb-4">
                         {isGold && (
                           <>
-                            {/* SVG Crown */}
                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 select-none" style={{ filter: 'drop-shadow(0 2px 6px rgba(184,134,11,0.8))' }}>
                               <svg width="40" height="30" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M4 22L4 8L12 16L20 3L28 16L36 8L36 22Z" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
@@ -113,7 +144,6 @@ export const LeaderboardPage: React.FC = () => {
                                 <circle cx="28" cy="23.5" r="1.5" fill="#B8860B"/>
                               </svg>
                             </div>
-                            {/* Chat bubble */}
                             <div className="absolute -top-16 left-1/2 z-20 whitespace-nowrap" style={{ transform: 'translateX(-15%) rotate(-3deg)' }}>
                               <div className="relative bg-white text-black text-[10px] md:text-xs font-black px-3 py-2 leading-tight"
                                 style={{
@@ -166,19 +196,35 @@ export const LeaderboardPage: React.FC = () => {
                         {entry.isUser ? 'You' : entry.name}
                         {entry.isPremium && <span className="ml-1 text-amber-500 text-[10px]">★</span>}
                       </p>
+                      {/* Day-pass badge for top 3 */}
+                      {entry.hasDayPass && (
+                        <span className="text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-full mb-1">
+                          DAY PASS
+                        </span>
+                      )}
                       <div className={`w-full ${podiumHeights[podiumIdx]} rounded-t-xl sketch-border border-b-0 flex flex-col items-center justify-start pt-4 ${podiumBg[podiumIdx]}`}
                         style={{ borderColor: isGold ? '#FFD700' : undefined }}
                       >
                         <span className={`font-black ${isGold ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'}`}
                           style={{ color: isGold ? '#B38F00' : undefined }}
                         >
-                          {entry.score.toLocaleString()}
+                          {entry.rankedScore.toLocaleString()}
                         </span>
-                        <span className="text-[10px] md:text-xs font-bold text-stone-500 mt-1">XP</span>
+                        <span className="text-[10px] md:text-xs font-bold text-stone-500 mt-1">Ranked</span>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Top 3 premium reward note */}
+            {top3.length >= 3 && activeTab === 'daily' && (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl mb-6 border border-purple-200">
+                <span className="material-symbols-outlined text-[16px] text-purple-500">card_giftcard</span>
+                <span className="text-xs text-purple-800 font-headline">
+                  Top 3 mỗi ngày được tặng <strong>Premium Day Pass</strong> — trải nghiệm full premium miễn phí!
+                </span>
               </div>
             )}
 
@@ -218,15 +264,20 @@ export const LeaderboardPage: React.FC = () => {
                   {/* Name */}
                   <div className="flex-1 min-w-0">
                     <p className={`font-headline font-bold text-sm md:text-base ${entry.isUser ? 'text-black' : 'text-stone-700'} truncate`}>
-                      {entry.isUser ? `You${userStreak > 0 ? ` 🔥${userStreak}` : ''}` : entry.name}
+                      {entry.isUser ? 'You' : entry.name}
                       {entry.isPremium && <span className="ml-1.5 text-amber-500 text-xs">★</span>}
                     </p>
+                    {entry.hasDayPass && (
+                      <span className="text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white px-1.5 py-0.5 rounded-full">
+                        DAY PASS
+                      </span>
+                    )}
                   </div>
 
                   {/* Score */}
                   <div className="text-right">
-                    <p className="font-headline font-black text-base md:text-lg">{entry.score.toLocaleString()}</p>
-                    <p className="text-[10px] md:text-xs font-bold text-stone-400 uppercase">XP</p>
+                    <p className="font-headline font-black text-base md:text-lg">{entry.rankedScore.toLocaleString()}</p>
+                    <p className="text-[10px] md:text-xs font-bold text-stone-400 uppercase">Ranked</p>
                   </div>
                 </div>
               ))}
@@ -239,6 +290,44 @@ export const LeaderboardPage: React.FC = () => {
               </div>
             )}
           </>
+        )}
+
+        {/* Daily XP Caps progress */}
+        {rewardsSummary && dailyAgg && activeTab === 'daily' && (
+          <div className="mt-10 border-2 border-stone-200 rounded-2xl p-5">
+            <h3 className="font-headline font-bold text-sm mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">speed</span>
+              Today's Progress
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Journal', used: dailyAgg.journalXp, cap: dailyCaps.xp_journal_daily_cap || 15 },
+                { label: 'Lesson', used: dailyAgg.lessonXp, cap: dailyCaps.xp_lesson_daily_cap || 40 },
+                { label: 'Review', used: dailyAgg.reviewXp, cap: dailyCaps.xp_review_daily_cap || 25 },
+                { label: 'Practice', used: dailyAgg.practiceXp, cap: dailyCaps.xp_practice_daily_cap || 20 },
+              ].map(b => {
+                const pct = Math.min(100, b.cap > 0 ? (b.used / b.cap) * 100 : 0);
+                return (
+                  <div key={b.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-headline font-bold">{b.label}</span>
+                      <span className="text-stone-500">{b.used}/{b.cap} XP</span>
+                    </div>
+                    <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex justify-between text-xs pt-3 border-t border-stone-100">
+              <span className="font-headline font-bold">Total XP Today</span>
+              <span className="font-black">{dailyAgg.xpEarned} / {dailyCaps.xp_global_daily_cap || 100}</span>
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>

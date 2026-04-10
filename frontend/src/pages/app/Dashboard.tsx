@@ -4,6 +4,7 @@ import { AppLayout } from '../../layouts/AppLayout';
 import { getProgressSummary, getProgressDaily, getDueVocab, getSettings, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 import { consumeGuestMergedFlag } from '../../services/api/auth';
 import { usePremium } from '../../hooks/usePremium';
+import { PremiumDayPassBanner } from '../../components/PremiumDayPassBanner';
 
 export const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -104,6 +105,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <AppLayout activePath="#app">
+      <PremiumDayPassBanner />
       {showMergedBanner && (
         <div className="mb-4 p-3 bg-secondary-container border-2 border-secondary sketch-border rounded-xl flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">

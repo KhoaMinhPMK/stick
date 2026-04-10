@@ -3268,6 +3268,30 @@ router.get('/rewards/summary', requireAuth, asyncHandler(async (req, res) => {
   res.status(200).json({ daily, weekly, caps });
 }));
 
+// ─── Premium Active Grant ────────────────────────────
+router.get('/premium/active-grant', requireAuth, asyncHandler(async (req, res) => {
+  const [rows] = await prisma.$queryRawUnsafe(
+    `SELECT id, reason, startsAt, endsAt, status
+     FROM \`PremiumGrant\`
+     WHERE userId = ? AND status = 'active' AND endsAt > NOW()
+     ORDER BY endsAt DESC LIMIT 1`,
+    req.authUser.id,
+  );
+
+  if (!rows) {
+    return res.status(200).json({ active: false });
+  }
+
+  res.status(200).json({
+    active: true,
+    grantId: rows.id,
+    reason: rows.reason,
+    startsAt: rows.startsAt,
+    expiresAt: rows.endsAt,
+    status: rows.status,
+  });
+}));
+
 // ─── Journal Mood ────────────────────────────────────
 router.post('/journals/:id/mood', requireAuth, asyncHandler(async (req, res) => {
   const { mood } = req.body || {};

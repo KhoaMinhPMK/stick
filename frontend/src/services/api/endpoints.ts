@@ -381,6 +381,79 @@ export async function getLeaderboard(scope: 'weekly' | 'all-time' = 'weekly') {
   return apiRequest<{ items: LeaderboardEntry[]; scope: string }>(`/leaderboard?scope=${scope}`);
 }
 
+// ─── Ranked Leaderboard ──────────────────────────────
+export interface RankedBoardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  rankedScore: number;
+  isPremium: boolean;
+  hasDayPass: boolean;
+  isUser: boolean;
+}
+
+export interface RankedLeaderboardResponse {
+  scope: string;
+  board: RankedBoardEntry[];
+  userPosition: {
+    rank: number;
+    rankedScore: number;
+  } | null;
+}
+
+export async function getRankedLeaderboard(scope: 'daily' | 'weekly' = 'daily', limit = 20) {
+  return apiRequest<RankedLeaderboardResponse>(`/leaderboard/ranked?scope=${scope}&limit=${limit}`);
+}
+
+export interface LeaderboardSnapshotEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  rankedScore: number;
+  wonDayPass: boolean;
+}
+
+export async function getLeaderboardSnapshot(period: 'daily' | 'weekly', periodKey: string) {
+  return apiRequest<{ period: string; periodKey: string; snapshot: LeaderboardSnapshotEntry[] }>(
+    `/leaderboard/snapshot?period=${period}&periodKey=${periodKey}`
+  );
+}
+
+// ─── Rewards Summary ─────────────────────────────────
+export interface DailyAggregate {
+  xpEarned: number;
+  rankedScore: number;
+  journalXp: number;
+  lessonXp: number;
+  reviewXp: number;
+  practiceXp: number;
+}
+
+export interface RewardsSummaryResponse {
+  daily: DailyAggregate | null;
+  weekly: DailyAggregate | null;
+  caps: Record<string, number>;
+}
+
+export async function getRewardsSummary() {
+  return apiRequest<RewardsSummaryResponse>('/rewards/summary');
+}
+
+// ─── Premium Day Pass State ──────────────────────────
+export interface PremiumGrantInfo {
+  id: string;
+  grantType: string;
+  startsAt: string;
+  endsAt: string | null;
+  status: string;
+  sourceRank: number | null;
+}
+
+export async function getActivePremiumGrant() {
+  return apiRequest<{ grant: PremiumGrantInfo | null }>('/premium/active-grant');
+}
+
 // ─── Journal Mood ────────────────────────────────────
 export async function postJournalMood(journalId: string, mood: string) {
   return apiRequest<{ message: string; mood: string }>(`/journals/${journalId}/mood`, {

@@ -12,6 +12,9 @@ const menuItems = [
   { id: 'lessons', hash: '#admin/lessons', icon: 'menu_book', label: 'Lessons' },
   { id: 'ai-logs', hash: '#admin/ai-logs', icon: 'smart_toy', label: 'AI Logs' },
   { id: 'users', hash: '#admin/users', icon: 'group', label: 'Users' },
+  { id: 'game-config', hash: '#admin/game-config', icon: 'tune', label: 'Game Config' },
+  { id: 'abuse-flags', hash: '#admin/abuse-flags', icon: 'shield', label: 'Abuse Flags' },
+  { id: 'leaderboard-ops', hash: '#admin/leaderboard-ops', icon: 'emoji_events', label: 'Leaderboard Ops' },
   { id: 'settings', hash: '#admin/settings', icon: 'settings', label: 'Settings' },
 ];
 
