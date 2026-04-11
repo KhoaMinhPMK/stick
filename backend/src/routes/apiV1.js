@@ -4337,7 +4337,7 @@ router.put('/admin/openai-key', requireAuth, requireAdmin, asyncHandler(async (r
   } else {
     const newId = require('crypto').randomUUID();
     await prisma.$queryRawUnsafe(
-      "INSERT INTO `AppConfig` (id, `key`, value, updatedBy, createdAt, updatedAt) VALUES (?, 'openai_api_key', ?, ?, NOW(), NOW())",
+      "INSERT INTO `AppConfig` (id, `key`, value, updatedBy, updatedAt) VALUES (?, 'openai_api_key', ?, ?, NOW())",
       newId, valStr, req.authUser.id
     );
   }
