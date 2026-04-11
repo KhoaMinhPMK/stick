@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, generateVocabQuiz, importFeedbackVocab, type VocabItem, type QuizQuestion } from '../../services/api/endpoints';
+import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, generateVocabQuiz, importFeedbackVocab, getProgressSummary, type VocabItem, type QuizQuestion } from '../../services/api/endpoints';
 import { ApiError, apiRequest } from '../../services/api/client';
 import { QuizModal, type QuizResult } from '../../components/quiz/QuizModal';
 import { parseFeedback, type LearningCandidate } from '../../types/dto/ai-feedback';
@@ -92,16 +92,24 @@ export const VocabNotebookPage: React.FC = () => {
     }
   }
 
-  // Load this session's learning candidates when journalId is in URL
+  // Load this session's learning candidates.
+  // If journalId is in URL (came from feedback flow), use it directly.
+  // Otherwise, silently look up today's submitted journal so the checklist
+  // is always visible when the user navigates here from any tab.
   useEffect(() => {
-    if (!journalId) return;
     (async () => {
       try {
-        const res = await apiRequest(`/journals/${journalId}`) as any;
+        let targetId = journalId;
+        if (!targetId) {
+          const summary = await getProgressSummary();
+          targetId = summary.todayJournalId;
+        }
+        if (!targetId) return;
+        const res = await apiRequest(`/journals/${targetId}`) as any;
         const dto = parseFeedback(res.journal.feedback);
         if (dto.learningCandidates.length > 0) {
           setSessionCandidates(dto.learningCandidates);
-          setSessionJournalId(journalId);
+          setSessionJournalId(targetId);
         }
       } catch { /* non-blocking */ }
     })();
