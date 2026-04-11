@@ -10,6 +10,9 @@ const { prisma } = require('./lib/db');
 const app = express();
 const port = Number(process.env.PORT || 3040);
 
+// Trust IIS reverse proxy so express-rate-limit can read X-Forwarded-For correctly
+app.set('trust proxy', 1);
+
 const openApiPath = path.join(__dirname, '..', 'docs', 'openapi.yaml');
 let openApiDocument;
 try {
