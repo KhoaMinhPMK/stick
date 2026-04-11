@@ -29,13 +29,7 @@ export const JournalRecordPage: React.FC = () => {
     setLoadingJournal(true);
     apiRequest<{ journal: { feedback: string | null; content: string } }>(`/journals/${journalId}`)
       .then(res => {
-        const j = res.journal;
-        try {
-          const fb = typeof j.feedback === 'string' ? JSON.parse(j.feedback) : j.feedback;
-          setSentence(fb?.enhancedText || j.content || '');
-        } catch {
-          setSentence(j.content || '');
-        }
+        setSentence(res.journal.content || '');
       })
       .catch(() => {})
       .finally(() => setLoadingJournal(false));

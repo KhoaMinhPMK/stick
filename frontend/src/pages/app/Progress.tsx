@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getProgressSummary, getProgressDaily, getProgressDailyDetail, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
-import { apiRequest } from '../../services/api/client';
-
+import { getProgressSummary, getProgressDaily, type ProgressSummary, type ProgressDailyItem } from '../../services/api/endpoints';
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 type DayStatus = 'completed' | 'missed' | 'today' | 'future';
@@ -11,14 +9,10 @@ type DayStatus = 'completed' | 'missed' | 'today' | 'future';
 export const ProgressPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [monthOffset, setMonthOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [dayDetail, setDayDetail] = useState<any>(null);
-  const [dayDetailLoading, setDayDetailLoading] = useState(false);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [dailyData, setDailyData] = useState<ProgressDailyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     async function load() {
       try {
@@ -76,52 +70,14 @@ export const ProgressPage: React.FC = () => {
     return { day, status: 'missed' as DayStatus };
   });
 
-  const completedCount = days.filter(d => d.status === 'completed').length;
   const streak = summary?.currentStreak || 0;
   const bestStreak = summary?.bestStreak || 0;
   const totalDaysAllTime = summary?.totalActiveDays || 0;
-
-  // Build XP-per-date map for bar chart heights in calendar cells
-  const xpByDate = React.useMemo(() => {
-    const m = new Map<string, number>();
-    dailyData.forEach(d => {
-      const key = getLocalDateString(new Date(d.day));
-      m.set(key, d.xpEarned);
-    });
-    return m;
-  }, [dailyData]);
-  const maxXpInPeriod = React.useMemo(
-    () => Math.max(10, ...dailyData.map(d => d.xpEarned)),
-    [dailyData]
-  );
 
   // Milestone uses all-time total journals for meaningful goal tracking
   const totalJournals = summary?.totalJournals || 0;
   const nextMilestone = Math.max(Math.ceil((totalJournals + 1) / 10) * 10, 10);
   const daysToGoal = nextMilestone - totalJournals;
-
-  // Load day detail when clicking a completed day
-  const handleDayClick = async (day: number, status: DayStatus) => {
-    if (status !== 'completed' && status !== 'today') return;
-    if (selectedDay === day) {
-      setSelectedDay(null);
-      setDayDetail(null);
-      return;
-    }
-    setSelectedDay(day);
-    setDayDetailLoading(true);
-    setDayDetail(null);
-    try {
-      const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-      const dateStr = getLocalDateString(date);
-      const res = await getProgressDailyDetail(dateStr);
-      setDayDetail(res.detail);
-    } catch (err) {
-      console.error('Failed to load day detail:', err);
-    } finally {
-      setDayDetailLoading(false);
-    }
-  };
 
   return (
     <AppLayout activePath="#progress">
@@ -156,10 +112,10 @@ export const ProgressPage: React.FC = () => {
                     <p className="text-on-surface-variant font-medium text-xs md:text-sm">{t('progress.consistency_quote')}</p>
                   </div>
                   <div className="flex gap-2 md:gap-4">
-                    <button onClick={() => { setMonthOffset(m => m - 1); setSelectedDay(null); setDayDetail(null); }} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
+                    <button onClick={() => setMonthOffset(m => m - 1)} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
                       <span className="material-symbols-outlined text-sm md:text-base">chevron_left</span>
                     </button>
-                    <button onClick={() => { setMonthOffset(m => Math.min(m + 1, 0)); setSelectedDay(null); setDayDetail(null); }} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
+                    <button onClick={() => setMonthOffset(m => Math.min(m + 1, 0))} className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center border-2 border-black rounded-lg hover:bg-surface-container transition-colors active:scale-95">
                       <span className="material-symbols-outlined text-sm md:text-base">chevron_right</span>
                     </button>
                   </div>
@@ -180,13 +136,12 @@ export const ProgressPage: React.FC = () => {
                     <div key={`empty-${i}`} />
                   ))}
 
-                  {days.map(({ day, status, isStreakDay }) => {
+                  {days.map(({ day, status }) => {
                     if (status === 'completed') {
                       return (
                         <div
                           key={day}
-                          onClick={() => handleDayClick(day, status)}
-                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform cursor-pointer overflow-hidden bg-tertiary-container ${selectedDay === day ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          className="aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 hover:-rotate-1 transition-transform overflow-hidden bg-tertiary-container"
                         >
                           <span className="font-headline font-bold text-white text-xs md:text-base leading-none">{day}</span>
                           <span
@@ -213,8 +168,7 @@ export const ProgressPage: React.FC = () => {
                       return (
                         <div
                           key={day}
-                          onClick={() => handleDayClick(day, status)}
-                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 ring-2 md:ring-4 ring-primary ring-offset-2 md:ring-offset-4 ring-offset-surface cursor-pointer ${isTodayDone ? 'bg-tertiary-container' : 'bg-secondary-container'}`}
+                          className={`aspect-square md:h-auto md:aspect-auto md:min-h-[5rem] lg:min-h-[6rem] border-2 border-black rounded-lg md:rounded-xl flex flex-col items-center justify-between pt-1.5 pb-1.5 md:pt-2 md:pb-2 px-1.5 md:px-2 ring-2 md:ring-4 ring-primary ring-offset-2 md:ring-offset-4 ring-offset-surface ${isTodayDone ? 'bg-tertiary-container' : 'bg-secondary-container'}`}
                         >
                           <span className={`font-headline font-bold text-xs md:text-base leading-none ${isTodayDone ? 'text-white' : 'text-black'}`}>{day}</span>
                           {isTodayDone ? (
@@ -239,72 +193,10 @@ export const ProgressPage: React.FC = () => {
                   })}
                 </div>
               </div>
-
-              {/* Day Detail Panel */}
-              {selectedDay && (
-                <div className="mt-4 bg-surface-container-lowest sketch-border p-4 md:p-6 animate-fade-in">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-headline font-bold text-base md:text-lg">
-                      📋 {viewDate.toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { month: 'short' })} {selectedDay} — {t('progress.day_detail')}
-                    </h4>
-                    <button onClick={() => { setSelectedDay(null); setDayDetail(null); }} className="text-stone-400 hover:text-black">
-                      <span className="material-symbols-outlined">close</span>
-                    </button>
-                  </div>
-                  {dayDetailLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                    </div>
-                  ) : dayDetail ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="bg-surface-container p-3 rounded-lg text-center">
-                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.journalsCount}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_journals')}</p>
-                        </div>
-                        <div className="bg-surface-container p-3 rounded-lg text-center">
-                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.wordsLearned}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_words')}</p>
-                        </div>
-                        <div className="bg-surface-container p-3 rounded-lg text-center">
-                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.xpEarned}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_xp')}</p>
-                        </div>
-                        <div className="bg-surface-container p-3 rounded-lg text-center">
-                          <p className="font-black text-xl md:text-2xl font-headline">{dayDetail.minutesSpent}</p>
-                          <p className="text-[10px] md:text-xs font-bold text-stone-500 uppercase">{t('progress.stat_minutes')}</p>
-                        </div>
-                      </div>
-                      {dayDetail.journals && dayDetail.journals.length > 0 && (
-                        <div>
-                          <p className="font-bold text-xs uppercase text-stone-500 mb-2">{t('progress.journal_entries')}:</p>
-                          <div className="space-y-2">
-                            {dayDetail.journals.map((j: any) => (
-                              <div
-                                key={j.id}
-                                onClick={() => window.location.hash = `#history-detail?id=${j.id}`}
-                                className="flex items-center justify-between bg-white p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-surface-container transition-colors"
-                              >
-                                <span className="font-medium text-sm">{j.title}</span>
-                                {j.score != null && (
-                                  <span className="bg-tertiary-container text-white text-xs font-bold px-2 py-0.5 rounded-full">{j.score}/100</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-stone-400 text-sm italic">{t('progress.no_activity')}</p>
-                  )}
-                </div>
-              )}
             </section>
 
             {/* Stats Side Panel */}
             <aside className="lg:col-span-4 space-y-4 md:space-y-6 lg:space-y-8">
-              {/* Streak Card */}
               <div className="bg-secondary-container p-5 md:p-6 lg:p-8 sketch-border rotate-1">
                 <h4 className="font-headline font-extrabold text-lg md:text-xl lg:text-2xl mb-4 md:mb-6">{t('progress.streak_stats')}</h4>
                 <div className="space-y-3 md:space-y-4 lg:space-y-6">

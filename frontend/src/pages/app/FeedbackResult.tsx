@@ -341,6 +341,56 @@ export const FeedbackResultPage: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Review List — Words you used vs still learning */}
+            {learningCandidates.length > 0 && (
+              <div className="sketch-card p-5 md:p-8 bg-surface-container-low">
+                <h3 className="font-headline font-bold text-base md:text-xl mb-4 md:mb-6 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg md:text-2xl">checklist</span>
+                  {t('feedback_result.review_list_title', { defaultValue: 'Hôm nay bạn dùng được gì?' })}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                  {/* Dùng được */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-tertiary shrink-0" />
+                      <span className="font-label font-bold text-[10px] md:text-xs uppercase tracking-widest text-tertiary">
+                        {t('feedback_result.review_used', { defaultValue: 'Dùng được ✓' })}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {learningCandidates.filter(c => c.candidateType === 'reinforce').length === 0 ? (
+                        <p className="text-xs italic text-stone-400 px-1">
+                          {t('feedback_result.review_used_empty', { defaultValue: 'Viết thêm tiếng Anh để có từ ở đây nhé!' })}
+                        </p>
+                      ) : learningCandidates.filter(c => c.candidateType === 'reinforce').map((c, i) => (
+                        <div key={i} className="px-3 py-2 bg-tertiary/10 border border-tertiary/30 rounded-lg">
+                          <span className="font-headline font-bold text-sm">{c.expression}</span>
+                          {c.meaning && <p className="text-xs text-on-surface-variant italic mt-0.5">{c.meaning}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Từ cần học thêm */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-stone-400 shrink-0" />
+                      <span className="font-label font-bold text-[10px] md:text-xs uppercase tracking-widest text-stone-500">
+                        {t('feedback_result.review_learning', { defaultValue: 'Từ cần học thêm' })}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {learningCandidates.filter(c => c.candidateType !== 'reinforce').map((c, i) => (
+                        <div key={i} className="px-3 py-2 bg-surface-dim rounded-lg border border-stone-200">
+                          <span className="font-headline font-bold text-sm text-on-surface-variant">{c.expression}</span>
+                          {c.meaning && <p className="text-xs text-stone-400 italic mt-0.5">{c.meaning}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Sidebar */}
