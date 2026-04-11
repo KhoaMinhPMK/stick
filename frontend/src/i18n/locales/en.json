@@ -439,6 +439,7 @@
                          "step_of":  "Step {{current}} of {{total}}",
                          "step_name":  "Vocabulary Reinforcement",
                          "continue_to_speaking":  "Continue to speaking",
+                         "finish":  "Back to home",
                          "cards":  {
                                        "a_lot_of":  {
                                                         "meaning":  "A large amount or number of something.",

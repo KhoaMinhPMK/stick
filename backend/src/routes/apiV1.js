@@ -14,7 +14,7 @@ const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, ge
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
 // ─── Game Engines ────────────────────────────────────
-const { grantReward, todayKey: rewardTodayKey } = require('../lib/rewardEngine');
+const { grantReward, todayKey: rewardTodayKey, weekKey: rewardWeekKey } = require('../lib/rewardEngine');
 const { getGameConfig, getGameConfigs, clearGameConfigCache } = require('../lib/gameConfig');
 const { getDailyLeaderboard, getWeeklyLeaderboard, getSnapshot, finalizeDailyLeaderboard, expirePremiumGrants } = require('../lib/leaderboardEngine');
 const { checkJournalIntegrity, checkPracticeIntegrity, getOpenFlags, reviewFlag } = require('../lib/abuseEngine');
@@ -921,10 +921,12 @@ function getLevelInfo(totalXp) {
  */
 async function awardXp(userId, amount, source, opts = {}) {
   if (!amount || amount <= 0) return;
-  // P0-D: Use $transaction to ensure XpLog + User.totalXp atomicity
-  const id = require('crypto').randomUUID();
-  await prisma.$transaction([
-    prisma.userXpLog.create({
+  const id = crypto.randomUUID();
+  const day = rewardTodayKey();
+  const week = rewardWeekKey(day);
+  // Use interactive transaction so we can mix ORM + raw SQL
+  await prisma.$transaction(async (tx) => {
+    await tx.userXpLog.create({
       data: {
         id,
         userId,
@@ -933,12 +935,28 @@ async function awardXp(userId, amount, source, opts = {}) {
         description: opts.description || null,
         journalId: opts.journalId || null,
       },
-    }),
-    prisma.user.update({
+    });
+    await tx.user.update({
       where: { id: userId },
       data: { totalXp: { increment: amount } },
-    }),
-  ]);
+    });
+    // Sync to DailyUserAggregate so leaderboard includes achievement XP
+    const aggId = crypto.randomUUID();
+    await tx.$executeRawUnsafe(
+      `INSERT INTO \`DailyUserAggregate\` (\`id\`, \`userId\`, \`dayKey\`, \`xpEarned\`, \`rankedScore\`, \`updatedAt\`)
+       VALUES (?, ?, ?, ?, 0, NOW(3))
+       ON DUPLICATE KEY UPDATE \`xpEarned\` = \`xpEarned\` + VALUES(\`xpEarned\`), \`updatedAt\` = NOW(3)`,
+      aggId, userId, day, amount
+    );
+    // Sync to WeeklyUserAggregate
+    const weekAggId = crypto.randomUUID();
+    await tx.$executeRawUnsafe(
+      `INSERT INTO \`WeeklyUserAggregate\` (\`id\`, \`userId\`, \`weekKey\`, \`xpEarned\`, \`rankedScore\`, \`verifiedLearningMinutes\`, \`verifiedEventCount\`, \`daysActive\`, \`updatedAt\`)
+       VALUES (?, ?, ?, ?, 0, 0, 0, 0, NOW(3))
+       ON DUPLICATE KEY UPDATE \`xpEarned\` = \`xpEarned\` + VALUES(\`xpEarned\`), \`updatedAt\` = NOW(3)`,
+      weekAggId, userId, week, amount
+    );
+  });
 }
 
 // ─── Health ───────────────────────────────────────────
@@ -1951,18 +1969,18 @@ router.get('/achievements/summary', requireAuth, asyncHandler(async (req, res) =
   });
   const achievementXp = totalXpRecords.reduce((sum, ua) => sum + (ua.achievement?.xpReward || 0), 0);
 
-  // Also include totalXp from ProgressDaily for a unified view
-  const allXpProgress = await prisma.progressDaily.findMany({
-    where: { userId: req.authUser.id },
-    select: { xpEarned: true },
+  // Use User.totalXp directly — same source as /progress/summary for consistency
+  const userXpRow = await prisma.user.findUnique({
+    where: { id: req.authUser.id },
+    select: { totalXp: true },
   });
-  const totalXp = allXpProgress.reduce((sum, p) => sum + p.xpEarned, 0);
+  const totalXp = userXpRow?.totalXp ?? 0;
 
   res.status(200).json({
     totalAchievements: totalDefinitions,
     unlocked: totalUnlocked,
     locked: totalDefinitions - totalUnlocked,
-    xpEarned: totalXp, // unified XP from daily progress (matches /progress/summary)
+    xpEarned: totalXp, // matches /progress/summary (User.totalXp)
     achievementXp, // XP from achievement rewards only
     completionPercent: totalDefinitions > 0 ? Math.round((totalUnlocked / totalDefinitions) * 100) : 0,
   });

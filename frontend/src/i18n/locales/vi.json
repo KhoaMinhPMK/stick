@@ -439,6 +439,7 @@
                          "step_of":  "Bước {{current}} / {{total}}",
                          "step_name":  "Củng cố từ vựng",
                          "continue_to_speaking":  "Tiếp tục luyện nói",
+                         "finish":  "Về trang chủ",
                          "cards":  {
                                        "a_lot_of":  {
                                                         "meaning":  "Một lượng lớn hoặc số lượng nhiều của thứ gì đó.",
