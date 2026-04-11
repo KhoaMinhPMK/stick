@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '../../layouts/AppLayout';
-import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, generateVocabQuiz, type VocabItem, type QuizQuestion } from '../../services/api/endpoints';
-import { ApiError } from '../../services/api/client';
+import { getVocabNotebook, createVocabItem, updateVocabItem, deleteVocabItem, generateVocabQuiz, importFeedbackVocab, type VocabItem, type QuizQuestion } from '../../services/api/endpoints';
+import { ApiError, apiRequest } from '../../services/api/client';
 import { QuizModal, type QuizResult } from '../../components/quiz/QuizModal';
+import { parseFeedback, type LearningCandidate } from '../../types/dto/ai-feedback';
 
 export const VocabNotebookPage: React.FC = () => {
   const { t } = useTranslation();
@@ -22,6 +23,16 @@ export const VocabNotebookPage: React.FC = () => {
   const [quizPhase, setQuizPhase] = useState<'idle' | 'loading' | 'active' | 'result'>('idle');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+
+  // ── Session feedback checklist ────────────────────────────────────────────
+  const journalId = useMemo(() => {
+    return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
+  }, []);
+  const [sessionCandidates, setSessionCandidates] = useState<LearningCandidate[]>([]);
+  const [sessionJournalId, setSessionJournalId] = useState<string | null>(null);
+  const [savedSessionIndices, setSavedSessionIndices] = useState<Set<number>>(new Set());
+  const [savingSessionIndex, setSavingSessionIndex] = useState<number | null>(null);
+  // ─────────────────────────────────────────────────────────
 
   const handleStartQuiz = async () => {
     if (words.length < 3) {
@@ -80,6 +91,36 @@ export const VocabNotebookPage: React.FC = () => {
       setLoading(false);
     }
   }
+
+  // Load this session's learning candidates when journalId is in URL
+  useEffect(() => {
+    if (!journalId) return;
+    (async () => {
+      try {
+        const res = await apiRequest(`/journals/${journalId}`) as any;
+        const dto = parseFeedback(res.journal.feedback);
+        if (dto.learningCandidates.length > 0) {
+          setSessionCandidates(dto.learningCandidates);
+          setSessionJournalId(journalId);
+        }
+      } catch { /* non-blocking */ }
+    })();
+  }, [journalId]);
+
+  const handleSaveSessionWord = async (index: number, candidate: LearningCandidate) => {
+    if (!sessionJournalId || savedSessionIndices.has(index) || savingSessionIndex !== null) return;
+    setSavingSessionIndex(index);
+    try {
+      await importFeedbackVocab(sessionJournalId, [{
+        word: candidate.expression,
+        meaning: candidate.meaning,
+        example: candidate.example,
+      }]);
+      setSavedSessionIndices(prev => new Set(prev).add(index));
+    } catch { /* silent */ } finally {
+      setSavingSessionIndex(null);
+    }
+  };
 
   const handleAdd = async () => {
     if (!newWord.trim()) return;
@@ -157,6 +198,83 @@ export const VocabNotebookPage: React.FC = () => {
           <div className="mb-4 p-3 bg-error-container border-2 border-error rounded-xl flex items-center justify-between">
             <span className="text-sm font-bold text-on-error-container">{error}</span>
             <button onClick={() => { setError(null); loadWords(); }} className="text-sm font-headline font-bold text-error underline">{t('common.retry')}</button>
+          </div>
+        )}
+
+        {/* Session Checklist — from today's journal */}
+        {sessionCandidates.length > 0 && (
+          <div className="sketch-card p-5 md:p-6 mb-6 md:mb-8 bg-secondary-container/10">
+            <div className="flex items-center justify-between mb-4 md:mb-5">
+              <h3 className="font-headline font-bold text-base md:text-xl flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg md:text-2xl text-secondary">checklist</span>
+                Hôm nay bạn dùng được gì?
+              </h3>
+              <button
+                onClick={() => setSessionCandidates([])}
+                className="text-on-surface-variant hover:text-primary transition-colors"
+                title="Đóng"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+              {/* Dùng được ✓ */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-tertiary shrink-0" />
+                  <span className="font-label font-bold text-[10px] md:text-xs uppercase tracking-widest text-tertiary">Dùng được ✓</span>
+                </div>
+                <div className="space-y-2">
+                  {sessionCandidates.filter(c => c.candidateType === 'reinforce').length === 0 ? (
+                    <p className="text-xs italic text-stone-400 px-1">Viết thêm tiếng Anh để có từ ở đây nhé!</p>
+                  ) : sessionCandidates.map((c, idx) => c.candidateType === 'reinforce' ? (
+                    <div key={idx} className="px-3 py-2 bg-tertiary/10 border border-tertiary/30 rounded-lg">
+                      <span className="font-headline font-bold text-sm">{c.expression}</span>
+                      {c.meaning && <p className="text-xs text-on-surface-variant italic mt-0.5">{c.meaning}</p>}
+                    </div>
+                  ) : null)}
+                </div>
+              </div>
+
+              {/* Từ cần học thêm */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
+                  <span className="font-label font-bold text-[10px] md:text-xs uppercase tracking-widest text-primary">Từ cần học thêm</span>
+                </div>
+                <div className="space-y-3">
+                  {sessionCandidates.map((c, idx) => c.candidateType !== 'reinforce' ? (
+                    <div key={idx} className="p-3 bg-surface-container-lowest border-2 border-black/10 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-headline font-bold text-sm md:text-base">{c.expression}</span>
+                            {c.level && <span className="text-[10px] px-1.5 py-0.5 bg-black text-white rounded font-mono">{c.level}</span>}
+                            {c.candidateType === 'upgrade' && <span className="text-[10px] px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-bold">nâng cấp</span>}
+                          </div>
+                          {c.meaningGap && <p className="text-[10px] text-stone-400 italic">Bạn muốn nói: &#8220;{c.meaningGap}&#8221;</p>}
+                          {c.meaning && <p className="text-xs text-on-surface-variant mt-1">{c.meaning}</p>}
+                          {c.example && <p className="text-xs italic text-stone-500 mt-0.5">&#8220;{c.example}&#8221;</p>}
+                        </div>
+                        <button
+                          onClick={() => handleSaveSessionWord(idx, c)}
+                          disabled={savedSessionIndices.has(idx) || savingSessionIndex !== null}
+                          title={savedSessionIndices.has(idx) ? 'Đã lưu vào sổ' : 'Lưu vào sổ'}
+                          className="shrink-0 mt-0.5 p-1.5 rounded hover:bg-black/10 transition-colors disabled:opacity-40 disabled:cursor-default"
+                        >
+                          {savingSessionIndex === idx
+                            ? <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                            : savedSessionIndices.has(idx)
+                              ? <span className="material-symbols-outlined text-base text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>bookmark_added</span>
+                              : <span className="material-symbols-outlined text-base text-stone-400 hover:text-primary">bookmark_add</span>
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  ) : null)}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

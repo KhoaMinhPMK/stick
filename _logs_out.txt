@@ -1,0 +1,171 @@
+E:\anaconda3\Lib\site-packages\paramiko\pkey.py:82: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+E:\anaconda3\Lib\site-packages\paramiko\transport.py:243: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+[TAILING] Tailing last 80 lines for [stick-api-prod] process (change the value with --lines option)
+C:\Users\Administrator\.pm2\logs\stick-api-prod-out-15.log last 80 lines:
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [streak-cron] Sent 6 streak warning(s)
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  override existing env vars with { override: true }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [streak-cron] Sent 7 streak warning(s)
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+15|stick-a | [dotenv@17.3.1] injecting env (4) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+15|stick-a | STICK backend listening on http://localhost:3040
+15|stick-a | Swagger UI available at http://localhost:3040/docs
+
+C:\Users\Administrator\.pm2\logs\stick-api-prod-error-15.log last 80 lines:
+15|stick-a |     at async C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:691:5 {
+15|stick-a |   code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+15|stick-a |   help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+15|stick-a | }
+15|stick-a | mergeGuestIntoUser: progress merge error 
+15|stick-a | Invalid `prisma.$queryRawUnsafe()` invocation:
+15|stick-a | 
+15|stick-a | 
+15|stick-a | Raw query failed. Code: `1052`. Message: `Column 'ProgressDaily.journalsCount' in field list is ambiguous`
+15|stick-a | mergeGuestIntoUser: error pattern merge error 
+15|stick-a | Invalid `prisma.$queryRawUnsafe()` invocation:
+15|stick-a | 
+15|stick-a | 
+15|stick-a | Raw query failed. Code: `1052`. Message: `Column 'LearnerErrorPattern.count' in field list is ambiguous`
+15|stick-a | mergeGuestIntoUser: lexicon merge error 
+15|stick-a | Invalid `prisma.$queryRawUnsafe()` invocation:
+15|stick-a | 
+15|stick-a | 
+15|stick-a | Raw query failed. Code: `1052`. Message: `Column 'LearnerLexicon.aiSuggestedCount' in field list is ambiguous`
+15|stick-a | ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+15|stick-a |     at Object.xForwardedForHeader (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:185:13)
+15|stick-a |     at wrappedValidations.<computed> [as xForwardedForHeader] (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:397:22)
+15|stick-a |     at Object.keyGenerator (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:658:20)
+15|stick-a |     at C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:710:32
+15|stick-a |     at async C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:691:5 {
+15|stick-a |   code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+15|stick-a |   help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+15|stick-a | }
+15|stick-a | ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+15|stick-a |     at Object.xForwardedForHeader (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:185:13)
+15|stick-a |     at wrappedValidations.<computed> [as xForwardedForHeader] (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:397:22)
+15|stick-a |     at Object.keyGenerator (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:658:20)
+15|stick-a |     at C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:710:32
+15|stick-a |     at async C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:691:5 {
+15|stick-a |   code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+15|stick-a |   help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+15|stick-a | }
+15|stick-a | ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+15|stick-a |     at Object.xForwardedForHeader (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:185:13)
+15|stick-a |     at wrappedValidations.<computed> [as xForwardedForHeader] (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:397:22)
+15|stick-a |     at Object.keyGenerator (C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:658:20)
+15|stick-a |     at C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:710:32
+15|stick-a |     at async C:\inetpub\wwwroot\stick\backend\node_modules\express-rate-limit\dist\index.cjs:691:5 {
+15|stick-a |   code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+15|stick-a |   help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+15|stick-a | }
+15|stick-a | API Error: PrismaClientKnownRequestError: 
+15|stick-a | Invalid `prisma.$queryRawUnsafe()` invocation:
+15|stick-a | 
+15|stick-a | 
+15|stick-a | Raw query failed. Code: `1054`. Message: `Unknown column 'createdAt' in 'field list'`
+15|stick-a |     at zn.handleRequestError (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:121:7459)
+15|stick-a |     at zn.handleAndLogRequestError (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:121:6784)
+15|stick-a |     at zn.request (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:121:6491)
+15|stick-a |     at async l (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:130:9778)
+15|stick-a |     at async C:\inetpub\wwwroot\stick\backend\src\routes\apiV1.js:4339:5 {
+15|stick-a |   code: 'P2010',
+15|stick-a |   meta: {
+15|stick-a |     code: '1054',
+15|stick-a |     message: "Unknown column 'createdAt' in 'field list'"
+15|stick-a |   },
+15|stick-a |   clientVersion: '6.6.0'
+15|stick-a | }
+15|stick-a | API Error: PrismaClientKnownRequestError: 
+15|stick-a | Invalid `prisma.$queryRawUnsafe()` invocation:
+15|stick-a | 
+15|stick-a | 
+15|stick-a | Raw query failed. Code: `1054`. Message: `Unknown column 'createdAt' in 'field list'`
+15|stick-a |     at zn.handleRequestError (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:121:7459)
+15|stick-a |     at zn.handleAndLogRequestError (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:121:6784)
+15|stick-a |     at zn.request (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:121:6491)
+15|stick-a |     at async l (C:\inetpub\wwwroot\stick\backend\node_modules\@prisma\client\runtime\library.js:130:9778)
+15|stick-a |     at async C:\inetpub\wwwroot\stick\backend\src\routes\apiV1.js:4339:5 {
+15|stick-a |   code: 'P2010',
+15|stick-a |   meta: {
+15|stick-a |     code: '1054',
+15|stick-a |     message: "Unknown column 'createdAt' in 'field list'"
+15|stick-a |   },
+15|stick-a |   clientVersion: '6.6.0'
+15|stick-a | }
+
+
+[EXIT CODE: 0]

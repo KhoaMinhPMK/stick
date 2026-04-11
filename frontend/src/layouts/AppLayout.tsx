@@ -29,8 +29,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
     { id: '#journal', icon: 'edit_note', label: t('navigation.journal') },
     { id: '#vocab-notebook', icon: 'book_5', label: t('navigation.vocab') },
     { id: '#progress', icon: 'trending_up', label: t('navigation.progress') },
-    { id: '#history', icon: 'history', label: t('navigation.history') },
-    { id: '#library', icon: 'school', label: t('navigation.library') },
     { id: '#profile', icon: 'person', label: t('navigation.profile') },
   ];
 
@@ -39,7 +37,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activePath = '#a
     { id: '#app', icon: 'home', label: t('navigation.home') },
     { id: '#journal', icon: 'edit_note', label: t('navigation.journal') },
     { id: '#vocab-notebook', icon: 'book_5', label: t('navigation.vocab') },
-    { id: '#history', icon: 'history', label: t('navigation.history') },
+    { id: '#progress', icon: 'trending_up', label: t('navigation.progress') },
     { id: '#profile', icon: 'person', label: t('navigation.profile') },
   ];
 

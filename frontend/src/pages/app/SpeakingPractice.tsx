@@ -502,11 +502,11 @@ export const SpeakingPracticePage: React.FC = () => {
         {/* ── Actions ── */}
         <div className="flex flex-col gap-3 mt-4">
           <button
-            onClick={() => window.location.hash = journalId ? `#completion?journalId=${journalId}` : '#completion'}
+            onClick={() => window.location.hash = journalId ? `#vocab-review?journalId=${journalId}` : '#vocab-review'}
             className="w-full py-4 sketch-border bg-primary text-white font-headline font-black text-base flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-stone-800"
           >
-            Hoàn thành
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+            Tiếp theo: Ôn từ vựng
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>arrow_forward</span>
           </button>
           <button
             onClick={() => window.location.hash = journalId ? `#feedback-result?journalId=${journalId}` : '#journal'}

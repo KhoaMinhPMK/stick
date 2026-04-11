@@ -76,7 +76,7 @@ export const VocabularyReviewPage: React.FC = () => {
 
   const handleContinue = (skipped = false) => {
     trackReviewDone({ rememberedCount, skipped });
-    const target = journalId ? `#speaking-intro?journalId=${journalId}` : '#speaking-intro';
+    const target = journalId ? `#completion?journalId=${journalId}` : '#completion';
     window.location.hash = target;
   };
 

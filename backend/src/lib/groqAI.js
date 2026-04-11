@@ -45,7 +45,7 @@ CRITICAL RULES:
 2. The "enhancedText" must be natural, conversational English — not formal or academic. Write as a native speaker would casually express the same thought.
 3. For Vietnamese food names, cultural terms, or proper nouns (e.g. "bánh mì", "phở", "Tết"), keep them in the original Vietnamese form inside the English text — do NOT translate them.
 4. Keep corrections concise (max ${isPremium ? 6 : 4}). Focus on the most impactful improvements.
-5. "learningCandidates" contains 0-${isPremium ? 5 : 3} expressions worth learning, tied to the learner's meaning gaps. Each must have a candidateType:
+5. "learningCandidates" contains 0-${isPremium ? 8 : 5} expressions worth learning, tied to the learner's meaning gaps. Each must have a candidateType:
    - "new": expression the learner has never encountered — fills a clear meaning gap from this entry
    - "reinforce": expression the learner has seen/saved before but never used naturally — now there's a real context for it
    - "upgrade": expression the learner attempted but used awkwardly — a better/more natural form

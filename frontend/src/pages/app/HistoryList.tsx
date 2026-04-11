@@ -77,10 +77,14 @@ export const HistoryListPage: React.FC = () => {
   };
 
   return (
-    <AppLayout activePath="#history">
+    <AppLayout activePath="#progress">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6 md:mb-8">
+          <button onClick={() => (window.location.hash = '#progress')} className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors mb-3 group">
+            <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
+            <span className="font-headline font-bold text-xs md:text-sm">{t('progress.title', { defaultValue: 'Progress' })}</span>
+          </button>
           <h2 className="font-headline font-extrabold text-2xl md:text-3xl lg:text-4xl tracking-tight -rotate-1 origin-left">
             {t('history_list.title')}
           </h2>

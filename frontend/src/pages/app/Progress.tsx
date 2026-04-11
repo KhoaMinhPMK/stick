@@ -261,6 +261,32 @@ export const ProgressPage: React.FC = () => {
                 <span className="material-symbols-outlined text-stone-400">chevron_right</span>
               </button>
 
+              {/* Writing History CTA */}
+              <button
+                onClick={() => window.location.hash = '#history'}
+                className="w-full bg-surface-container-lowest sketch-border p-4 md:p-5 flex items-center gap-3 hover:rotate-1 transition-transform cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-3xl text-primary">history_edu</span>
+                <div className="text-left flex-1">
+                  <p className="font-headline font-bold text-sm md:text-base">Writing History</p>
+                  <p className="text-xs text-stone-500">Đọc lại các bài viết đã qua</p>
+                </div>
+                <span className="material-symbols-outlined text-stone-400">chevron_right</span>
+              </button>
+
+              {/* Achievements CTA */}
+              <button
+                onClick={() => window.location.hash = '#achievements'}
+                className="w-full bg-surface-container-lowest sketch-border p-4 md:p-5 flex items-center gap-3 hover:-rotate-1 transition-transform cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-2xl md:text-3xl text-secondary">workspace_premium</span>
+                <div className="text-left flex-1">
+                  <p className="font-headline font-bold text-sm md:text-base">{t('achievements.title', { defaultValue: 'Achievements' })}</p>
+                  <p className="text-xs text-stone-500">{t('achievements.subtitle', { unlocked: summary?.totalJournals || 0, total: 30 })}</p>
+                </div>
+                <span className="material-symbols-outlined text-stone-400">chevron_right</span>
+              </button>
+
               {/* Encouragement */}
               <div className="flex flex-col items-center text-center py-4 md:py-6 opacity-60">
                 <span className="material-symbols-outlined text-5xl md:text-6xl text-black/40 mb-3">directions_run</span>

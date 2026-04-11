@@ -349,7 +349,28 @@ async function getLexiconContextForAI(userId) {
 
     const masteredList = mastered.map(e => `"${e.expression}"`).join(', ');
 
-    return { learningItems, masteredList, activeCount: active.length, masteredCount: mastered.length };
+    // Supplement with directly-saved vocab notebook words for more accurate AI suggestions
+    let notebookMasteredStr = '';
+    let notebookLearningStr = '';
+    try {
+      const nbMastered = await safeFindManyRaw(
+        'VocabNotebookItem',
+        `userId = '${userId.replace(/'/g, '')}' AND mastery = 'mastered'`,
+        'ORDER BY updatedAt DESC LIMIT 30'
+      );
+      const nbLearning = await safeFindManyRaw(
+        'VocabNotebookItem',
+        `userId = '${userId.replace(/'/g, '')}' AND mastery = 'learning'`,
+        'ORDER BY updatedAt DESC LIMIT 20'
+      );
+      notebookMasteredStr = nbMastered.map(v => `"${v.word}"`).join(', ');
+      notebookLearningStr = nbLearning.map(v => `- "${v.word}" (notebook, in progress)`).join('\n');
+    } catch { /* non-blocking */ }
+
+    const fullMasteredList = [masteredList, notebookMasteredStr].filter(Boolean).join(', ');
+    const fullLearningItems = [learningItems, notebookLearningStr].filter(Boolean).join('\n');
+
+    return { learningItems: fullLearningItems, masteredList: fullMasteredList, activeCount: active.length, masteredCount: mastered.length };
   } catch {
     return { learningItems: '', masteredList: '', activeCount: 0, masteredCount: 0 };
   }
