@@ -25,7 +25,8 @@ export const ListeningPracticePage: React.FC = () => {
 
   useEffect(() => {
     getSettings().then(res => {
-      const s = res.settings.speechSpeed ?? 1;
+      const extra = res.settings as unknown as Record<string, unknown>;
+      const s = (extra.speechSpeed as number) ?? 1;
       speechRateRef.current = s === 0 ? 0.65 : s === 2 ? 1.1 : 0.85;
     }).catch(() => {});
     apiRequest<{ sentence?: string; content?: string }>('/ai/reading-content?topic=daily+conversation&level=intermediate')

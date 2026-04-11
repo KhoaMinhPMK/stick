@@ -17,9 +17,9 @@ export const PremiumConversionModal: React.FC<Props> = ({ onDismiss }) => {
 
   useEffect(() => {
     getActivePremiumGrant()
-      .then(g => {
-        if (g.active && g.reason === 'leaderboard_top3') {
-          setGrant(g);
+      .then(res => {
+        if (res.grant && res.grant.grantType === 'leaderboard_top3') {
+          setGrant(res.grant);
           setVisible(true);
         }
       })

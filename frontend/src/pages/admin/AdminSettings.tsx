@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { getConfigs, updateConfig } from '../../services/api/admin.api';
+import { getConfigs, updateConfig, getOpenAIKey, setOpenAIKey } from '../../services/api/admin.api';
 import type { AppConfigDTO } from '../../types/dto/admin.dto';
 
 // Known config keys with human-readable descriptions
@@ -27,12 +27,22 @@ export const AdminSettingsPage: React.FC = () => {
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
 
+  // OpenAI API Key section
+  const [apiKeyMasked, setApiKeyMasked] = useState('');
+  const [apiKeyHas, setApiKeyHas] = useState(false);
+  const [newApiKey, setNewApiKey] = useState('');
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState('');
+  const [apiKeySuccess, setApiKeySuccess] = useState(false);
+
   const loadConfigs = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await getConfigs();
+      const [res, keyRes] = await Promise.all([getConfigs(), getOpenAIKey()]);
       setConfigs(res.items);
+      setApiKeyMasked(keyRes.masked);
+      setApiKeyHas(keyRes.hasKey);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load configs');
     } finally {
@@ -71,8 +81,27 @@ export const AdminSettingsPage: React.FC = () => {
     }
   };
 
-  const handleAddConfig = async () => {
-    const trimmedKey = newKey.trim();
+  const handleSaveApiKey = async () => {
+    const trimmed = newApiKey.trim();
+    if (!trimmed) return;
+    setApiKeySaving(true);
+    setApiKeyError('');
+    setApiKeySuccess(false);
+    try {
+      const res = await setOpenAIKey(trimmed);
+      setApiKeyMasked(res.masked);
+      setApiKeyHas(true);
+      setNewApiKey('');
+      setApiKeySuccess(true);
+      setTimeout(() => setApiKeySuccess(false), 3000);
+    } catch (err: unknown) {
+      setApiKeyError(err instanceof Error ? err.message : 'Failed to save key');
+    } finally {
+      setApiKeySaving(false);
+    }
+  };
+
+  const handleAddConfig = async () => {    const trimmedKey = newKey.trim();
     const trimmedValue = newValue.trim();
     if (!trimmedKey || !trimmedValue) return;
     setSaving(true);
@@ -120,6 +149,48 @@ export const AdminSettingsPage: React.FC = () => {
       {error && (
         <div className="mb-4 p-3 bg-error-container text-on-error-container text-sm rounded-lg">{error}</div>
       )}
+
+      {/* OpenAI API Key Section */}
+      <div className="mb-6 border-2 border-black rounded-2xl p-4 bg-surface-container-lowest">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="material-symbols-outlined text-[18px] text-primary">key</span>
+          <h3 className="font-headline font-bold text-sm">OpenAI API Key</h3>
+          {apiKeyHas && (
+            <span className="text-[10px] font-headline font-bold px-2 py-0.5 bg-tertiary-container text-on-tertiary-container rounded-full">Active</span>
+          )}
+        </div>
+        <p className="text-[11px] text-outline mb-3">
+          Key dùng cho toàn bộ tính năng AI (journal feedback, TTS, quiz…). Lưu trong DB, có hiệu lực ngay không cần restart.
+        </p>
+        {apiKeyHas && apiKeyMasked && (
+          <p className="text-xs font-mono text-on-surface-variant mb-3 bg-surface-container px-3 py-1.5 rounded-lg inline-block">
+            {apiKeyMasked}
+          </p>
+        )}
+        {apiKeyError && (
+          <p className="text-xs text-error mb-2">{apiKeyError}</p>
+        )}
+        {apiKeySuccess && (
+          <p className="text-xs text-tertiary font-headline font-bold mb-2">Key đã cập nhật ✓</p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="password"
+            placeholder="sk-..."
+            value={newApiKey}
+            onChange={(e) => setNewApiKey(e.target.value)}
+            autoComplete="off"
+            className="flex-1 px-3 py-2 border-2 border-outline-variant rounded-xl text-sm bg-surface focus:border-primary focus:outline-none transition-colors font-mono"
+          />
+          <button
+            onClick={handleSaveApiKey}
+            disabled={apiKeySaving || !newApiKey.trim()}
+            className="px-4 py-2 bg-primary text-on-primary-container font-headline font-bold text-xs rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
+          >
+            {apiKeySaving ? 'Saving…' : apiKeyHas ? 'Update Key' : 'Set Key'}
+          </button>
+        </div>
+      </div>
 
       {/* Add New Config */}
       {showAdd && (

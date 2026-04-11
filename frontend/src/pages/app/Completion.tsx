@@ -9,7 +9,7 @@ import { PremiumConversionModal } from '../../components/PremiumConversionModal'
 export const CompletionPage: React.FC = () => {
   const { t } = useTranslation();
   const isPremium = usePremium();
-  const [showConversionModal, setShowConversionModal] = useState(false);
+  const [, setShowConversionModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [moodSaved, setMoodSaved] = useState(false);
   const [moodError, setMoodError] = useState<string | null>(null);

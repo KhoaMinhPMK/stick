@@ -9,7 +9,7 @@ const {
   requireAuth,
 } = require('../lib/auth');
 const { verifyIdToken, admin: firebaseAdmin } = require('../lib/firebase');
-const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio, textToSpeech, generateLessonQuiz, generateVocabQuiz } = require('../lib/openaiAI');
+const { generateJournalFeedback, generateDailyChallenge, generateGrammarQuiz, generateReadingContent, generateLessonExercises, generateLessonContent, evaluateDailyChallenge, transcribeAudio, textToSpeech, generateLessonQuiz, generateVocabQuiz, updateApiKey } = require('../lib/openaiAI');
 
 const { requireAdmin } = require('../middlewares/requireAdmin');
 
@@ -4310,6 +4310,42 @@ router.put('/admin/config/:key', requireAuth, requireAdmin, asyncHandler(async (
   }
 
   res.status(200).json({ config });
+}));
+
+// ─── Admin: OpenAI API Key ────────────────────────────
+router.get('/admin/openai-key', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const key = await getConfigValue('openai_api_key', process.env.OPENAI_API_KEY || '');
+  const hasKey = Boolean(key);
+  const masked = hasKey ? key.slice(0, 7) + '****' + key.slice(-4) : '';
+  res.status(200).json({ hasKey, masked });
+}));
+
+router.put('/admin/openai-key', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { key } = req.body || {};
+  if (!key || typeof key !== 'string' || !key.startsWith('sk-')) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid OpenAI API key (must start with sk-)' });
+  }
+  const valStr = key.trim();
+  const existing = await prisma.$queryRawUnsafe(
+    "SELECT id FROM `AppConfig` WHERE `key` = 'openai_api_key' LIMIT 1"
+  );
+  if (existing.length > 0) {
+    await prisma.$queryRawUnsafe(
+      "UPDATE `AppConfig` SET value = ?, updatedBy = ?, updatedAt = NOW() WHERE `key` = 'openai_api_key'",
+      valStr, req.authUser.id
+    );
+  } else {
+    const newId = require('crypto').randomUUID();
+    await prisma.$queryRawUnsafe(
+      "INSERT INTO `AppConfig` (id, `key`, value, updatedBy, createdAt, updatedAt) VALUES (?, 'openai_api_key', ?, ?, NOW(), NOW())",
+      newId, valStr, req.authUser.id
+    );
+  }
+  _configCache.delete('openai_api_key');
+  process.env.OPENAI_API_KEY = valStr;
+  updateApiKey(valStr);
+  const masked = valStr.slice(0, 7) + '****' + valStr.slice(-4);
+  res.status(200).json({ ok: true, masked });
 }));
 
 // ─── Admin: Lessons CRUD ─────────────────────────────

@@ -10,14 +10,14 @@ export const PremiumDayPassBanner: React.FC = () => {
 
   useEffect(() => {
     getActivePremiumGrant()
-      .then(g => { if (g.active) setGrant(g); })
+      .then(res => { if (res.grant) setGrant(res.grant); })
       .catch(() => {});
   }, []);
 
   if (!grant) return null;
 
-  const hoursLeft = grant.expiresAt
-    ? Math.max(0, Math.ceil((new Date(grant.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)))
+  const hoursLeft = grant.endsAt
+    ? Math.max(0, Math.ceil((new Date(grant.endsAt).getTime() - Date.now()) / (1000 * 60 * 60)))
     : null;
 
   return (

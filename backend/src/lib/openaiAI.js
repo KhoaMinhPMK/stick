@@ -1,10 +1,15 @@
 const OpenAI = require('openai');
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+let _openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || '',
   timeout: 30000,
   maxRetries: 2,
 });
+
+function getClient() { return _openai; }
+function updateApiKey(newKey) {
+  _openai = new OpenAI({ apiKey: newKey, timeout: 30000, maxRetries: 2 });
+}
 
 // Defaults — overridden by AppConfig values read in the route layer
 const DEFAULT_CHAT_MODEL = 'gpt-4.1';
@@ -145,7 +150,7 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: cfgModel,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -216,7 +221,7 @@ async function generateDailyChallenge(dateStr) {
 
   try {
     const seed = dateStr.replace(/-/g, '');
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_FAST_MODEL,
       messages: [
         {
@@ -262,7 +267,7 @@ async function generateGrammarQuiz(level = 'intermediate', count = 5) {
   };
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_FAST_MODEL,
       messages: [
         {
@@ -312,7 +317,7 @@ async function generateReadingContent(topic, level = 'intermediate') {
   };
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_FAST_MODEL,
       messages: [
         {
@@ -378,7 +383,7 @@ async function generateLessonExercises(opts = {}) {
   };
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_FAST_MODEL,
       messages: [
         {
@@ -476,7 +481,7 @@ async function generateLessonContent(opts = {}) {
   };
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_CHAT_MODEL,
       messages: [
         {
@@ -578,7 +583,7 @@ async function evaluateDailyChallenge({ sentence, phrase, meaning }) {
     suggestion: sentence,
   };
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_FAST_MODEL,
       messages: [
         {
@@ -628,7 +633,7 @@ async function transcribeAudio(buffer) {
   const tmpPath = path.join(os.tmpdir(), `stick_${crypto.randomUUID()}.webm`);
   fs.writeFileSync(tmpPath, buffer);
   try {
-    const response = await openai.audio.transcriptions.create({
+    const response = await getClient().audio.transcriptions.create({
       file: fs.createReadStream(tmpPath),
       model: 'whisper-1',
       language: 'en',
@@ -649,7 +654,7 @@ async function transcribeAudio(buffer) {
  * @param {string} [voice='nova'] - OpenAI voice: alloy, echo, fable, onyx, nova, shimmer
  */
 async function textToSpeech(text, voice = 'nova') {
-  const response = await openai.audio.speech.create({
+  const response = await getClient().audio.speech.create({
     model: 'tts-1-hd',
     voice,
     input: text,
@@ -685,7 +690,7 @@ async function generateLessonQuiz({ title, sections = [], vocabulary = [], level
   };
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_FAST_MODEL,
       messages: [
         {
@@ -750,7 +755,7 @@ async function generateVocabQuiz({ words = [], level = 'intermediate', count = 5
   };
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: DEFAULT_CHAT_MODEL,
       messages: [
         {
@@ -809,4 +814,5 @@ module.exports = {
   textToSpeech,
   generateLessonQuiz,
   generateVocabQuiz,
+  updateApiKey,
 };

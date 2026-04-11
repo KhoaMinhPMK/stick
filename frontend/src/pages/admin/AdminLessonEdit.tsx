@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getLesson, createLesson, updateLesson, aiGenerateLesson, aiGenerateExercises } from '../../services/api/admin.api';
-import type { AdminLessonDetailDTO, LessonContentJSON, LessonSection, LessonExercise } from '../../types/dto/admin.dto';
+import type { LessonContentJSON, LessonSection, LessonExercise } from '../../types/dto/admin.dto';
 
 const CATEGORIES = ['grammar', 'vocabulary', 'reading', 'listening', 'speaking'];
 const LEVELS = ['beginner', 'intermediate', 'advanced'];

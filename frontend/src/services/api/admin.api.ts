@@ -233,6 +233,17 @@ export function updateConfig(key: string, value: string) {
   });
 }
 
+export function getOpenAIKey() {
+  return adminRequest<{ hasKey: boolean; masked: string }>('/admin/openai-key');
+}
+
+export function setOpenAIKey(key: string) {
+  return adminRequest<{ ok: boolean; masked: string }>('/admin/openai-key', {
+    method: 'PUT',
+    body: { key },
+  });
+}
+
 // ─── Lessons ──────────────────────────
 export function getLessons(params: LessonFilterParams = {}) {
   const qs = new URLSearchParams();
