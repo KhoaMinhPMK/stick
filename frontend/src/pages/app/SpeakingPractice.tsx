@@ -39,6 +39,7 @@ export const SpeakingPracticePage: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const recAudioRef = useRef<HTMLAudioElement | null>(null);
   const enhancedTextRef = useRef('');
+  const journalContentRef = useRef('');
 
   // Load journal
   useEffect(() => {
@@ -55,6 +56,7 @@ export const SpeakingPracticePage: React.FC = () => {
         setEnhancedText(text);
         setJournalContent(j.content || '');
         enhancedTextRef.current = text;
+        journalContentRef.current = j.content || '';
       } catch {
         setLoadError('Không tải được bài viết. Vui lòng thử lại.');
       } finally {
@@ -75,7 +77,7 @@ export const SpeakingPracticePage: React.FC = () => {
 
   // ── TTS ──────────────────────────────────────────────
   const handlePlaySample = async () => {
-    if (!enhancedText) return;
+    if (!journalContent) return;
     if (isPlaying) {
       ttsAudioRef.current?.pause();
       ttsAudioRef.current = null;
@@ -84,7 +86,7 @@ export const SpeakingPracticePage: React.FC = () => {
     }
     setTtsLoading(true);
     try {
-      const base64 = await ttsSpeak(enhancedText);
+      const base64 = await ttsSpeak(journalContent);
       const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
       audio.playbackRate = playbackSpeed;
       ttsAudioRef.current = audio;
@@ -107,7 +109,7 @@ export const SpeakingPracticePage: React.FC = () => {
 
   // ── Recording ─────────────────────────────────────────
   const handlePronunciation = async (blob: Blob) => {
-    const target = enhancedTextRef.current;
+    const target = journalContentRef.current;
     if (!target) return;
     setScoringState('scoring');
     try {
@@ -284,7 +286,7 @@ export const SpeakingPracticePage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-base md:text-lg font-medium leading-relaxed text-on-surface">{enhancedText}</p>
+              <p className="text-base md:text-lg font-medium leading-relaxed text-on-surface">{journalContent}</p>
             )}
           </div>
 
