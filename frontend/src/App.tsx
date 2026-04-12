@@ -43,6 +43,7 @@ import { DailyChallengePage } from './pages/app/DailyChallenge';
 import { LeaderboardPage } from './pages/app/Leaderboard';
 import { JournalArchivePage } from './pages/app/JournalArchive';
 import { SpeakingPracticePage } from './pages/app/SpeakingPractice';
+import { SpeakingPracticeOriginPage } from './pages/app/SpeakingPracticeOrigin';
 import { AdminApp } from './pages/admin/AdminApp';
 
 function App() {
@@ -172,6 +173,8 @@ function App() {
         setCurrentView('journal-archive');
       } else if (hash === '#speaking-practice') {
         setCurrentView('speaking-practice');
+      } else if (hash === '#speaking-origin') {
+        setCurrentView('speaking-origin');
       } else {
         setCurrentView('landing');
       }
@@ -325,6 +328,8 @@ function App() {
         return <JournalArchivePage />;
       case 'speaking-practice':
         return <SpeakingPracticePage />;
+      case 'speaking-origin':
+        return <SpeakingPracticeOriginPage />;
       case 'admin':
         return <AdminApp route={adminRoute} />;
       default:

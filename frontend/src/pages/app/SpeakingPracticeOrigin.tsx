@@ -6,15 +6,15 @@ import { ttsSpeak } from '../../services/api/endpoints';
 
 type RecordState = 'idle' | 'requesting' | 'recording' | 'recorded' | 'playing' | 'error';
 
-export const SpeakingPracticePage: React.FC = () => {
+export const SpeakingPracticeOriginPage: React.FC = () => {
   const journalId = useMemo(() => {
     return new URLSearchParams(window.location.hash.split('?')[1] || '').get('journalId');
   }, []);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [enhancedText, setEnhancedText] = useState('');
   const [journalContent, setJournalContent] = useState('');
+  const [enhancedText, setEnhancedText] = useState('');
 
   // TTS
   const [isPlaying, setIsPlaying] = useState(false);
@@ -38,7 +38,6 @@ export const SpeakingPracticePage: React.FC = () => {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const recAudioRef = useRef<HTMLAudioElement | null>(null);
-  const enhancedTextRef = useRef('');
   const journalContentRef = useRef('');
 
   // Load journal
@@ -52,10 +51,8 @@ export const SpeakingPracticePage: React.FC = () => {
         const res = await apiRequest(`/journals/${journalId}`) as any;
         const j = res.journal;
         const dto = parseFeedback(j.feedback);
-        const text = dto.enhancedText || j.content || '';
-        setEnhancedText(text);
         setJournalContent(j.content || '');
-        enhancedTextRef.current = text;
+        setEnhancedText(dto.enhancedText || j.content || '');
         journalContentRef.current = j.content || '';
       } catch {
         setLoadError('Không tải được bài viết. Vui lòng thử lại.');
@@ -75,9 +72,9 @@ export const SpeakingPracticePage: React.FC = () => {
     };
   }, [recAudioUrl]);
 
-  // ── TTS ──────────────────────────────────────────────
+  // ── TTS (uses journalContent — the original text) ──────────────────────────────────────────────
   const handlePlaySample = async () => {
-    if (!enhancedText) return;
+    if (!journalContent) return;
     if (isPlaying) {
       ttsAudioRef.current?.pause();
       ttsAudioRef.current = null;
@@ -86,7 +83,7 @@ export const SpeakingPracticePage: React.FC = () => {
     }
     setTtsLoading(true);
     try {
-      const base64 = await ttsSpeak(enhancedText);
+      const base64 = await ttsSpeak(journalContent);
       const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
       audio.playbackRate = playbackSpeed;
       ttsAudioRef.current = audio;
@@ -107,9 +104,9 @@ export const SpeakingPracticePage: React.FC = () => {
     if (ttsAudioRef.current) ttsAudioRef.current.playbackRate = speed;
   };
 
-  // ── Recording ─────────────────────────────────────────
+  // ── Recording (pronunciation target = journalContent) ─────────────────────────────────────────
   const handlePronunciation = async (blob: Blob) => {
-    const target = enhancedTextRef.current;
+    const target = journalContentRef.current;
     if (!target) return;
     setScoringState('scoring');
     try {
@@ -122,7 +119,6 @@ export const SpeakingPracticePage: React.FC = () => {
       const res = await apiRequest('/pronunciation-check', {
         method: 'POST',
         body: { audio: base64, targetText: target },
-
       }) as { words: { word: string; correct: boolean; comment?: string }[] };
       setWordScores(res.words || []);
       setScoringState('done');
@@ -212,14 +208,14 @@ export const SpeakingPracticePage: React.FC = () => {
     );
   }
 
-  if (loadError || !enhancedText) {
+  if (loadError || !journalContent) {
     return (
       <AppLayout activePath="#journal">
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
           <span className="material-symbols-outlined text-5xl text-error mb-4">error_outline</span>
           <p className="font-headline font-bold text-lg mb-2">{loadError || 'Không có nội dung để luyện nói.'}</p>
           <button
-            onClick={() => window.location.hash = journalId ? `#feedback-result?journalId=${journalId}` : '#journal'}
+            onClick={() => window.location.hash = journalId ? `#speaking-practice?journalId=${journalId}` : '#journal'}
             className="mt-4 px-6 py-3 sketch-border bg-primary text-white font-headline font-bold text-sm active:scale-95 transition-all"
           >
             Quay lại
@@ -238,32 +234,32 @@ export const SpeakingPracticePage: React.FC = () => {
 
         {/* ── Back ── */}
         <button
-          onClick={() => window.location.hash = journalId ? `#feedback-result?journalId=${journalId}` : '#journal'}
+          onClick={() => window.location.hash = journalId ? `#speaking-practice?journalId=${journalId}` : '#journal'}
           className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors mb-5 group"
         >
           <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
-          <span className="font-headline font-bold text-xs">Quay lại nhận xét</span>
+          <span className="font-headline font-bold text-xs">Quay lại bản tiếng Anh</span>
         </button>
 
         {/* ── Header ── */}
         <div className="mb-6">
           <h2 className="font-headline font-black text-2xl md:text-3xl tracking-tight -rotate-1 origin-left flex items-center gap-3">
-            <span className="material-symbols-outlined text-2xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
-            Luyện nói
+            <span className="material-symbols-outlined text-2xl text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>record_voice_over</span>
+            Luyện nói — Bài gốc
           </h2>
           <p className="text-sm text-on-surface-variant mt-1.5">
-            Đọc to đoạn bên dưới, AI sẽ kiểm tra phát âm từng từ.
+            Bây giờ hãy đọc bài gốc của bạn. AI sẽ kiểm tra phát âm từng từ.
           </p>
         </div>
 
         {/* ── Step 1: Nghe mẫu ── */}
         <div className="sketch-card p-5 md:p-6 mb-4">
-          <p className="text-[10px] font-headline font-black uppercase tracking-widest text-primary mb-3 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-black shrink-0">1</span>
+          <p className="text-[10px] font-headline font-black uppercase tracking-widest text-secondary mb-3 flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-secondary text-white flex items-center justify-center text-[10px] font-black shrink-0">1</span>
             Nghe mẫu trước
           </p>
 
-          {/* Text display */}
+          {/* Text display — shows journalContent (original) */}
           <div className="p-4 bg-surface-container-low rounded-xl border-2 border-dashed border-black/20 mb-4">
             {scoringState === 'done' && wordScores.length > 0 ? (
               <div className="flex flex-wrap gap-x-1 gap-y-1 text-base md:text-lg leading-relaxed">
@@ -287,7 +283,7 @@ export const SpeakingPracticePage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-base md:text-lg font-medium leading-relaxed text-on-surface">{enhancedText}</p>
+              <p className="text-base md:text-lg font-medium leading-relaxed text-on-surface">{journalContent}</p>
             )}
           </div>
 
@@ -296,31 +292,33 @@ export const SpeakingPracticePage: React.FC = () => {
             <button
               onClick={handlePlaySample}
               disabled={ttsLoading}
-              className="flex items-center gap-2 px-4 py-2.5 sketch-border bg-primary text-white font-headline font-bold text-sm active:scale-95 transition-all disabled:opacity-50"
+              className={`flex items-center gap-2 px-4 py-2.5 sketch-border font-headline font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
+                isPlaying
+                  ? 'bg-secondary text-white'
+                  : 'bg-surface hover:bg-secondary/10 text-on-surface'
+              }`}
             >
               {ttsLoading ? (
-                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-              ) : isPlaying ? (
-                <span className="material-symbols-outlined text-sm">stop</span>
+                <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
               ) : (
-                <span className="material-symbols-outlined text-sm">volume_up</span>
+                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {isPlaying ? 'stop' : 'volume_up'}
+                </span>
               )}
               {isPlaying ? 'Dừng' : 'Nghe mẫu'}
             </button>
 
             {/* Speed selector */}
-            <div className="flex gap-1 ml-auto">
-              {[0.75, 1, 1.25, 1.5].map(spd => (
+            <div className="flex items-center gap-1">
+              {[0.75, 1, 1.25].map(speed => (
                 <button
-                  key={spd}
-                  onClick={() => handleSpeedChange(spd)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-headline font-bold transition-all ${
-                    playbackSpeed === spd
-                      ? 'bg-black text-white'
-                      : 'bg-surface-container border border-black/20 hover:border-black/50'
+                  key={speed}
+                  onClick={() => handleSpeedChange(speed)}
+                  className={`px-2.5 py-1.5 text-xs font-headline font-bold sketch-border transition-all active:scale-95 ${
+                    playbackSpeed === speed ? 'bg-secondary text-white' : 'bg-surface text-on-surface-variant hover:bg-secondary/10'
                   }`}
                 >
-                  {spd}x
+                  {speed}×
                 </button>
               ))}
             </div>
@@ -328,16 +326,16 @@ export const SpeakingPracticePage: React.FC = () => {
         </div>
 
         {/* ── Step 2: Ghi âm ── */}
-        <div className="sketch-card p-5 md:p-6 mb-4 bg-tertiary-container/10">
-          <p className="text-[10px] font-headline font-black uppercase tracking-widest text-tertiary mb-4 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-tertiary text-white flex items-center justify-center text-[10px] font-black shrink-0">2</span>
+        <div className="sketch-card p-5 md:p-6 mb-4 bg-secondary-container/10">
+          <p className="text-[10px] font-headline font-black uppercase tracking-widest text-secondary mb-4 flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-secondary text-white flex items-center justify-center text-[10px] font-black shrink-0">2</span>
             Đọc to và ghi âm
           </p>
 
-          {/* Original text hint — shows user's original writing */}
-          {journalContent && (
+          {/* Enhanced text hint — shows AI version for comparison */}
+          {enhancedText && (
             <p className="text-xs text-on-surface-variant bg-surface-container rounded-lg px-3 py-2 mb-4 italic">
-              Bài gốc: "{journalContent.slice(0, 80)}{journalContent.length > 80 ? '\u2026' : ''}"
+              Bản AI: "{enhancedText.slice(0, 80)}{enhancedText.length > 80 ? '\u2026' : ''}"
             </p>
           )}
 
@@ -359,11 +357,11 @@ export const SpeakingPracticePage: React.FC = () => {
               className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full border-4 flex items-center justify-center transition-all active:scale-90 disabled:opacity-50 mb-4 ${
                 isRecording
                   ? 'border-error bg-error/10 animate-pulse'
-                  : 'border-primary bg-surface hover:bg-primary/10'
+                  : 'border-secondary bg-surface hover:bg-secondary/10'
               }`}
             >
               <span
-                className={`material-symbols-outlined text-4xl md:text-5xl ${isRecording ? 'text-error' : 'text-primary'}`}
+                className={`material-symbols-outlined text-4xl md:text-5xl ${isRecording ? 'text-error' : 'text-secondary'}`}
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 {recordState === 'requesting'
@@ -405,7 +403,7 @@ export const SpeakingPracticePage: React.FC = () => {
             )}
             {scoringState === 'scoring' && (
               <div className="flex items-center gap-2 mt-2">
-                <span className="material-symbols-outlined text-sm animate-spin text-primary">psychology</span>
+                <span className="material-symbols-outlined text-sm animate-spin text-secondary">psychology</span>
                 <span className="text-sm text-on-surface-variant">AI đang phân tích phát âm...</span>
               </div>
             )}
@@ -492,7 +490,7 @@ export const SpeakingPracticePage: React.FC = () => {
             {/* Try again CTA */}
             <button
               onClick={handleRetry}
-              className="mt-4 flex items-center gap-2 text-xs font-headline font-bold text-primary hover:underline"
+              className="mt-4 flex items-center gap-2 text-xs font-headline font-bold text-secondary hover:underline"
             >
               <span className="material-symbols-outlined text-sm">replay</span>
               Thử lại từ đầu
@@ -502,14 +500,14 @@ export const SpeakingPracticePage: React.FC = () => {
 
       </div>
 
-      {/* Sticky Next footer */}
+      {/* Sticky Next footer — goes to vocab-review */}
       <footer className="fixed bottom-0 left-0 md:left-[224px] lg:left-[256px] right-0 h-20 md:h-24 bg-surface-container-highest/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 lg:px-12 z-30 border-t-2 border-black/5">
         <div className="flex flex-col">
           <p className="text-[10px] md:text-xs font-bold text-on-surface-variant uppercase tracking-widest">Luyện phát âm</p>
-          <p className="font-headline font-bold text-sm md:text-base">English version</p>
+          <p className="font-headline font-bold text-sm md:text-base">Bài gốc</p>
         </div>
         <button
-          onClick={() => window.location.hash = journalId ? `#speaking-origin?journalId=${journalId}` : '#speaking-origin'}
+          onClick={() => window.location.hash = journalId ? `#vocab-review?journalId=${journalId}` : '#vocab-review'}
           className="px-6 md:px-10 py-3 md:py-4 bg-black text-white rounded-full font-headline font-black text-sm md:text-base flex items-center gap-2 md:gap-3 hover:scale-105 transition-transform active:scale-95 sketch-border"
         >
           Tiếp theo
